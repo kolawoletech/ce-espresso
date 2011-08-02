@@ -1,0 +1,233 @@
+
+#===============================
+# espresso
+#===============================
+#
+# Makefile for plugins
+#
+
+include ../make.sys
+include plugins_list
+W90=wannier90-latest
+PLUMED=PLUMED-latest
+GIPAW=qe-gipaw-latest
+#
+# MAIN target
+#
+
+EXTLIBS=liblapack libblas libiotk
+
+##########################################################
+# GIPAW
+###########################################################
+gipaw:  uncompress-gipaw configure-gipaw
+	if test -d ../GIPAW; then \
+	cd ../GIPAW; $(MAKE) all; cd ../bin; ln -fs ../GIPAW/bin/gipaw.x . ; fi
+	touch make-gipaw
+uncompress-gipaw: touch-dummy
+	@(if test ! -e ../archive/qe-gipaw-latest.tar.gz && test ! -d ../GIPAW ; then \
+	wget -O ../archive/qe-gipaw-latest.tar.gz http://qe-forge.org/frs/download.php/166/qe-gipaw-latest.tar.gz > /dev/null 2>&1; \
+	if test "`echo $$?`" -ne "0" ; then \
+	curl -o ../archive/qe-gipaw-latest.tar.gz http://qe-forge.org/frs/download.php/166/qe-gipaw-latest.tar.gz > /dev/null 2>&1; \
+	if test "`echo $$?`" -ne "0" ; then \
+	echo "unable to download qe-gipaw. Test whether curl or wget is installed in your computer." ; \
+	fi ; fi ; fi) 
+	if test ! -d ../GIPAW; then \
+	(gzip -dc ../archive/qe-gipaw-latest.tar.gz | (cd ../ ; tar -xvf -)) ; \
+	(cd ../ ; ln -s qe-gipaw* GIPAW) ; fi 
+	touch uncompress-gipaw
+configure-gipaw: touch-dummy
+	cd ../GIPAW ; \
+	./configure --with-qe-source=${TOPDIR}
+	touch ./configure-gipaw
+###########################################################
+# wannier90
+###########################################################
+
+w90: test-w90 uncompress-w90 configure-w90
+	if test -d ../W90; then \
+	cd ../W90; $(MAKE) all; cd ../bin; ln -fs ../W90/wannier90.x . ; fi
+#	-(cd ../bin; ln -fs ../W90/wannier90.x .)
+	touch make-w90
+test-w90: touch-dummy
+	@(if test ! -e ../archive/$(W90).tar.gz && test ! -d ../W90; then \
+	echo "The release contains no Wannier90 package"; fi) 
+	touch ./test-w90
+uncompress-w90: touch-dummy
+	if (test -e archive/$(W90).tar.gz) || (test ! -d ../W90); then \
+	( gzip -dc ../archive/$(W90).tar.gz | (cd ../; tar -xvf -)) ; \
+	( cd ../; ln -s wannier90* W90; cd install) ; fi
+	touch ./uncompress-w90
+configure-w90: touch-dummy
+	cd ../W90 ; \
+	if (test -e ../install/make_wannier90.sys) || (test -d ../W90); then \
+	(cp ../install/make_wannier90.sys ../W90/make.sys); fi 
+	touch ./configure-w90
+###########################################################
+# WANT
+###########################################################
+
+want: extlibs uncompress-want configure-want
+	if test -d ../WANT; then \
+	cd ../WANT; $(MAKE) all; fi
+#	- ( cd ../bin ; ln -sf ../WANT/bin/* . ) 
+	touch ./make-want
+uncompress-want: touch-dummy
+	@(if test ! -e ../archive/$(WANT).tar.gz && test ! -d ../WANT ; then \
+	wget -O ../archive/$(WANT).tar.gz $(WANT_URL) > /dev/null 2>&1; \
+	if test "`echo $$?`" -ne "0" ; then \
+	curl -o ../archive/$(WANT) $(WANT_URL) > /dev/null 2>&1; \
+	if test "`echo $$?`" -ne "0" ; then \
+	echo "unable to download want. Test whether curl or wget is installed in your computer." ; \
+	fi ; fi ; fi) 
+	if test ! -d ../WANT; then \
+	(gzip -dc ../archive/$(WANT).tar.gz | (cd ../ ; tar -xvf -)) ; \
+	(cd ../ ; ln -s want* WANT) ; fi 
+	touch uncompress-want
+
+configure-want: touch-dummy
+	cd ../WANT ; \
+	./conf/configure \
+	--with-external-iotk \
+	IOTK_LIBS="-L../../S3DE/iotk/src -liotk" \
+	IOTK_INCLUDE="$(MOD_FLAG)../../S3DE/iotk/src" \
+	CC="$(CC)" \
+	F90="$(F90)" \
+	MPIF90="$(MPIF90)" \
+	F90FLAGS="$(F90FLAGS) $($PRE_FDFLAGS) $(FDFLAGS) $(IFLAGS) $(MODFLAGS)" \
+	F77="$(F77)" \
+	FFLAGS="$(FFLAGS)" \
+	FFLAGS_NOOPT="$(FFLAGS_NOOPT)" \
+	LD="$(LD)" \
+	LDFLAGS="$(LDFLAGS)" \
+	AR="$(AR)" \
+	ARFLAGS="$(ARFLAGS)" \
+	RANLIB="$(RANLIB)" \
+	DFLAGS="$(DFLAGS)" \
+	FDFLAGS="$(DFLAGS)" \
+	LAPACK_LIBS="$(LAPACK_LIBS)" \
+	BLAS_LIBS="$(BLAS_LIBS)" \
+	FFT_LIBS="$(FFT_LIBS)" 
+	touch ./configure-want
+
+###################################################
+# YAMBO
+###################################################
+
+yambo: extlibs uncompress-yambo configure-yambo
+	if test -d ../YAMBO; then \
+	cd ../YAMBO; $(MAKE) all; fi
+	touch ./make-yambo
+uncompress-yambo: touch-dummy
+	@(if test ! -e ../archive/$(YAMBO).tar.gz && test ! -d ../YAMBO ; then \
+	wget -O ../archive/$(YAMBO).tar.gz $(YAMBO_URL) > /dev/null 2>&1; \
+	if test "`echo $$?`" -ne "0" ; then \
+	curl -o ../archive/$(YAMBO) $(YAMBO_URL) > /dev/null 2>&1; \
+	if test "`echo $$?`" -ne "0" ; then \
+	echo "unable to download yambo. Test whether curl or wget is installed in your computer." ; \
+	fi ; fi ; fi) 
+	if test ! -d ../YAMBO; then \
+	(gzip -dc ../archive/$(YAMBO).tar.gz | (cd ../ ; tar -xvf -)) ; \
+	(cd ../ ; ln -s yambo* YAMBO) ; fi 
+	touch uncompress-yambo
+
+configure-yambo: touch-dummy
+	cd ../YAMBO ; \
+	./configure --with-blas="$(BLAS_LIBS)" \
+	--with-lapack="$(LAPACK_LIBS)" \
+	--with-iotk="$(TOPDIR)/iotk" \
+	PFC="$(MPIF90)" \
+	FC="$(LD)" \
+	FCFLAGS="$(F90FLAGS) $(FDFLAGS) $(IFLAGS) $(MODFLAGS) $(FFLAGS_NOMAIN)"
+	F77="$(F77)" \
+	FFLAGS="$(FFLAGS)"
+	AR="$(AR)" \
+	ARFLAGS="$(ARFLAGS)" 
+	touch ./configure-yambo
+touch-dummy:
+	$(dummy-variable)
+###########################################################
+# plumed
+###########################################################
+
+plumed: test-plumed uncompress-plumed patch-plumed
+	if test -d ../PLUMED; then \
+	cd ../; $(MAKE) pw; $(MAKE) cp; fi
+	touch make-plumed
+test-plumed: touch-dummy
+	@(if test ! -e ../archive/$(PLUMED).tar.gz && test ! -d ../PLUMED; then \
+	echo "The release contains no PLUMED package"; fi) 
+	touch ./test-plumed
+uncompress-plumed: touch-dummy
+	if (test -e archive/$(PLUMED).tar.gz) || (test ! -d ../PLUMED); then \
+	( gzip -dc ../archive/$(PLUMED).tar.gz | (cd ../; tar -xvf -)) ; \
+	( mv ../PLUMED-latest ../PLUMED) ; fi
+	touch ./uncompress-plumed
+patch-plumed: touch-dummy
+	if test -d ../PLUMED; then \
+	(cd ../PLUMED ; export plumedir="`pwd`" ; \
+	cp  patches/plumedpatch_qespresso.sh ../ ; \
+	cd ../ ; ./plumedpatch_qespresso.sh -patch) ; fi	
+	touch ./patch-plumed
+
+##################################
+# extlibs
+###################################
+extlibs:
+	test -n "$(EXTLIBS)" && ( cd .. ; $(MAKE) $(MFLAGS) $(EXTLIBS) || exit 1) || :
+###################################
+# cleaning
+###################################
+# each lib independently
+gipaw_clean:
+	if test -d ../GIPAW; then (cd ../GIPAW; \
+	$(MAKE) clean); fi
+	rm -f ../bin/gipaw.x
+	rm -rf ./make-gipaw 
+gipaw_veryclean: gipaw_clean
+	if test -d ../GIPAW; then (cd ../GIPAW; \
+	rm -f config.log config.status ); fi
+	rm -rf ./configure-gipaw
+w90_clean:
+	if test -d ../W90; then (cd ../W90; \
+	$(MAKE) veryclean); fi
+	rm -f ../bin/wannier90.x
+	rm -rf ./make-w90 ./configure-w90
+w90_veryclean: w90_clean
+	if test -d ../W90; then (rm -R -f ../W90); fi
+	if test -d ../wannier90*; then (rm -R -f ../wannier90*); fi
+	rm -f ../bin/wannier90.x
+	rm -rf ./make-w90 ./configure-w90 ./uncompress-w90
+want_clean:
+	if test -d ../WANT; then (cd ../WANT; \
+	$(MAKE) clean); fi
+	- rm -rf ./make-want ./configure-want
+
+want_veryclean: want_clean
+	if test -d ../WANT; then (rm -R -f ../WANT); fi
+	if test -d ../want*; then (rm -R -f ../want*); fi
+	- rm -rf ./make-want ./configure-want ./uncompress-want
+yambo_clean:
+	if test -d ../YAMBO; then (cd ../YAMBO; \
+	$(MAKE) clean); fi
+	- rm -rf ./make-yambo ./configure-yambo
+
+yambo_veryclean: yambo_clean
+	if test -d ../YAMBO; then (rm -R -f ../YAMBO); fi
+	if test -d ../yambo*; then (rm -R -f ../yambo*); fi
+	- rm -rf ./make-yambo ./configure-yambo ./uncompress-yambo
+plumed_clean:
+	if test -d ../PLUMED; then (cd ../PLUMED; \
+	export plumedir="`pwd`" ; \
+	cd ../ ; ./plumedpatch_qespresso.sh -revert); fi
+	cd ../PW ; $(MAKE) clean; cd ../CPV ; $(MAKE) clean
+	rm -rf ./make-plumed ./patch-plumed
+plumed_veryclean: plumed_clean
+	if test -d ../PLUMED; then (rm -R -f ../PLUMED); fi
+	rm -rf ./uncompress-plumed
+
+##########################################################
+# general cleaning
+##########################################################
+clean: w90_clean want_clean yambo_clean plumed_clean
+veryclean: w90_veryclean want_veryclean yambo_veryclean plumed_veryclean

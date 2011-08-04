@@ -39,7 +39,7 @@ SUBROUTINE errore( calling_routine, message, ierr )
   INTEGER,          INTENT(IN) :: ierr
     ! the error flag
   INTEGER                      :: mpime, mpierr
-    ! the task id 
+    ! the task id  
   !
   !
   IF ( ierr <= 0 ) RETURN

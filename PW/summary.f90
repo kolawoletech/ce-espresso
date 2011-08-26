@@ -14,7 +14,7 @@ SUBROUTINE summary()
   !    the input file and from the setup routine, before starting the
   !    self-consistent calculation.
   !
-  !    if iverbosity = 0 only a partial summary is done.
+  !    if iverbosity < 1 only a partial summary is done.
   !
   USE io_global,       ONLY : stdout
   USE kinds,           ONLY : DP
@@ -240,7 +240,7 @@ SUBROUTINE summary()
   !
   !  output of starting magnetization
   !
-  IF (iverbosity.EQ.1) THEN
+  IF (iverbosity > 0) THEN
      !
      !   allocate work space
      !
@@ -282,7 +282,7 @@ SUBROUTINE summary()
      WRITE( stdout, '(/5x,"number of k points=",i6)') nkstot
 
   ENDIF
-  IF (iverbosity==1 .OR. nkstot < 100 ) THEN
+  IF ( iverbosity > 0 .OR. nkstot < 100 ) THEN
      WRITE( stdout, '(23x,"cart. coord. in units 2pi/alat")')
      DO ik = 1, nkstot
         WRITE( stdout, '(8x,"k(",i5,") = (",3f12.7,"), wk =",f12.7)') ik, &
@@ -292,7 +292,7 @@ SUBROUTINE summary()
      WRITE( stdout, '(/5x,a)') &
      "Number of k-points >= 100: set verbosity='high' to print them."
   ENDIF
-  IF (iverbosity.EQ.1) THEN
+  IF ( iverbosity > 0 ) THEN
      WRITE( stdout, '(/23x,"cryst. coord.")')
      DO ik = 1, nkstot
         DO ipol = 1, 3
@@ -438,7 +438,8 @@ SUBROUTINE print_symmetries ( iverbosity, noncolin, domag )
   !
   USE kinds,           ONLY : dp
   USE io_global,       ONLY : stdout 
-  USE symm_base,       ONLY : nsym, invsym, s, sr, t_rev, ftau, sname
+  USE symm_base,       ONLY : nsym, nsym_ns, nsym_na, invsym, s, sr, &
+                              t_rev, ftau, sname
   USE rap_point_group, ONLY : code_group, nclass, nelem, elem, &
        which_irr, char_mat, name_rap, name_class, gname, ir_ram
   USE rap_point_group_so, ONLY : nrap, nelem_so, elem_so, has_e, &
@@ -463,12 +464,30 @@ SUBROUTINE print_symmetries ( iverbosity, noncolin, domag )
      WRITE( stdout, '(/5x,"No symmetry found")')
   ELSE
      IF (invsym) THEN
-        WRITE( stdout, '(/5x,i2," Sym.Ops. (with inversion)",/)') nsym
+        IF ( nsym_ns > 0 ) THEN
+           WRITE( stdout, '(/5x,i2," Sym. Ops., with inversion, found ", &
+                    &  "(",i2," have fractional translation)")' ) nsym, nsym_ns
+        ELSE 
+           WRITE( stdout, '(/5x,i2," Sym. Ops., with inversion, found")' )&
+                         nsym
+        END IF
      ELSE
-        WRITE( stdout, '(/5x,i2," Sym.Ops. (no inversion)",/)') nsym
+        IF ( nsym_ns > 0 ) THEN
+           WRITE( stdout, '(/5x,i2," Sym. Ops. (no inversion) found ",&
+                    &  "(",i2," have fractional translation)")' ) nsym, nsym_ns
+        ELSE
+           WRITE( stdout,'(/5x,i2," Sym. Ops. (no inversion) found")' ) nsym
+        END IF
      ENDIF
   ENDIF
-  IF (iverbosity == 1) THEN
+  IF ( nsym_na > 0 ) THEN 
+      WRITE( stdout, '(10x,"(note: ",i2," additional sym.ops. were found ", &
+                   &   "but ignored",/,10x," their fractional transations ", &
+                   &   "are incommensurate with FFT grid)",/)') nsym_na
+  ELSE
+      WRITE( stdout, '(/)' )
+  END IF
+  IF ( iverbosity > 0 ) THEN
      WRITE( stdout, '(36x,"s",24x,"frac. trans.")')
      nsym_is=0
      DO isym = 1, nsym

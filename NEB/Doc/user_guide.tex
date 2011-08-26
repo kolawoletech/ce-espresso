@@ -1,0 +1,429 @@
+\documentclass[12pt,a4paper]{article}
+\def\version{4.3.2}
+\def\qe{{\sc Quantum ESPRESSO}}
+\def\neb{{\sc NEB}}
+\usepackage{html}
+
+% BEWARE: don't revert from graphicx for epsfig, because latex2html
+% doesn't handle epsfig commands !!!
+\usepackage{graphicx}
+
+\textwidth = 17cm
+\textheight = 24cm
+\topmargin =-1 cm
+\oddsidemargin = 0 cm
+
+\def\pwx{\texttt{pw.x}}
+\def\cpx{\texttt{cp.x}}
+\def\phx{\texttt{ph.x}}
+\def\nebx{\texttt{neb.x}}
+\def\configure{\texttt{configure}}
+\def\PWscf{\texttt{PWscf}}
+\def\PHonon{\texttt{PHonon}}
+\def\CP{\texttt{CP}}
+\def\PostProc{\texttt{PostProc}}
+\def\make{\texttt{make}}
+
+\begin{document} 
+\author{}
+\date{}
+
+\def\qeImage{../../Doc/quantum_espresso.pdf}
+\def\democritosImage{../../Doc/democritos.pdf}
+
+\begin{htmlonly}
+\def\qeImage{../../Doc/quantum_espresso.png}
+\def\democritosImage{../../Doc/democritos.png}
+\end{htmlonly}
+
+\title{
+  \includegraphics[width=5cm]{\qeImage} \hskip 2cm
+  \includegraphics[width=6cm]{\democritosImage}\\
+  \vskip 1cm
+  % title
+  \Huge User's Guide for \neb \ \smallskip
+  \Large (version \version)
+}
+%\endhtmlonly
+
+%\latexonly
+%\title{
+% \epsfig{figure=quantum_espresso.png,width=5cm}\hskip 2cm
+% \epsfig{figure=democritos.png,width=6cm}\vskip 1cm
+%  % title
+%  \Huge User's Guide for \qe \smallskip
+%  \Large (version \version)
+%}
+%\endlatexonly
+
+\maketitle
+
+\tableofcontents
+
+\section{Introduction}
+
+This guide covers the installation and usage of \neb \ (opEn-Source 
+Package for energy barriers and reaction pathway calculations through the
+Nudged Elastic Band method
+, version \version.
+
+\neb \ is part of the \qe \ distribution and can not be compiled nor used independently.
+
+\neb \ calculates reaction pathways and energy barriers 
+using the Nudged Elastic Band (NEB) and Fourier String Method Dynamics 
+(SMD) methods. Note that these calculations are no longer performed
+by the \pwx\ executable of \PWscf. Also note that NEB with Car-Parrinello
+Molecular Dynamics is currently not implemented.
+
+The original \qe \ implementation of the Nudged Elastic Band and 
+String Method Dynamics was developed by Carlo Sbraccia (Princeton).
+
+\neb\ is free software, released under the 
+GNU General Public License. \\ See
+\texttt{http://www.gnu.org/licenses/old-licenses/gpl-2.0.txt}, 
+or the file License in the distribution).
+    
+We shall greatly appreciate if scientific work done using this code will 
+contain an explicit acknowledgment and the following reference:
+\begin{quote}
+P. Giannozzi, S. Baroni, N. Bonini, M. Calandra, R. Car, C. Cavazzoni,
+D. Ceresoli, G. L. Chiarotti, M. Cococcioni, I. Dabo, A. Dal Corso,
+S. Fabris, G. Fratesi, S. de Gironcoli, R. Gebauer, U. Gerstmann,
+C. Gougoussis, A. Kokalj, M. Lazzeri, L. Martin-Samos, N. Marzari,
+F. Mauri, R. Mazzarello, S. Paolini, A. Pasquarello, L. Paulatto,
+C. Sbraccia, S. Scandolo, G. Sclauzero, A. P. Seitsonen, A. Smogunov,
+P. Umari, R. M. Wentzcovitch, J.Phys.:Condens.Matter 21, 395502 (2009),
+http://arxiv.org/abs/0906.2569
+\end{quote}
+
+All trademarks mentioned in this guide belong to their respective owners.
+
+\section{Installation}
+
+\subsection{Download}
+ 
+is automatically downloaded from \texttt{http://qe-forge.org/frs/?group\_id=37}
+
+
+\subsection{Prerequisites}
+\label{Sec:Installation}
+
+To install \neb\ from source, you need first of all a minimal Unix 
+environment and the \qe \ distribution.
+
+\subsection{\configure}
+
+For instruction on how to install the \qe\ source package please refer to
+the \qe \ general documentation (user\_guide) that is available at
+\begin{verbatim}
+http://www.quantum-espresso.org/wiki/index.php/Main_Page. 
+\end{verbatim}
+
+After the correct installation of \qe \, the installation and compilation of \neb \
+can be done just typing \texttt{make neb} from the main espresso directory.
+
+\subsection{Compilation}
+
+Typing \texttt{make neb} will produce the following codes in \texttt{NEB/src}:
+\begin{itemize}
+\item \nebx: calculates reaction barriers and pathways using NEB.
+\item \texttt{path\_int.x}: used by utility \texttt{path\_int.sh}
+  that generates, starting from a path (a set of images), a new one with a 
+  different number of images. The initial and final points of the new
+ path can differ from those in the original one. 
+\end{itemize}
+
+Symlinks to executable programs will be placed in the
+\texttt{bin/} subdirectory.
+
+\subsection{Running examples}
+\label{SubSec:Examples}
+As a final check that compilation was successful, you may want to run some or
+all of the examples. You should first of all ensure that you have downloaded 
+
+To run the examples, you should follow this procedure:
+\begin{enumerate}   
+\item Go to the \texttt{examples/} directory from the main \qe \ directory and edit the 
+  \texttt{environment\_variables} file, setting the following variables as needed: 
+\begin{quote}
+   BIN\_DIR: directory where executables reside\\
+   PSEUDO\_DIR: directory where pseudopotential files reside\\
+   TMP\_DIR: directory to be used as temporary storage area
+\end{quote}
+\end{enumerate}
+The default values of BIN\_DIR and PSEUDO\_DIR should be fine, 
+unless you have installed things in nonstandard places. TMP\_DIR 
+must be a directory where you have read and write access to, with 
+enough available space to host the temporary files produced by the 
+example runs, and possibly offering high I/O performance (i.e., don't 
+use an NFS-mounted directory). NOTA BENE: do not use a
+directory containing other data, the examples will clean it!
+If you have compiled the parallel version of \qe\ (this
+is the default if parallel libraries are detected), you will usually
+have to specify a driver program (such as \texttt{mpirun} or \texttt{mpiexec}) 
+and the number of processors: see Sec.\ref{SubSec:para} for
+details. In order to do that, edit again the \texttt{environment\_variables} 
+file
+and set the PARA\_PREFIX and PARA\_POSTFIX variables as needed. 
+Parallel executables will be run by a command like this: 
+\begin{verbatim}
+      $PARA_PREFIX neb.x $PARA_POSTFIX -inp file.in > file.out
+\end{verbatim}
+For example, if the command line is like this (as for an IBM SP):
+\begin{verbatim}
+      poe neb.x -procs 4 -inp file.in > file.out
+\end{verbatim}
+you should set PARA\_PREFIX="poe", PARA\_POSTFIX="-procs
+4". Furthermore, if your machine does not support interactive use, you
+must run the commands specified below through the batch queuing
+system installed on that machine. Ask your system administrator for
+instructions. 
+
+Go to NEB/examples and execute:
+\begin{verbatim}
+      ./run_example
+\end{verbatim}
+This will create a subdirectory results, containing the input and
+output files generated by the calculation.
+
+The \texttt{reference/} subdirectory contains
+verified output files, that you can check your results against. They
+were generated on a Linux PC using the Intel compiler. On different
+architectures the precise numbers could be slightly different, in
+particular if different FFT dimensions are automatically selected. For
+this reason, a plain diff of your results against the reference data
+doesn't work, or at least, it requires human inspection of the
+results. 
+
+\section{Parallelism}
+\label{Sec:para}
+
+\neb \ uses \texttt{PWscf} as energy and forces engine. It can take advantage from the two 
+different parallelization paradigms currently implemented inside \qe. For a detailed
+information about \qe \ parallization, please refer to the \qe \ general documentation.
+All the specific \texttt{PWscf}-parallelization options holds.
+
+As \neb \ makes several energy and forces evaluations ("images") for each neb cycle 
+it is possible to distribute them through Message-Passin (MPI).
+
+\subsection{Running on parallel machines}
+\label{SubSec:para}
+
+Parallel execution is strongly system- and installation-dependent. 
+Typically one has to specify:
+\begin{enumerate}
+\item a launcher program (not always needed), 
+such as \texttt{poe}, \texttt{mpirun}, \texttt{mpiexec},
+  with the  appropriate options (if any);
+\item the number of processors, typically as an option to the launcher
+  program, but in some cases to be specified after the name of the
+  program to be
+  executed; 
+\item the program to be executed, with the proper path if needed: for
+  instance, \texttt{./neb.x}, or \texttt{\$HOME/bin/neb.x}, or
+  whatever applies; 
+\item other \texttt{PWscf}-specific parallelization options, to be
+  read and interpreted by the running code; 
+\item the number of ``images'' used by NEB.
+\end{enumerate}
+Items 1) and 2) are machine- and installation-dependent, and may be 
+different for interactive and batch execution. Note that large
+parallel machines are  often configured so as to disallow interactive
+execution: if in doubt, ask your system administrator.
+Item 3) also depend on your specific configuration (shell, execution
+path, etc). 
+Item 4) is optional but may be important: see the following section
+for the meaning of the various options.
+
+For illustration, here is how to run \texttt{neb.x} \ on 16 processors partitioned into
+4 images (4 processors each), for a path containing at least 4 points.
+
+IBM SP machines, batch:
+\begin{verbatim}
+   neb.x -nimages 4 -inp input
+\end{verbatim}
+
+\subsection{Parallelization levels}
+
+Data structures are distributed across processors.
+Processors are organized in a hierarchy of groups, 
+which are identified by different MPI communicators level.
+The groups hierarchy is as follow:
+\begin{verbatim}
+  world - images - PWscf hierarchy
+\end{verbatim}
+
+{\bf world}: is the group of all processors (MPI\_COMM\_WORLD).
+
+{\bf images}: Processors can then be divided into different "images",
+corresponding to a point in configuration space (i.e. to
+a different set of atomic positions).
+
+{\bf Communications}:
+Images is loosely coupled and processors communicate
+between different images only once in a while, whereas
+processors within each image are tightly coupled and communications
+are significant. 
+
+Default value is: \texttt{-nimage 1} ; 
+
+\newpage
+
+\section{Using \neb}
+
+{\bf Reminder 1:} NEB calculations are no longer performed by \pwx.
+In order to perform a NEB calculation, you should compile
+\texttt{NEB/neb.x} (command \texttt{make neb}). 
+
+\noindent {\bf  Reminder 2:} \nebx\ does not read from standard input.
+You cannot use input redirection, as in \texttt{neb.x < neb.in ...}.
+
+A NEB calculation can be run in two different ways:
+\begin{enumerate}
+\item by reading a single input file, to be specified using command-line 
+options \texttt{neb.x -inp} or \texttt{neb.x -input};
+\item by specifying the number $N$ of images (i.e. points in the 
+configuration space), using command-line option 
+\texttt{neb.x -input\_images N}, and providing input data in 
+a \texttt{neb.dat} file and in files \texttt{pw\_X.in}, $X=1,...,N$.
+\end{enumerate}
+
+For case 1) the input file contains KEYWORDS (see below for format 
+specifications). 
+These KEYWORDS enable the code to distinguish which part of the file 
+contains NEB-specific data and which parts contains input data for the
+energy and force computational engine (currently only PW).
+After the parsing, different files are generated: \texttt{neb.dat}, with
+NEB-specific input data, and a set of PWscf input files 
+\texttt{pw\_1.in},..,\texttt{pw\_N.in} PWscf input files, one for each
+set of atomic position. All options for a single SCF calculation apply.
+
+The general structure of the file to be parsed is:
+
+\begin{verbatim}
+BEGIN
+BEGIN_PATH_INPUT
+~... neb specific namelists and cards
+END_PATH_INPUT
+BEGIN_ENGINE_INPUT
+BEGIN_ENGINE_INPUT
+~...pw specific namelists and cards
+BEGIN_POSITIONS
+FIRST_IMAGE
+~...pw ATOMIC_POSITIONS card
+INTERMEDIATE_IMAGE
+~...pw ATOMIC_POSITIONS card
+LAST_IMAGE
+~...pw ATOMIC_POSITIONS card
+END_POSITIONS
+~... other pw specific cards
+END_ENGINE_INPUT
+END
+\end{verbatim}
+
+For case 2), the \texttt{neb.dat} file and all \texttt{pw\_X.in} 
+should be already present. 
+
+A detailed description of all NEB-specific input variables 
+is contained in files \texttt{Doc/INPUT\_NEB.*}. See Example 17. 
+
+A NEB calculation will produce a number of files in the current directory
+(i.e. in the directory were the code is run) containing additional information
+on the minimum-energy path. The files are organized as following
+(where \texttt{prefix} is specified in the input file):
+\begin{description}
+\item[\texttt{prefix.dat}]
+is a three-column file containing the position of each image on the reaction
+coordinate (arb. units), its energy in eV relative to the energy of the first image
+and the residual error for the image in eV/$a_0$.
+\item[\texttt{prefix.int}]
+contains an interpolation of the path energy profile that pass exactly through each
+image; it is computed using both the image energies and their derivatives
+\item[\texttt{prefix.path}]
+information used by \qe\ 
+to restart a path calculation, its format depends on the input
+details and is undocumented
+\item[\texttt{prefix.axsf}]
+atomic positions of all path images in the XCrySDen animation format:
+to visualize it, use \texttt{xcrysden -\--axsf prefix.axsf}
+\item[\texttt{prefix.xyz}]
+atomic positions of all path images in the generic xyz format, used by
+many quantum-chemistry softwares
+\item[\texttt{prefix.crd}]
+path information in the input format used by \pwx, suitable for a manual
+restart of the calculation
+\end{description}
+
+"NEB calculation are a bit tricky in general and require extreme care to be
+setup correctly. NEB also takes easily hundreds of iteration to converge,
+of course depending on the number of atoms and of images. Here is some
+free advice:
+\begin{enumerate}
+\item 
+Don't use Climbing Image (CI) from the beginning. It makes convergence slower, 
+especially if the special image changes during the convergence process (this 
+may happen if \texttt{CI\_scheme='auto'} and if it does it may mess up everything).
+Converge your calculation, then restart from the last configuration with
+CI option enabled (note that this will {\em increase} the barrier).
+\item
+Carefully choose the initial path. Remember that \qe\ assumes continuity
+between the first and the last image at the initial condition. In other 
+words, periodic images are NOT used; you may have to manually translate
+an atom by one or more unit cell base vectors in order to have a meaningful
+initial path. You can visualize NEB input files with XCrySDen as animations,
+take some time to check if any atoms overlap or get very close in the initial
+path (you will have to add intermediate images, in this case).
+\item
+Try to start the NEB process with most atomic positions fixed, 
+in order to converge the more "problematic" ones, before leaving
+all atoms move.
+\item
+Especially for larger systems, you can start NEB with lower accuracy 
+(less k-points, lower cutoff) and then increase it when it has
+converged to refine your calculation.
+\item
+Use the Broyden algorithm instead of the default one: it is a bit more
+fragile, but it removes the problem of "oscillations" in the calculated
+activation energies. If these oscillations persist, and you cannot afford 
+more images, focus to a smaller problem, decompose it into pieces.
+\item
+A gross estimate of the required number of iterations is
+(number of images) * (number of atoms) * 3. Atoms that do not
+move should not be counted. It may take half that many iterations, 
+or twice as many, but more or less that's the order of magnitude, 
+unless one starts from a very good or very bad initial guess.
+\end{enumerate}
+(Courtesy of Lorenzo Paulatto)
+
+The code \texttt{path\_int.x} is
+is a tool to generate a new path (what is actually
+generated is the restart file) starting from an old one through
+interpolation (cubic splines). The new path can be discretized with a
+different number of images (this is its main purpose), images are
+equispaced and the interpolation can be also
+performed on a subsection of the old path. The input file needed by
+\texttt{path\_int.x} can be easily set up  with the help of the self-explanatory
+\texttt{path\_int.sh} shell script.
+
+
+\section{Performances}
+
+\subsection{Execution time}
+
+\neb \ spends roughly \texttt{num\_of\_images} times a scf calculation.
+\subsection{File space requirements}
+
+A typical \texttt{neb.x} run will require an amount of temporary disk space in the
+order of O double precision complex numbers:
+$$O = N_k M N + q N_{r1} N_{r2}N_{r3}$$
+
+\section{Troubleshooting}
+
+Almost all problems in \neb \ arise from incorrect input data 
+and result in
+error stops. Error messages should be self-explanatory, but unfortunately
+this is not always true. If the code issues a warning messages and continues,
+pay attention to it but do not assume that something is necessarily wrong in
+your calculation: most warning messages signal harmless problems.
+
+\end{document}

@@ -1,5 +1,5 @@
 !
-! Copyright (C) 2010 Quantum ESPRESSO group
+! Copyright (C) 2010-2011 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
@@ -15,32 +15,49 @@ MODULE symm_base
   ! ... The variables needed to describe the symmetry properties
   ! ... and the routines to find crystal symmetries
   !  
+  ! ... these are acceptance criteria
+  !
+  REAL(DP), parameter :: eps1 = 1.0d-6, eps2 = 1.0d-5
+  !
   SAVE
   !
   PRIVATE
   !
   ! ... Exported variables
   !
-  PUBLIC :: s, sr, sname, ft, ftau, nrot, nsym, t_rev, no_t_rev, &
-            time_reversal, irt, invs, invsym, is_symmorphic, d1, d2, d3
+  PUBLIC :: s, sr, sname, ft, ftau, nrot, nsym, nsym_ns, nsym_na, t_rev, &
+            no_t_rev, time_reversal, irt, invs, invsym, d1, d2, d3, &
+            allfrac, nofrac, nosym, nosym_evc
   INTEGER :: &
        s(3,3,48),            &! symmetry matrices, in crystal axis
        invs(48),             &! index of inverse operation: S^{-1}_i=S(invs(i))
        ftau(3,48),           &! fractional translations, in FFT coordinates
        nrot,                 &! number of bravais lattice symmetries 
-       nsym                   ! number of crystal symmetries
+       nsym = 1,             &! total number of crystal symmetries
+       nsym_ns = 0,          &! nonsymmorphic (fractional translation) symms
+       nsym_na = 0            ! excluded nonsymmorphic symmetries because
+                              ! fract. transl. is noncommensurate with FFT grid
   REAL (DP) :: &
        ft (3,48),            &! fractional translations, in crystal axis
        sr (3,3,48)            ! symmetry matrices, in cartesian axis
+  !
+  ! ... note: ftau are used for symmetrization in real space (phonon, exx)
+  ! ... in which case they must be commensurated with the FFT grid
+  !
   CHARACTER(LEN=45) ::  sname(48)   ! name of the symmetries
   INTEGER :: &
        t_rev(48) = 0          ! time reversal flag, for noncolinear magnetism
   INTEGER, ALLOCATABLE :: &
        irt(:,:)               ! symmetric atom for each atom and sym.op.
   LOGICAL :: &
-       time_reversal=.true., &! if .TRUE. the system has time_reversal symmetry
+       time_reversal=.true., &! if .TRUE. the system has time reversal symmetry
        invsym,               &! if .TRUE. the system has inversion symmetry
-       is_symmorphic,        &! if .TRUE. the space group is symmorphic
+       nofrac= .FALSE.,      &! if .TRUE. fract. translations are not allowed
+       allfrac= .FALSE.,     &! if .TRUE. all fractionary transations allowed,
+                              ! even those not commensurate with FFT grid
+       nosym = .FALSE.,      &! if .TRUE. no symmetry is used
+       nosym_evc = .FALSE.,  &! if .TRUE. symmetry is used only to symmetrize
+                              ! k points
        no_t_rev=.FALSE.       ! if .TRUE. remove the symmetries that 
                               ! require time reversal               
   REAL(DP),TARGET :: &
@@ -50,13 +67,8 @@ MODULE symm_base
   !
   ! ... Exported routines
   !
-  PUBLIC ::  hexsym, cubicsym, find_sym, inverse_s, copy_sym, checkallsym, &
-             s_axis_to_cart, set_sym, set_sym_bl, symmorphic
-  !
-  ! ... Note about fractional translations: ftau should be replaced by ft,
-  ! ... that do not depend upon either upon the FFT grid or the lattice
-  ! ... parameter (important for variable-cell calculations).
-  ! ... The ftau are used only for symmetrization in the phonon code
+  PUBLIC ::  find_sym, inverse_s, copy_sym, checkallsym, &
+             s_axis_to_cart, set_sym, set_sym_bl
   !
 CONTAINS
    !
@@ -87,25 +99,30 @@ CONTAINS
    END SUBROUTINE inverse_s 
    !
 !-----------------------------------------------------------------------
-subroutine cubicsym ( )
+subroutine set_sym_bl ( )
   !-----------------------------------------------------------------------
   !
-  ! Provides symmetry operations for all cubic and lower-symmetry
-  ! bravais lattices (Hexagonal and Trigonal excepted) 
+  ! Provides symmetry operations for all bravais lattices
+  ! Tests first the 24 proper rotations for the cubic lattice; 
+  ! then the 8 rotations specific for the hexagonal axis (special axis c);
+  ! then inversion is added
   !
   implicit none
   !
-  real(DP) :: s0(3, 3, 24), overlap (3, 3), rat (3), rot (3, 3), &
-       value
-  ! the s matrices in cartesian axis
-  ! inverse overlap matrix between direct lattice
-  ! the rotated of a direct vector ( cartesian )
-  ! the rotated of a direct vector ( crystal axis )
-  ! component of the s matrix in axis basis
+  ! sin3 = sin(pi/3), cos3 = cos(pi/3), msin3 = -sin(pi/3), mcos3 = -cos(pi/3)
+  !
+  real(DP), parameter :: sin3 = 0.866025403784438597d0, cos3 = 0.5d0, &
+                             msin3 =-0.866025403784438597d0, mcos3 = -0.5d0
+  real(DP) :: s0(3, 3, 32), overlap (3, 3), rat (3), rot (3, 3), value
+  ! s0: the s matrices in cartesian axis
+  ! overlap: inverse overlap matrix between direct lattice
+  ! rat: the rotated of a direct vector ( cartesian )
+  ! rot: the rotated of a direct vector ( crystal axis )
+  ! value: component of the s matrix in axis basis
   integer :: jpol, kpol, mpol, irot
   ! counters over the polarizations and the rotations
 
-  character :: s0name (48) * 45
+  character :: s0name (64) * 45
   ! full name of the rotational part of each symmetry operation
 
   data s0/ 1.d0,  0.d0,  0.d0,  0.d0,  1.d0,  0.d0,  0.d0,  0.d0,  1.d0, &
@@ -131,56 +148,80 @@ subroutine cubicsym ( )
            0.d0,  1.d0,  0.d0,  0.d0,  0.d0,  1.d0,  1.d0,  0.d0,  0.d0, &
            0.d0, -1.d0,  0.d0,  0.d0,  0.d0, -1.d0,  1.d0,  0.d0,  0.d0, &
            0.d0, -1.d0,  0.d0,  0.d0,  0.d0,  1.d0, -1.d0,  0.d0,  0.d0, &
-           0.d0,  1.d0,  0.d0,  0.d0,  0.d0, -1.d0, -1.d0,  0.d0,  0.d0 /
-  data s0name/&
-       &        'identity                                    ',&
-       &        '180 deg rotation - cart. axis [0,0,1]       ',&
-       &        '180 deg rotation - cart. axis [0,1,0]       ',&
-       &        '180 deg rotation - cart. axis [1,0,0]       ',&
-       &        '180 deg rotation - cart. axis [1,1,0]       ',&
-       &        '180 deg rotation - cart. axis [1,-1,0]      ',&
-       &        ' 90 deg rotation - cart. axis [0,0,-1]      ',&
-       &        ' 90 deg rotation - cart. axis [0,0,1]       ',&
-       &        '180 deg rotation - cart. axis [1,0,1]       ',&
-       &        '180 deg rotation - cart. axis [-1,0,1]      ',&
-       &        ' 90 deg rotation - cart. axis [0,1,0]       ',&
-       &        ' 90 deg rotation - cart. axis [0,-1,0]      ',&
-       &        '180 deg rotation - cart. axis [0,1,1]       ',&
-       &        '180 deg rotation - cart. axis [0,1,-1]      ',&
-       &        ' 90 deg rotation - cart. axis [-1,0,0]      ',&
-       &        ' 90 deg rotation - cart. axis [1,0,0]       ',&
-       &        '120 deg rotation - cart. axis [-1,-1,-1]    ',&
-       &        '120 deg rotation - cart. axis [-1,1,1]      ',&
-       &        '120 deg rotation - cart. axis [1,1,-1]      ',&
-       &        '120 deg rotation - cart. axis [1,-1,1]      ',&
-       &        '120 deg rotation - cart. axis [1,1,1]       ',&
-       &        '120 deg rotation - cart. axis [-1,1,-1]     ',&
-       &        '120 deg rotation - cart. axis [1,-1,-1]     ',&
-       &        '120 deg rotation - cart. axis [-1,-1,1]     ',&
-       &        'inversion                                    ',&
-       &        'inv. 180 deg rotation - cart. axis [0,0,1]  ',&
-       &        'inv. 180 deg rotation - cart. axis [0,1,0]  ',&
-       &        'inv. 180 deg rotation - cart. axis [1,0,0]  ',&
-       &        'inv. 180 deg rotation - cart. axis [1,1,0]  ',&
-       &        'inv. 180 deg rotation - cart. axis [1,-1,0] ',&
-       &        'inv.  90 deg rotation - cart. axis [0,0,-1] ',&
-       &        'inv.  90 deg rotation - cart. axis [0,0,1]  ',&
-       &        'inv. 180 deg rotation - cart. axis [1,0,1]  ',&
-       &        'inv. 180 deg rotation - cart. axis [-1,0,1] ',&
-       &        'inv.  90 deg rotation - cart. axis [0,1,0]  ',&
-       &        'inv.  90 deg rotation - cart. axis [0,-1,0] ',&
-       &        'inv. 180 deg rotation - cart. axis [0,1,1]  ',&
-       &        'inv. 180 deg rotation - cart. axis [0,1,-1] ',&
-       &        'inv.  90 deg rotation - cart. axis [-1,0,0] ',&
-  &        'inv.  90 deg rotation - cart. axis [1,0,0]  ',&
-  &        'inv. 120 deg rotation - cart. axis [-1,-1,-1]',&
-  &        'inv. 120 deg rotation - cart. axis [-1,1,1] ',&
-  &        'inv. 120 deg rotation - cart. axis [1,1,-1]' ,&
-  &        'inv. 120 deg rotation - cart. axis [1,-1,1] ',&
-  &        'inv. 120 deg rotation - cart. axis [1,1,1]  ',&
-  &        'inv. 120 deg rotation - cart. axis [-1,1,-1] ',&
-  &        'inv. 120 deg rotation - cart. axis [1,-1,-1]',&
-  &        'inv. 120 deg rotation - cart. axis [-1,-1,1] ' /
+           0.d0,  1.d0,  0.d0,  0.d0,  0.d0, -1.d0, -1.d0,  0.d0,  0.d0, &
+           cos3,  sin3, 0.d0, msin3,  cos3, 0.d0, 0.d0, 0.d0,  1.d0, &
+           cos3, msin3, 0.d0,  sin3,  cos3, 0.d0, 0.d0, 0.d0,  1.d0, &
+          mcos3,  sin3, 0.d0, msin3, mcos3, 0.d0, 0.d0, 0.d0,  1.d0, &
+          mcos3, msin3, 0.d0,  sin3, mcos3, 0.d0, 0.d0, 0.d0,  1.d0, &
+           cos3, msin3, 0.d0, msin3, mcos3, 0.d0, 0.d0, 0.d0, -1.d0, &
+           cos3,  sin3, 0.d0,  sin3, mcos3, 0.d0, 0.d0, 0.d0, -1.d0, &
+          mcos3, msin3, 0.d0, msin3,  cos3, 0.d0, 0.d0, 0.d0, -1.d0, &
+          mcos3,  sin3, 0.d0,  sin3,  cos3, 0.d0, 0.d0, 0.d0, -1.d0 /
+
+  data s0name/  'identity                                     ',&
+                '180 deg rotation - cart. axis [0,0,1]        ',&
+                '180 deg rotation - cart. axis [0,1,0]        ',&
+                '180 deg rotation - cart. axis [1,0,0]        ',&
+                '180 deg rotation - cart. axis [1,1,0]        ',&
+                '180 deg rotation - cart. axis [1,-1,0]       ',&
+                ' 90 deg rotation - cart. axis [0,0,-1]       ',&
+                ' 90 deg rotation - cart. axis [0,0,1]        ',&
+                '180 deg rotation - cart. axis [1,0,1]        ',&
+                '180 deg rotation - cart. axis [-1,0,1]       ',&
+                ' 90 deg rotation - cart. axis [0,1,0]        ',&
+                ' 90 deg rotation - cart. axis [0,-1,0]       ',&
+                '180 deg rotation - cart. axis [0,1,1]        ',&
+                '180 deg rotation - cart. axis [0,1,-1]       ',&
+                ' 90 deg rotation - cart. axis [-1,0,0]       ',&
+                ' 90 deg rotation - cart. axis [1,0,0]        ',&
+                '120 deg rotation - cart. axis [-1,-1,-1]     ',&
+                '120 deg rotation - cart. axis [-1,1,1]       ',&
+                '120 deg rotation - cart. axis [1,1,-1]       ',&
+                '120 deg rotation - cart. axis [1,-1,1]       ',&
+                '120 deg rotation - cart. axis [1,1,1]        ',&
+                '120 deg rotation - cart. axis [-1,1,-1]      ',&
+                '120 deg rotation - cart. axis [1,-1,-1]      ',&
+                '120 deg rotation - cart. axis [-1,-1,1]      ',&
+                ' 60 deg rotation - cryst. axis [0,0,1]       ',&
+                ' 60 deg rotation - cryst. axis [0,0,-1]      ',&
+                '120 deg rotation - cryst. axis [0,0,1]       ',&
+                '120 deg rotation - cryst. axis [0,0,-1]      ',&
+                '180 deg rotation - cryst. axis [1,-1,0]      ',&
+                '180 deg rotation - cryst. axis [2,1,0]       ',&
+                '180 deg rotation - cryst. axis [0,1,0]       ',&
+                '180 deg rotation - cryst. axis [1,1,0]       ',&
+                'inversion                                    ',&
+                'inv. 180 deg rotation - cart. axis [0,0,1]   ',&
+                'inv. 180 deg rotation - cart. axis [0,1,0]   ',&
+                'inv. 180 deg rotation - cart. axis [1,0,0]   ',&
+                'inv. 180 deg rotation - cart. axis [1,1,0]   ',&
+                'inv. 180 deg rotation - cart. axis [1,-1,0]  ',&
+                'inv.  90 deg rotation - cart. axis [0,0,-1]  ',&
+                'inv.  90 deg rotation - cart. axis [0,0,1]   ',&
+                'inv. 180 deg rotation - cart. axis [1,0,1]   ',&
+                'inv. 180 deg rotation - cart. axis [-1,0,1]  ',&
+                'inv.  90 deg rotation - cart. axis [0,1,0]   ',&
+                'inv.  90 deg rotation - cart. axis [0,-1,0]  ',&
+                'inv. 180 deg rotation - cart. axis [0,1,1]   ',&
+                'inv. 180 deg rotation - cart. axis [0,1,-1]  ',&
+                'inv.  90 deg rotation - cart. axis [-1,0,0]  ',&
+                'inv.  90 deg rotation - cart. axis [1,0,0]   ',&
+                'inv. 120 deg rotation - cart. axis [-1,-1,-1]',&
+                'inv. 120 deg rotation - cart. axis [-1,1,1]  ',&
+                'inv. 120 deg rotation - cart. axis [1,1,-1]  ',&
+                'inv. 120 deg rotation - cart. axis [1,-1,1]  ',&
+                'inv. 120 deg rotation - cart. axis [1,1,1]   ',&
+                'inv. 120 deg rotation - cart. axis [-1,1,-1] ',&
+                'inv. 120 deg rotation - cart. axis [1,-1,-1] ',&
+                'inv. 120 deg rotation - cart. axis [-1,-1,1] ',& 
+                'inv.  60 deg rotation - cryst. axis [0,0,1]  ',&
+                'inv.  60 deg rotation - cryst. axis [0,0,-1] ',&
+                'inv. 120 deg rotation - cryst. axis [0,0,1]  ',&
+                'inv. 120 deg rotation - cryst. axis [0,0,-1] ',&
+                'inv. 180 deg rotation - cryst. axis [1,-1,0] ',&
+                'inv. 180 deg rotation - cryst. axis [2,1,0]  ',&
+                'inv. 180 deg rotation - cryst. axis [0,1,0]  ',&
+                'inv. 180 deg rotation - cryst. axis [1,1,0]  ' /
 
   !    compute the overlap matrix for crystal axis
 
@@ -197,7 +238,7 @@ subroutine cubicsym ( )
   call invmat (3, rot, overlap, value)
 
   nrot = 1
-  do irot = 1,24
+  do irot = 1,32
      !
      !   for each possible symmetry
      !
@@ -228,7 +269,7 @@ subroutine cubicsym ( )
            value = overlap(jpol,1)*rot(1,kpol) +&
            &       overlap(jpol,2)*rot(2,kpol) +&
            &       overlap(jpol,3)*rot(3,kpol)
-           if ( abs(DBLE(nint(value))-value) > 1.0d-8) then
+           if ( abs(DBLE(nint(value))-value) > eps1 ) then
               !
               ! if a noninteger is obtained, this implies that this operation
               ! is not a symmetry operation for the given lattice
@@ -251,7 +292,7 @@ subroutine cubicsym ( )
      do kpol = 1,3
         do jpol = 1,3
            s(kpol,jpol,irot+nrot) = -s(kpol,jpol,irot)
-           sname(irot+nrot) = s0name(irot+24)
+           sname(irot+nrot) = s0name(irot+32)
         end do
      end do
   end do
@@ -259,149 +300,11 @@ subroutine cubicsym ( )
   nrot = 2*nrot
 
   return
-end subroutine cubicsym
+  !
+end subroutine set_sym_bl
 !
 !-----------------------------------------------------------------------
-subroutine hexsym ( )
-!-----------------------------------------------------------------------
-  !
-  ! Provides symmetry operations for Hexagonal and Trigonal lattices.
-  ! The c axis is assumed to be along the z axis
-  !
-  implicit none
-  !
-  ! sin3 = sin(pi/3), cos3 = cos(pi/3), msin3 = -sin(pi/3), mcos3 = -cos(pi/3)
-  !
-  real(DP), parameter :: sin3 = 0.866025403784438597d0, cos3 = 0.5d0, &
-                             msin3 =-0.866025403784438597d0, mcos3 = -0.5d0
-  !
-  real(DP) :: s0(3, 3, 12), overlap (3, 3), rat (3), rot (3, 3), &
-       value
-  ! the s matrices in cartesian coordinates
-  ! inverse overlap matrix between direct lattice
-  ! the rotated of a direct vector (cartesian)
-  ! the rotated of a direct vector (crystal axis)
-  integer :: jpol, kpol, mpol, irot
-  ! counters over polarizations and rotations
-  character :: s0name (24) * 45
-  ! full name of the rotation part of each symmetry operation
-
-  data s0/ 1.d0,  0.d0, 0.d0,  0.d0,  1.d0, 0.d0, 0.d0, 0.d0,  1.d0, &
-          -1.d0,  0.d0, 0.d0,  0.d0, -1.d0, 0.d0, 0.d0, 0.d0,  1.d0, &
-          -1.d0,  0.d0, 0.d0,  0.d0,  1.d0, 0.d0, 0.d0, 0.d0, -1.d0, &
-           1.d0,  0.d0, 0.d0,  0.d0, -1.d0, 0.d0, 0.d0, 0.d0, -1.d0, &
-           cos3,  sin3, 0.d0, msin3,  cos3, 0.d0, 0.d0, 0.d0,  1.d0, &
-           cos3, msin3, 0.d0,  sin3,  cos3, 0.d0, 0.d0, 0.d0,  1.d0, &
-          mcos3,  sin3, 0.d0, msin3, mcos3, 0.d0, 0.d0, 0.d0,  1.d0, &
-          mcos3, msin3, 0.d0,  sin3, mcos3, 0.d0, 0.d0, 0.d0,  1.d0, &
-           cos3, msin3, 0.d0, msin3, mcos3, 0.d0, 0.d0, 0.d0, -1.d0, &
-           cos3,  sin3, 0.d0,  sin3, mcos3, 0.d0, 0.d0, 0.d0, -1.d0, &
-          mcos3, msin3, 0.d0, msin3,  cos3, 0.d0, 0.d0, 0.d0, -1.d0, &
-          mcos3,  sin3, 0.d0,  sin3,  cos3, 0.d0, 0.d0, 0.d0, -1.d0 /
-
-  data s0name/ 'identity                                     ',&
-               '180 deg rotation - cryst. axis [0,0,1]       ',&
-               '180 deg rotation - cryst. axis [1,2,0]       ',&
-               '180 deg rotation - cryst. axis [1,0,0]       ',&
-               ' 60 deg rotation - cryst. axis [0,0,1]       ',&
-               ' 60 deg rotation - cryst. axis [0,0,-1]      ',&
-               '120 deg rotation - cryst. axis [0,0,1]       ',&
-               '120 deg rotation - cryst. axis [0,0,-1]      ',&
-               '180 deg rotation - cryst. axis [1,-1,0]      ',&
-               '180 deg rotation - cryst. axis [2,1,0]       ',&
-               '180 deg rotation - cryst. axis [0,1,0]       ',&
-               '180 deg rotation - cryst. axis [1,1,0]       ',&
-               'inversion                                    ',&
-               'inv. 180 deg rotation - cryst. axis [0,0,1]  ',&
-               'inv. 180 deg rotation - cryst. axis [1,2,0]  ',&
-               'inv. 180 deg rotation - cryst. axis [1,0,0]  ',&
-               'inv.  60 deg rotation - cryst. axis [0,0,1]  ',&
-               'inv.  60 deg rotation - cryst. axis [0,0,-1] ',&
-               'inv. 120 deg rotation - cryst. axis [0,0,1]  ',&
-               'inv. 120 deg rotation - cryst. axis [0,0,-1] ',&
-               'inv. 180 deg rotation - cryst. axis [1,-1,0] ',&
-               'inv. 180 deg rotation - cryst. axis [2,1,0]  ',&
-               'inv. 180 deg rotation - cryst. axis [0,1,0]  ',&
-               'inv. 180 deg rotation - cryst. axis [1,1,0]  ' /
-  !
-  !   first compute the overlap matrix between direct lattice vectors
-  !
-  do jpol = 1, 3
-     do kpol = 1, 3
-        rot (kpol, jpol) = at (1, kpol) * at (1, jpol) + at (2, kpol) &
-             * at (2, jpol) + at (3, kpol) * at (3, jpol)
-     enddo
-  enddo
-  !
-  !    then its inverse (rot is used as work space)
-  !
-  call invmat (3, rot, overlap, value)
-  nrot = 1
-  do irot = 1, 12
-     !
-     !   for each possible symmetry
-     !
-     do jpol = 1, 3
-        do mpol = 1, 3
-           !
-           !   compute, in cartesian coordinates the rotated vector
-           !
-           rat (mpol) = s0(mpol, 1, irot) * at (1, jpol) + &
-                        s0(mpol, 2, irot) * at (2, jpol) + &
-                        s0(mpol, 3, irot) * at (3, jpol)
-        enddo
-        do kpol = 1, 3
-           !
-           !   the rotated vector is projected on the direct lattice
-           !
-           rot (kpol, jpol) = at (1, kpol) * rat (1) + &
-                              at (2, kpol) * rat (2) + &
-                              at (3, kpol) * rat (3)
-        enddo
-     enddo
-     !
-     !  and the inverse of the overlap matrix is applied
-     !
-     do jpol = 1, 3
-        do kpol = 1, 3
-           value = overlap (jpol, 1) * rot (1, kpol) + &
-                   overlap (jpol, 2) * rot (2, kpol) + &
-                   overlap (jpol, 3) * rot (3, kpol)
-           if (abs (DBLE (nint (value) ) - value) > 1.0d-8) then
-              !
-              ! if a noninteger is obtained, this implies that this operation
-              ! is not a symmetry operation for the given lattice
-              !
-              goto 10
-           endif
-           s (kpol, jpol, nrot) = nint (value)
-           sname (nrot) = s0name (irot)
-        enddo
-     enddo
-     nrot = nrot + 1
-10   continue
-  enddo
-  nrot = nrot - 1
-  !
-  !   set the inversion symmetry ( Bravais lattices have always inversion)
-  !
-  do irot = 1, nrot
-     do kpol = 1, 3
-        do jpol = 1, 3
-           s (kpol, jpol, irot + nrot) = -s (kpol, jpol, irot)
-           sname (irot + nrot) = s0name (irot + 12)
-        enddo
-     enddo
-
-  enddo
-
-  nrot = 2 * nrot
-  return
-end subroutine hexsym
-!
-!-----------------------------------------------------------------------
-SUBROUTINE find_sym ( nat, tau, ityp, nr1, nr2, nr3, nofrac, &
-                   magnetic_sym, m_loc, nosym_evc )
+SUBROUTINE find_sym ( nat, tau, ityp, nr1, nr2, nr3, magnetic_sym, m_loc )
   !-----------------------------------------------------------------------
   !
   !     This routine finds the point group of the crystal, by eliminating
@@ -412,7 +315,7 @@ SUBROUTINE find_sym ( nat, tau, ityp, nr1, nr2, nr3, nofrac, &
   !
   integer, intent(in) :: nat, ityp (nat), nr1, nr2, nr3  
   real(DP), intent(in) :: tau (3,nat), m_loc(3,nat)
-  logical, intent(in) :: magnetic_sym, nosym_evc, nofrac
+  logical, intent(in) :: magnetic_sym
   !
   logical :: sym (48)
   ! if true the corresponding operation is a symmetry operation
@@ -422,7 +325,7 @@ SUBROUTINE find_sym ( nat, tau, ityp, nr1, nr2, nr3, nofrac, &
   !
   !    Here we find the true symmetries of the crystal
   !
-  CALL sgam_at ( nat, tau, ityp, nr1, nr2, nr3, nofrac, sym )
+  CALL sgam_at ( nat, tau, ityp, nr1, nr2, nr3, sym )
   !
   !    Here we check for magnetic symmetries
   !
@@ -440,10 +343,11 @@ SUBROUTINE find_sym ( nat, tau, ityp, nr1, nr2, nr3, nofrac, &
   !
   nsym = copy_sym ( nrot, sym )
   !
-  IF ( .not. is_group(nr1,nr2,nr3) ) THEN
+  IF ( .not. is_group ( ) ) THEN
      CALL infomsg ('find_sym', 'Not a group! symmetry disabled')
      nsym = 1
   END IF
+  !
   ! check if inversion (I) is a symmetry.
   ! If so, it should be the (nsym/2+1)-th operation of the group
   !
@@ -453,14 +357,12 @@ SUBROUTINE find_sym ( nat, tau, ityp, nr1, nr2, nr3, nofrac, &
   !
   CALL s_axis_to_cart ( ) 
   !
-  is_symmorphic=symmorphic(nsym, ftau)
-  !
   return
   !
 END SUBROUTINE find_sym
 !
 !-----------------------------------------------------------------------
-subroutine sgam_at ( nat, tau, ityp, nr1, nr2, nr3, nofrac, sym )
+subroutine sgam_at ( nat, tau, ityp, nr1, nr2, nr3, sym )
   !-----------------------------------------------------------------------
   !
   !     Given the point group of the Bravais lattice, this routine finds 
@@ -485,8 +387,6 @@ subroutine sgam_at ( nat, tau, ityp, nr1, nr2, nr3, nofrac, sym )
   real(DP), intent(in) :: tau (3, nat)
   !
   ! tau  : cartesian coordinates of the atoms
-  !
-  logical, intent(in) :: nofrac
   !
   !     output variables
   !
@@ -541,6 +441,7 @@ subroutine sgam_at ( nat, tau, ityp, nr1, nr2, nr3, nofrac, sym )
      end if
   enddo
   !
+  nsym_ns = 0 
   do irot = 1, nrot
      !
      ! check that the grid is compatible with the S rotation
@@ -556,8 +457,8 @@ subroutine sgam_at ( nat, tau, ityp, nr1, nr2, nr3, nofrac, sym )
              &         " not compatible with FFT grid. ")') irot
         WRITE( stdout, '(3i4)') ( (s (i, j, irot) , j = 1, 3) , i = 1, 3)
         goto 100
-
      endif
+
      do na = 1, nat
         ! rau = rotated atom coordinates
         rau (:, na) = s (1,:, irot) * xau (1, na) + &
@@ -585,35 +486,45 @@ subroutine sgam_at ( nat, tau, ityp, nr1, nr2, nr3, nofrac, sym )
               sym(irot) = checksym ( irot, nat, ityp, xau, rau, ft_ )
               !
               if (sym (irot) ) then
+                 nsym_ns = nsym_ns + 1
                  ft (:,irot) = ft_(:)
-                 ! convert ft to FFT coordinates
-                 ! for later use in symmetrization
-                 ft1 = ft_(1) * nr1
-                 ft2 = ft_(2) * nr2
-                 ft3 = ft_(3) * nr3
-                 ! check if the fractional translations are commensurate
-                 ! with the FFT grid, discard sym.op. if not
-                 ! (needed because ph.x symmetrizes in real space)
-                 if (abs (ft1 - nint (ft1) ) / nr1 > 1.0d-5 .or. &
-                     abs (ft2 - nint (ft2) ) / nr2 > 1.0d-5 .or. &
-                     abs (ft3 - nint (ft3) ) / nr3 > 1.0d-5) then
-                    WRITE( stdout, '(5x,"warning: symmetry operation", &
-                         &     " # ",i2," not allowed.   fractional ", &
-                         &     "translation:"/5x,3f11.7,"  in crystal", &
-                         &     " coordinates")') irot, ft_
-                    sym (irot) = .false.
-                 endif
-                 ftau (1, irot) = nint (ft1)
-                 ftau (2, irot) = nint (ft2)
-                 ftau (3, irot) = nint (ft3)
-                 goto 100
-              endif
+                 go to 100
+              end if
            endif
         enddo
 
      endif
 100  continue
   enddo
+  !
+  ! convert ft to FFT coordinates, check if compatible with FFT grid
+  ! for real-space symmetrization (if done: currently, exx, phonon)
+  ! 
+  nsym_na = 0
+  do irot =1, nrot
+     if ( sym(irot) .AND. .NOT. allfrac ) then
+        ft1 = ft(1,irot) * nr1
+        ft2 = ft(2,irot) * nr2
+        ft3 = ft(3,irot) * nr3
+        ! check if the fractional translations are commensurate
+        ! with the FFT grid, discard sym.op. if not
+        ! (needed because ph.x symmetrizes in real space)
+        if (abs (ft1 - nint (ft1) ) / nr1 > eps2 .or. &
+            abs (ft2 - nint (ft2) ) / nr2 > eps2 .or. &
+            abs (ft3 - nint (ft3) ) / nr3 > eps2 ) then
+            !     WRITE( stdout, '(5x,"warning: symmetry operation", &
+            !          &     " # ",i2," not allowed.   fractional ", &
+            !          &     "translation:"/5x,3f11.7,"  in crystal", &
+            !          &     " coordinates")') irot, ft_
+            sym (irot) = .false.
+            nsym_na = nsym_na + 1
+            nsym_ns = nsym_ns - 1
+         endif
+         ftau (1, irot) = nint (ft1)
+         ftau (2, irot) = nint (ft2)
+         ftau (3, irot) = nint (ft3)
+      end if
+  end do
   !
   !   deallocate work space
   !
@@ -686,10 +597,10 @@ subroutine sgam_at_mag ( nat, m_loc, sym )
            !
            t1 = ( abs(mrau(1,na) - mxau(1,nb)) +       &
                   abs(mrau(2,na) - mxau(2,nb)) +       &
-                  abs(mrau(3,na) - mxau(3,nb)) < 1.0D-5 ) .and. t1
+                  abs(mrau(3,na) - mxau(3,nb)) < eps2 ) .and. t1
            t2 = ( abs(mrau(1,na) + mxau(1,nb))+       &
                   abs(mrau(2,na) + mxau(2,nb))+       &
-                  abs(mrau(3,na) + mxau(3,nb)) < 1.0D-5 ) .and. t2
+                  abs(mrau(3,na) + mxau(3,nb)) < eps2 ) .and. t2
            !
         enddo
         !
@@ -716,72 +627,29 @@ subroutine sgam_at_mag ( nat, m_loc, sym )
   return
 END SUBROUTINE sgam_at_mag
 !
-SUBROUTINE set_sym_bl(ibrav, symm_type) 
-!
-! This subroutine receives as input the index of the Bravais lattice, or
-! symm_type if ibrav=0 and the at and bg in cell_base and sets all the 
-! symmetry matrices of the Bravais lattice: nrot, s, sname 
-!
-  IMPLICIT NONE
-  INTEGER, INTENT(IN) :: ibrav
-
-  CHARACTER(LEN=9), INTENT(INOUT) :: symm_type
-
-  IF ( ibrav == 4 .OR. ABS(ibrav) == 5 .OR. &
-     ( ibrav == 0 .AND. symm_type == 'hexagonal' ) )  THEN
-     !
-     ! ... here the hexagonal or trigonal bravais lattice
-     !
-     CALL hexsym( )
-     symm_type='hexagonal'
-     !
-  ELSE IF ( ( ibrav >= 1 .AND. ibrav <= 14 ) .OR. (ibrav == -12 ) .OR. &
-            ( ibrav == 0 .AND. symm_type == 'cubic' ) ) THEN
-     !
-     ! ... here for the cubic bravais lattice
-     !
-     CALL cubicsym( )
-     symm_type='cubic'
-     !
-  ELSE
-     !
-     CALL errore( 'set_sym_bl', 'wrong ibrav/symm_type', 1 )
-     !
-  ENDIF
-  END SUBROUTINE set_sym_bl
-
-  SUBROUTINE set_sym(ibrav, nat, tau, ityp, nspin_mag, m_loc, nr1, nr2, nr3, &
-                   nofrac, symm_type)
+SUBROUTINE set_sym(nat, tau, ityp, nspin_mag, m_loc, nr1, nr2, nr3)
   !
-  ! This routine receives as input the bravais lattice, (or symm_type if
-  ! ibrav=0) the atoms and their positions, if there is noncollinear 
-  ! magnetism and the initial magnetic moments, the fft dimesions nr1, nr2, 
-  ! nr3 and it sets the symmetry elements of this module. Note that at 
-  ! and bg are those in  cell_base. It sets nrot, nsym, s, sname, sr, invs, 
-  ! ftau, irt, t_rev,  time_reversal, and invsym
-  ! 
+  ! This routine receives as input atomic types and positions, if there
+  ! is noncollinear magnetism and the initial magnetic moments, the fft
+  ! dimensions nr1, nr2, nr3; it sets the symmetry elements of this module.
+  ! Note that at and bg are those in cell_base. It sets nrot, nsym, s,
+  ! sname, sr, invs, ftau, irt, t_rev,  time_reversal, and invsym
   ! 
   !-----------------------------------------------------------------------
   !
   IMPLICIT NONE
   ! input 
-  INTEGER, INTENT(IN)  :: ibrav, nat, ityp(nat), nspin_mag, nr1, nr2, nr3
+  INTEGER, INTENT(IN)  :: nat, ityp(nat), nspin_mag, nr1, nr2, nr3
   REAL(DP), INTENT(IN) :: tau(3,nat)
   REAL(DP), INTENT(IN) :: m_loc(3,nat) 
-  LOGICAL, INTENT(IN)  ::  nofrac
-  CHARACTER(LEN=9), INTENT(INOUT) :: symm_type
   !
   time_reversal = (nspin_mag /= 4)
   t_rev(:) = 0
-  CALL set_sym_bl(ibrav, symm_type)
-
-  !
-  CALL find_sym ( nat, tau, ityp, nr1, nr2, nr3, nofrac,.not.time_reversal, &
-                  m_loc, .FALSE. )
+  CALL set_sym_bl ( )
+  CALL find_sym ( nat, tau, ityp, nr1, nr2, nr3, .not.time_reversal, m_loc )
   !
   RETURN
   END SUBROUTINE set_sym
-!
 !
 !-----------------------------------------------------------------------
 INTEGER FUNCTION copy_sym ( nrot_, sym ) 
@@ -839,24 +707,24 @@ END FUNCTION copy_sym
 
 !
 !-----------------------------------------------------------------------
-LOGICAL FUNCTION is_group ( nr1, nr2, nr3 )
+LOGICAL FUNCTION is_group ( )
   !-----------------------------------------------------------------------
   !
   !  Checks that {S} is a group 
   !
   IMPLICIT NONE
   !
-  INTEGER, INTENT(IN) :: nr1,nr2,nr3
-  !
-  INTEGER :: isym, jsym, ksym, ss (3, 3), stau(3)
+  INTEGER :: isym, jsym, ksym, ss (3, 3)
+  REAL (DP) :: st(3), dt(3)
   LOGICAL :: found
   !
   DO isym = 1, nsym
      DO jsym = 1, nsym
         ! 
         ss = MATMUL (s(:,:,isym),s(:,:,jsym))
-        stau(:)= ftau(:,jsym) + s(1,:,jsym)*ftau(1,isym) + &
-                 s(2,:,jsym)*ftau(2,isym) + s(3,:,jsym)*ftau(3,isym) 
+        st(:)= ft(:,jsym) + s(1,:,jsym)*ft(1,isym) + &
+                            s(2,:,jsym)*ft(2,isym) + &
+                            s(3,:,jsym)*ft(3,isym) 
         !
         !     here we check that the input matrices really form a group:
         !        S(k)   = S(i)*S(j)
@@ -864,10 +732,11 @@ LOGICAL FUNCTION is_group ( nr1, nr2, nr3 )
         !
         found = .false.
         DO ksym = 1, nsym
+           dt(:) = ft(:,ksym) - st(:) - NINT( ft(:,ksym) - st(:) ) 
            IF ( ALL( s(:,:,ksym) == ss(:,:) ) .AND. &
-                ( MOD( ftau(1,ksym)-stau(1), nr1 ) == 0 ) .AND. &
-                ( MOD( ftau(2,ksym)-stau(2), nr2 ) == 0 ) .AND. &
-                ( MOD( ftau(3,ksym)-stau(3), nr3 ) == 0 ) ) THEN
+                ( ABS ( dt(1) ) < eps2 ) .AND. &
+                ( ABS ( dt(2) ) < eps2 ) .AND. &
+                ( ABS ( dt(3) ) < eps2 ) ) THEN
               IF (found) THEN
                  is_group = .false.
                  RETURN
@@ -951,9 +820,8 @@ subroutine checkallsym ( nat, tau, ityp, nr1, nr2, nr3 )
   !
   integer :: na, kpol, isym, i, j, k, l
   logical :: loksym (48)
-  real(DP) :: sx (3, 3), sy(3,3), ft_(3)
+  real(DP) :: sx (3, 3), sy(3,3)
   real(DP) , allocatable :: xau(:,:), rau(:,:)
-  real(DP), parameter :: eps = 1.0d-7
   !
   allocate (xau( 3 , nat))    
   allocate (rau( 3 , nat))    
@@ -970,7 +838,7 @@ subroutine checkallsym ( nat, tau, ityp, nr1, nr2, nr3 )
      do i = 1, 3
         sy (i,i) = sy (i,i) - 1.0_dp
      end do
-     if (any (abs (sy) > eps) ) &
+     if (any (abs (sy) > eps1 ) ) &
          call errore ('checkallsym', 'not orthogonal operation', isym)
   enddo
   !
@@ -995,11 +863,7 @@ subroutine checkallsym ( nat, tau, ityp, nr1, nr2, nr3 )
         enddo
      enddo
      !
-     ft_(1) = ftau (1, isym) / DBLE (nr1)
-     ft_(2) = ftau (2, isym) / DBLE (nr2)
-     ft_(3) = ftau (3, isym) / DBLE (nr3)
-     !
-     loksym(isym) =  checksym ( isym, nat, ityp, xau, rau, ft_ )
+     loksym(isym) =  checksym ( isym, nat, ityp, xau, rau, ft(1,isym) )
      !
   enddo
   !
@@ -1013,8 +877,8 @@ subroutine checkallsym ( nat, tau, ityp, nr1, nr2, nr3 )
           'the following symmetry operation is not satisfied  ', -isym)
   end do
   if (ANY (.not.loksym (1:nsym) ) ) then
-      !call symmetrize_at(nsym, s, nat, tau, ityp, at, bg, nr1, nr2, &
-      !                   nr3, irt, ftau, alat, omega)
+      !call symmetrize_at (nsym, s, invs, ft, irt, nat, tau, at, bg, &
+      !                    alat, omega)
       call errore ('checkallsym', &
            'some of the original symmetry operations not satisfied ',1)
   end if
@@ -1042,28 +906,5 @@ subroutine s_axis_to_cart ( )
   enddo
   !
  end subroutine s_axis_to_cart
-
-  LOGICAL FUNCTION symmorphic(nrot, ftau)
-!
-!  This function receives the fractionary translations and check if
-!  one of them is non zero. In this case the space group is non symmorphic and
-!  the function returns .false.
-!
-  IMPLICIT NONE
-  INTEGER, INTENT(IN) :: ftau(3,nrot)
-  INTEGER, INTENT(IN)  :: nrot
-
-  INTEGER :: isym
-
-  symmorphic=.TRUE.
-  DO isym=1,nrot
-     symmorphic=( symmorphic.AND.(ftau(1,isym)==0).AND.  &
-                                 (ftau(2,isym)==0).AND.  &
-                                 (ftau(3,isym)==0) )
-
-  END DO
-
-  RETURN
-  END FUNCTION symmorphic
 
 END MODULE symm_base

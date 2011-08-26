@@ -21,7 +21,7 @@ SUBROUTINE iosys()
   !
   !
   USE kinds,         ONLY : DP
-  USE funct,         ONLY : enforce_input_dft, dft_has_finite_size_correction, &
+  USE funct,         ONLY : dft_has_finite_size_correction, &
                             set_finite_size_volume, get_inlc 
 #if defined(EXX)
   USE funct,         ONLY: set_exx_fraction, set_screening_parameter
@@ -45,10 +45,8 @@ SUBROUTINE iosys()
                             nberrycyc_ => nberrycyc, &
                             efield_cart_ => efield_cart
   !
-  USE cell_base,     ONLY : at, bg, alat, omega, &
-                            celldm_ => celldm, &
-                            ibrav_  => ibrav, &
-                            init_dofree
+  USE cell_base,     ONLY : at, alat, omega, &
+                            cell_base_init, init_dofree
   !
   USE ions_base,     ONLY : if_pos, ityp, tau, extfor, &
                             ntyp_ => nsp, &
@@ -160,16 +158,14 @@ SUBROUTINE iosys()
                             mixing_beta_      => mixing_beta, &
                             nstep_            => nstep, &
                             iprint_           => iprint, &
-                            nosym_            => nosym, &
-                            nosym_evc_        => nosym_evc, &
                             noinv_            => noinv, &
                             modenum_          => modenum, &
                             lkpoint_dir_      => lkpoint_dir, &
                             tqr_              => tqr, &
                             io_level, ethr, lscf, lbfgs, lmd, &
-                            ldamped, lbands, llang,                    &
+                            ldamped, lbands, llang,           &
                             lconstrain, restart, twfcollect, &
-                            llondon, nofrac, do_makov_payne, &
+                            llondon, do_makov_payne, &
                             lecrpa_           => lecrpa
   !
   USE wvfct,         ONLY : nbnd_ => nbnd, &
@@ -192,7 +188,8 @@ SUBROUTINE iosys()
                        starting_spin_angle_ => starting_spin_angle
 
   !
-  USE symm_base, ONLY : no_t_rev_=> no_t_rev
+  USE symm_base, ONLY : no_t_rev_ => no_t_rev, nofrac, allfrac, &
+                        nosym_ => nosym, nosym_evc_=> nosym_evc
   !
   USE bfgs_module,   ONLY : bfgs_ndim_        => bfgs_ndim, &
                             trust_radius_max_ => trust_radius_max, &
@@ -207,6 +204,8 @@ SUBROUTINE iosys()
 
   USE realus,                ONLY : real_space_ => real_space
 
+  USE read_pseudo_mod,       ONLY : readpp
+
 #if defined __MS2
   USE MS2,                   ONLY : MS2_enabled_ => MS2_enabled, &
                                     MS2_handler_ => MS2_handler
@@ -219,7 +218,7 @@ SUBROUTINE iosys()
                                wfcdir, prefix, etot_conv_thr, forc_conv_thr,   &
                                pseudo_dir, disk_io, tefield, dipfield, lberry, &
                                gdir, nppstr, wf_collect,lelfield, efield,      &
-                               nberrycyc, lkpoint_dir, efield_cart, lecrpa,    & 
+                               nberrycyc, lkpoint_dir, efield_cart, lecrpa,    &
                                vdw_table_name
 
 #if defined __MS2
@@ -231,8 +230,9 @@ SUBROUTINE iosys()
   USE input_parameters, ONLY : ibrav, celldm, a, b, c, cosab, cosac, cosbc, &
                                nat, ntyp, nbnd,tot_charge,tot_magnetization,&
                                ecutwfc, ecutrho, nr1, nr2, nr3, nr1s, nr2s, &
-                               nr3s, noinv, nosym, nosym_evc,               &
-                               force_symmorphic, starting_magnetization,    &
+                               nr3s, noinv, nosym, nosym_evc, no_t_rev,     &
+                               use_all_frac, force_symmorphic,              &
+                               starting_magnetization,                      &
                                occupations, degauss, smearing, nspin,       &
                                ecfixed, qcutz, q2sigma, lda_plus_U,         &
                                Hubbard_U, Hubbard_alpha, input_dft, la2F,   &
@@ -250,7 +250,7 @@ SUBROUTINE iosys()
                                B_field, fixed_magnetization, report, lspinorb,&
                                starting_spin_angle,                           &
                                assume_isolated, spline_ps, london, london_s6, &
-                               london_rcut, one_atom_occupations, no_t_rev,   &
+                               london_rcut, one_atom_occupations, &
                                esm_bc, esm_efield, esm_w, esm_nfit
 #ifdef __SOLVENT
   !
@@ -296,10 +296,10 @@ SUBROUTINE iosys()
   USE input_parameters, ONLY : use_wannier, nwan, constrain_pot, &
                                use_energy_int, print_wannier_coeff
   !
-  ! ... "path" specific
+  ! ... CARDS
   !
-  !
-  USE input_parameters, ONLY : nconstr_inp, ncolvar_inp
+  USE input_parameters, ONLY : nconstr_inp, ncolvar_inp, trd_ht, rd_ht, &
+                               cell_units
   !
   USE constraints_module,    ONLY : init_constraint
   USE read_namelists_module, ONLY : read_namelists, sm_not_set
@@ -476,20 +476,6 @@ SUBROUTINE iosys()
                 & trim( calculation ) // ' not implemented', 1 )
      !
   END SELECT
-  !
-  ! ... translate from input to internals of PWscf, various checks
-  !
-  IF (input_dft /='none') CALL enforce_input_dft (input_dft)
-  !
-#if defined(EXX)
-  ! Set variables for functionals.f90 (HSE)
-  ! if enforced in input
-    !
-    IF (exx_fraction >= 0.0_DP) CALL set_exx_fraction (exx_fraction)
-    IF (screening_parameter >= 0.0_DP) &
-        & CALL set_screening_parameter (screening_parameter)
-    !
-#endif
   !
   IF ( tefield .and. ( .not. nosym ) ) THEN
      nosym = .true.
@@ -1048,9 +1034,13 @@ SUBROUTINE iosys()
                      & ' conv_thr must be reduced', 1 )
   !
   SELECT CASE( trim( verbosity ) )
-  CASE( 'high' )
+  CASE( 'debug', 'high', 'medium' )
      !
      iverbosity = 1
+     !
+  CASE( 'low', 'default', 'minimal' )
+     !
+     iverbosity = 0 
      !
   CASE DEFAULT
      !
@@ -1089,8 +1079,6 @@ SUBROUTINE iosys()
   iprint_     = iprint
   lecrpa_     = lecrpa
   !
-  celldm_  = celldm
-  ibrav_   = ibrav
   nat_     = nat
   ntyp_    = ntyp
   edir_    = edir
@@ -1123,6 +1111,7 @@ SUBROUTINE iosys()
   one_atom_occupations_ = one_atom_occupations
   !
   no_t_rev_ = no_t_rev
+  allfrac   = use_all_frac
   !
   spline_ps_ = spline_ps
   !
@@ -1269,7 +1258,7 @@ SUBROUTINE iosys()
       !
     CASE DEFAULT
       !
-      call errore ('iosys','unrecongnized value for assume_isolated',1)
+      call errore ('iosys','unrecognized value for assume_isolated',1)
   END SELECT
   !
   ! ... read following cards
@@ -1295,55 +1284,8 @@ SUBROUTINE iosys()
   !
   ! ... set up atomic positions and crystal lattice
   !
-  IF ( celldm_(1) == 0.D0 .and. a /= 0.D0 ) THEN
-     !
-     celldm_(1) = a / bohr_radius_angs
-     celldm_(2) = b / a
-     celldm_(3) = c / a
-     !
-     IF ( ibrav_ == 14 ) THEN
-        !
-        ! ... triclinic lattice
-        !
-        celldm_(4) = cosbc
-        celldm_(5) = cosac
-        celldm_(6) = cosab
-        !
-     ELSE IF ( ibrav_ ==-12 ) THEN
-        !
-        ! ... monoclinic P lattice, unique axis b
-        !
-        celldm_(5) = cosac
-        !
-     ELSE
-        !
-        ! ... trigonal and monoclinic lattices, unique axis c
-        !
-        celldm_(4) = cosab
-        !
-     ENDIF
-     !
-  ELSEIF ( celldm_(1) /= 0.D0 .and. a /= 0.D0 ) THEN
-     !
-     CALL errore( 'input', 'do not specify both celldm and a,b,c!', 1 )
-     !
-  ENDIF
-  !
-  ! ... generate at (in atomic units) from ibrav and celldm
-  !
-  CALL latgen( ibrav_, celldm_, at(1,1), at(1,2), at(1,3), omega )
-  !
-  ! ... define alat
-  !
-  alat = celldm_(1)
-  !
-  ! ... convert at to unit of alat
-  !
-  at = at / alat
-  !
-  ! ... Generate the reciprocal lattice vectors
-  !
-  CALL recips( at(1,1), at(1,2), at(1,3), bg(1,1), bg(1,2), bg(1,3) )
+  call cell_base_init ( ibrav, celldm, a, b, c, cosab, cosac, cosbc, &
+                        trd_ht, rd_ht, cell_units )
   !
   CALL convert_tau ( tau_format, nat_, tau)
   !
@@ -1384,9 +1326,19 @@ SUBROUTINE iosys()
   !
   CALL init_dofree ( cell_dofree )
   !
-  ! ... read pseudopotentials
+  ! ... read pseudopotentials (also sets DFT)
   !
-  CALL readpp()
+  CALL readpp ( input_dft )
+  !
+#if defined(EXX)
+    !
+    ! Set variables for hybrid functional HSE
+    !
+    IF (exx_fraction >= 0.0_DP) CALL set_exx_fraction (exx_fraction)
+    IF (screening_parameter >= 0.0_DP) &
+        & CALL set_screening_parameter (screening_parameter)
+    !
+#endif
   !
   ! ... read the vdw kernel table if needed
   !
@@ -1479,25 +1431,15 @@ SUBROUTINE read_cards_pw ( psfile, tau_format )
   USE input_parameters,   ONLY : atom_label, atom_pfile, atom_mass, taspc, &
                                  tapos, rd_pos, atomic_positions, if_pos,  &
                                  sp_pos, k_points, xk, wk, nk1, nk2, nk3,  &
-                                 k1, k2, k3, nkstot, cell_symmetry, rd_ht, &
-                                 trd_ht, f_inp, rd_for, tavel, sp_vel
-  USE cell_base,          ONLY : at, ibrav, symm_type
+                                 k1, k2, k3, nkstot, &
+                                 f_inp, rd_for, tavel, sp_vel, rd_vel
+  USE dynamics_module,    ONLY : tavel_ => tavel, vel
+  USE cell_base,          ONLY : at, ibrav
   USE ions_base,          ONLY : nat, ntyp => nsp, ityp, tau, atm, extfor
-  USE start_k,           ONLY : nk1_   => nk1, &
-                                 nk2_   => nk2, &
-                                 nk3_   => nk3, &
-                                 k1_    => k1,  &
-                                 k2_    => k2,  &
-                                 k3_    => k3
-  USE klist,              ONLY : nkstot_ => nkstot, &
-                                 lxkcry, &
-                                 xk_    => xk, &
-                                 wk_    => wk
+  USE start_k,            ONLY : init_start_k
   USE fixed_occ,          ONLY : tfixed_occ, &
                                  f_inp_ => f_inp
-  USE ions_base,          ONLY : fixatom, &
-                                 if_pos_ =>  if_pos
-  USE ions_base,          ONLY : amass
+  USE ions_base,          ONLY : if_pos_ =>  if_pos, amass, fixatom
   USE control_flags,      ONLY : lfixatom, gamma_only, textfor
   !
   IMPLICIT NONE
@@ -1507,7 +1449,6 @@ SUBROUTINE read_cards_pw ( psfile, tau_format )
   INTEGER, EXTERNAL :: atomic_number
   REAL(DP), EXTERNAL :: atom_weight
   !
-  LOGICAL :: tcell = .false.
   INTEGER :: is, ia
   !
   !
@@ -1547,36 +1488,30 @@ SUBROUTINE read_cards_pw ( psfile, tau_format )
   IF ( tavel .AND. ANY ( sp_pos(:) /= sp_vel(:) ) ) &
       CALL errore("cards","list of species in block ATOMIC_VELOCITIES &
                  & must be identical to those in ATOMIC_POSITIONS",1)
-  !
-  ! ... calculate fixatom
-  !
-  fixatom = 0
-  lfixatom = any( if_pos(:,1:nat) == 0 ) 
-  !
-  DO ia = 1, nat
-     !
-     IF ( if_pos(1,ia) /= 0 .or. &
-          if_pos(2,ia) /= 0 .or. &
-          if_pos(3,ia) /= 0 ) CYCLE
-     !
-     fixatom = fixatom + 1
-     !
-  ENDDO
+  tavel_ = tavel
+  IF ( tavel_ ) THEN
+     ALLOCATE( vel(3, nat) )
+     DO ia = 1, nat
+        vel(:,ia) = rd_vel(:,ia)
+     END DO
+  END IF
   !
   ! ... The constrain on fixed coordinates is implemented using the array
   ! ... if_pos whose value is 0 when the coordinate is to be kept fixed, 1
-  ! ... otherwise. fixatom is maintained for compatibility. ( C.S. 15/10/2003 )
+  ! ... otherwise. 
   !
   if_pos_(:,:) = if_pos(:,1:nat)
+  fixatom = COUNT( if_pos_(1,:)==0 .AND. if_pos_(2,:)==0 .AND. if_pos_(3,:)==0 )
+  lfixatom = ANY ( if_pos_ == 0 )
   !
   tau_format = trim( atomic_positions )
   !
-  CALL reset_k_points ( )
+  CALL init_start_k ( nk1, nk2, nk3, k1, k2, k3, k_points, nkstot, xk, wk )
   gamma_only = ( k_points == 'gamma' )
   !
   IF ( tfixed_occ ) THEN
      !
-     IF ( nkstot_ > 1 .or. ( nk1 * nk2 * nk3 ) > 1 ) &
+     IF ( nkstot > 1 .or. ( nk1 * nk2 * nk3 ) > 1 ) &
         CALL errore( 'read_cards_pw', &
                    & 'only one k point with fixed occupations', 1 )
      !
@@ -1585,19 +1520,6 @@ SUBROUTINE read_cards_pw ( psfile, tau_format )
      DEALLOCATE ( f_inp )
      !
   ENDIF
-  !
-  IF ( trd_ht ) THEN
-    !
-    symm_type = cell_symmetry
-    at        = transpose( rd_ht )
-    tcell     = .true.
-    !
-  ENDIF
-  !
-  IF ( ibrav == 0 .and. .not. tcell ) &
-     CALL errore( 'read_cards_pw', 'ibrav=0: must read cell parameters', 1 )
-  IF ( ibrav /= 0 .and. tcell ) &
-     CALL errore( 'read_cards_pw', 'redundant data for cell parameters', 2 )
   !
   RETURN
   !

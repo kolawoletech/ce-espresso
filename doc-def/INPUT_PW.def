@@ -52,7 +52,7 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 	   nks
 	   xk_x, xk_y, xk_z,  wk
 
-	[ CELL_PARAMETERS { cubic | hexagonal }
+	[ CELL_PARAMETERS { bohr | angstrom }
 	   v1(1) v1(2) v1(3)
 	   v2(1) v2(2) v2(3)
 	   v3(1) v3(2) v3(3) ]
@@ -99,22 +99,23 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 	}
 	
 	var verbosity -type CHARACTER {
+	    default { 'low' }
 	    info {
-		'high' | 'default' | 'low' | 'minimal'
+		Currently two verbosity levels are implemented:
+                  'high' and 'low'. 'debug' and 'medium' have the same
+                  effect as 'high'; 'default' and 'minimal', as 'low'
 	    }
 	}
 	
 	var restart_mode -type CHARACTER {
 	    default { 'from_scratch' }
 	    info {
-		'from_scratch'  : from scratch
-	                          NEB and SMD only: the starting path is obtained
-	                          with a linear interpolation between the images
-	                          specified in the ATOMIC_POSITIONS card.
-			          Note that in the linear interpolation
-	                          periodic boundary conditions ARE NON USED.
-	    
-		'restart'       : from previous interrupted run
+		'from_scratch'  : from scratch. This is the normal way
+                                  to perform a PWscf calculation
+		'restart'       : from previous interrupted run. Use this
+                                  switch only if you want to continue an
+                                  interrupted calculation, not to start a 
+                                  new one. See also startingpot, startingwfc
 	    }
 	}
 	
@@ -1333,7 +1334,8 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
                          ( default for scf, *relax, *md )
 
                'file'  : start from existing "charge-density.xml" file
-                         ( default, only possibility for nscf, bands )
+                         For nscf and bands alculation this is the default
+                         and the only sensible possibility.
 	    }
 	}
 
@@ -1994,12 +1996,12 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
     #
     card CELL_PARAMETERS {
 	flag lattice_type -use optional {
-	    enum {  cubic | hexagonal }
-	    default { cubic }
+	    enum { bohr | angstrom }
 	    info {
-		Flag "cubic" or "hexagonal" specify if you want to look for symmetries
-		derived from the cubic symmetry group (default) or from the hexagonal
-		symmetry group (assuming c axis as the z axis, a axis along the x axis).
+		bohr / angstrom: lattice vectors in bohr radii / angstrom.
+		nothing specified: if a lattice constant (celldm(1) or a)
+                is present, lattice vectors are in units of the lattice
+                constant; otherwise, in bohr radii.
 	    }
 	}
 
@@ -2012,12 +2014,10 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 		cols -start 1 -end 3 {
 		    rowgroup -type REAL {
 			info { 
-			    Crystal lattice vectors:
+			    Crystal lattice vectors (in cartesian axis):
 			        v1(1)  v1(2)  v1(3)    ... 1st lattice vector
 			        v2(1)  v2(2)  v2(3)    ... 2nd lattice vector
 			        v3(1)  v3(2)  v3(3)    ... 3rd lattice vector
-			    
-			    In alat units if celldm(1) was specified or in a.u. otherwise.
 			}		    
 			row v1
 			row v2

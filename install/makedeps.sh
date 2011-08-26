@@ -11,9 +11,9 @@ TOPDIR=`pwd`
 
 if test $# = 0
 then
-    dirs=" Modules clib PW CPV flib pwtools upftools PP PWCOND \
-           Gamma PH D3 atomic VdW XSpectra \
-	   GWW/gww GWW/pw4gww GWW/head ACFDT NEB Solvent" 
+    dirs=" Modules clib PW CPV//src flib pwtools upftools PP PWCOND//src \
+           Gamma PH//src D3 atomic//src VdW XSpectra//src \
+	   GWW//gww GWW//pw4gww GWW//head ACFDT NEB//src Solvent" 
           
 else
     dirs=$*
@@ -27,14 +27,22 @@ do
     # in directory DIR should be listed in DEPENDS
     DEPENDS="../include ../iotk/src"
     case $DIR in 
-        EE | flib | upftools | atomic | CPV | Solvent | PW )
+        EE | flib | upftools | Solvent | PW )
                   DEPENDS="$DEPENDS ../Modules "      ;;
-	PP | PWCOND | Gamma | PH | pwtools )
+	CPV/src )
+		  DEPENDS="../../Modules ../../iotk/src ../../include" ;;
+	atomic/src )
+		  DEPENDS="../../iotk/src ../../include ../../Modules" ;;
+	PP | PWCOND | Gamma | pwtools )
 		  DEPENDS="$DEPENDS ../Modules ../PW" ;;
+	PH/src )
+		 DEPENDS="../../include ../../iotk/src ../../Modules ../../PW" ;;
 	D3 | VdW | ACFDT ) 
-                  DEPENDS="$DEPENDS ../Modules ../PW ../PH" ;;
-	XSpectra  )
-		  DEPENDS="$DEPENDS ../Modules ../PW"  ;;
+                  DEPENDS="$DEPENDS ../Modules ../PW ../PH/src" ;;
+	XSpectra/src  )
+		  DEPENDS="../../iotk/src ../../include ../../Modules ../../PW"  ;;
+	PWCOND/src )
+		  DEPENDS="../../iotk/src ../../include ../../Modules ../../PW"  ;;
         GWW/pw4gww )
                   DEPENDS="../../include ../../iotk/src ../../Modules \
 		  ../../PW " ;;
@@ -42,9 +50,9 @@ do
                   DEPENDS="../../include ../../iotk/src ../../Modules " ;;
 	GWW/head )
                   DEPENDS="../../include ../../iotk/src ../../Modules \
-		  ../../PW ../../PH ../pw4gww " ;;
-	NEB )
-		  DEPENDS="$DEPENDS ../Modules ../PW" ;;
+		  ../../PW ../../PH/src ../pw4gww " ;;
+	NEB/src )
+		  DEPENDS="../../include ../../iotk/src ../../Modules ../../PW" ;;
 
     esac
 
@@ -59,7 +67,7 @@ do
         # handle special cases
         sed '/@\/cineca\/prod\/hpm\/include\/f_hpm.h@/d' \
             make.depend > make.depend.tmp
-        sed '/@iso_c_binding@/d;/@ifcore@/d' make.depend.tmp > make.depend
+        sed '/@iso_c_binding@/d' make.depend.tmp > make.depend
 
         if test "$DIR" = "clib"
         then

@@ -25,6 +25,7 @@ allocate_wfc.o \
 atomic_rho.o \
 atomic_wfc.o \
 average_pp.o \
+acfdt_in_pw.o \
 becmod.o \
 newd.o \
 bp_c_phase.o \
@@ -151,11 +152,9 @@ rdiagh.o \
 rdiaghg.o \
 read_conf_from_file.o \
 read_file.o \
-read_pseudo.o \
 regterg.o \
 remove_atomic_rho.o \
 report_mag.o \
-reset_k_points.o \
 restart_from_file.o \
 restart_in_electrons.o \
 restart_in_ions.o \

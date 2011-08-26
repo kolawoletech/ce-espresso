@@ -43,6 +43,7 @@ subroutine gener_pseudo
                     enl, enls, rcut, chis, nstoae, rmatch_augfun,&
                     lnc2paw, rhos, which_augfun, psipaw_rel, &
                     cau_fact, ik, ikus
+  use ld1inc, only: prefix, lmax
   use atomic_paw, only : us2paw, paw2us
   implicit none
 
@@ -76,7 +77,7 @@ subroutine gener_pseudo
 
   integer :: &
        n, nwf0, nst, ikl, &
-       is, ios, ind, nmax
+       is, ios, ind, nmax, l
 
   character(len=5) :: indqvan
   character(len=256) :: filename
@@ -483,6 +484,13 @@ subroutine gener_pseudo
   !
   ! write the main functions on files
   !
+  !<ceres>
+  open(unit=19,file=trim(prefix)//'.pot', status='unknown')
+  do n=1,grid%mesh
+     write(19,'(5e18.8)') grid%r(n),((vnl(n,l,1)+vpsloc(n)),l=0,lmax)
+  end do
+  close(19)
+  !</ceres>
   ! The beta functions  
   !
   call write_wfcfile(file_beta,betas,els,nbeta)

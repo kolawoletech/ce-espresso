@@ -436,13 +436,24 @@ end subroutine write_pseudo_addinfo
     integer,intent(in) :: ounps
     integer :: ios
 
+       write ( ounps, '(a)', err = 100, iostat = ios ) &
+            "<PP_PAW>"
+       write ( ounps, '(a)', err = 100, iostat = ios ) &
+            "<PP_PAW_FORMAT_VERSION>"
+       write ( ounps, '(a)', err=100, iostat=ios ) &
+            "0.1"
+       write ( ounps, '(a)', err = 100, iostat = ios ) &
+            "</PP_PAW_FORMAT_VERSION>"
+       write ( ounps, '(a)', err = 100, iostat = ios ) &
+            "<PP_PAW>"
+       
+
        write ( ounps, '(//a30)', err = 100, iostat = ios ) &
             "<PP_GIPAW_RECONSTRUCTION_DATA>"
-       
        write ( ounps, '(//a25)', err = 100, iostat = ios ) &
             "<PP_GIPAW_FORMAT_VERSION>"
-       write ( ounps, '(a1)', err=100, iostat=ios ) &
-            "1"
+       write ( ounps, '(a3)', err=100, iostat=ios ) &
+            "0.1"
        write ( ounps, '(a26)', err = 100, iostat = ios ) &
             "</PP_GIPAW_FORMAT_VERSION>"
        
@@ -490,9 +501,12 @@ subroutine write_gipaw_core_orbitals ( ounps )
      if ( .NOT. core_state ( co ) ) EXIT
      write ( ounps, '(t3,a23)', err = 100, iostat = ios ) &
           "<PP_GIPAW_CORE_ORBITAL>"
-     write ( ounps, '(2i5,t16,a,t43,a2,t50,a4,f14.8)', &
+     !!!write ( ounps, '(2i5,t16,a,t43,a2,t50,a4,f14.8)', &
+     !!!     err = 100, iostat = ios ) &
+     !!!     nn(co), ll(co), "N  L", el(co), "eig:", enl(co)
+     write ( ounps, '(2i5,t16,a,t43,f14.8)', &
           err = 100, iostat = ios ) &
-          nn(co), ll(co), "N  L", el(co), "eig:", enl(co)
+          nn(co), ll(co), "N  L", enl(co)
      write ( ounps, '(1p4e19.11)', err=100, iostat=ios ) &
           ( psi ( ir, 1, co ), ir = 1, grid%mesh )
      write ( ounps, '(t3,a24)', err = 100, iostat = ios ) &

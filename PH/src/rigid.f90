@@ -219,9 +219,11 @@ subroutine dyndiag (nat,ntyp,amass,ityp,dyn,w2,z)
   !-----------------------------------------------------------------------
   !
   !   diagonalise the dynamical matrix
+  !   On input:  amass = masses, in amu
   !   On output: w2 = energies, z = displacements
   !
   use kinds, only: dp
+  use constants, only: amconv
   implicit none
   ! input
   integer nat, ntyp, ityp(nat)
@@ -280,7 +282,7 @@ subroutine dyndiag (nat,ntyp,amass,ityp,dyn,w2,z)
            do jpol = 1,3
              dyn2((na-1)*3+ipol, (nb-1)*3+jpol) = &
                   dyn2((na-1)*3+ipol, (nb-1)*3+jpol) / &
-                  sqrt(amass(nta)*amass(ntb))
+                  (amconv*sqrt(amass(nta)*amass(ntb)))
           end do
        end do
     end do
@@ -298,7 +300,7 @@ subroutine dyndiag (nat,ntyp,amass,ityp,dyn,w2,z)
     do na = 1,nat
        nta = ityp(na)
        do ipol = 1,3
-          z((na-1)*3+ipol,i) = z((na-1)*3+ipol,i)/ sqrt(amass(nta))
+          z((na-1)*3+ipol,i) = z((na-1)*3+ipol,i)/ sqrt(amconv*amass(nta))
        end do
     end do
  end do

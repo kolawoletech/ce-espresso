@@ -7,13 +7,11 @@ default :
 	@echo 'where target is one of the following:'
 	@echo '  pw           basic code for scf, structure optimization, MD'
 	@echo '  cp           CP code: CP MD with ultrasoft pseudopotentials'
-	@echo '  ph           phonon code'
+	@echo '  ph           phonon code, Gamma-only version and third-order derivatives'
 	@echo '  neb          code for Nudged Elastic Band method'
 	@echo '  tddfpt       time dependent dft code'
 	@echo '  pp           postprocessing programs'
-	@echo '  gamma        Gamma-only version of phonon code'
 	@echo '  pwcond       ballistic conductance'
-	@echo '  d3           third-order derivatives'
 	@echo '  vdw          vdW calculation'
 	@echo '  w90          Maximally localised Wannier Functions'
 	@echo '  want         Quantum Transport with Wannier functions'
@@ -25,7 +23,7 @@ default :
 	@echo '  ld1          utilities for pseudopotential generation'
 	@echo '  upf          utilities for pseudopotential conversion'
 	@echo '  xspectra     X-ray core-hole spectroscopy calculations '
-	@echo '  pwall        same as "make pw ph pp gamma pwcond d3 tools"'
+	@echo '  pwall        same as "make pw ph pp pwcond tools"'
 	@echo '  all          same as "make pwall cp ld1 upf tddfpt"'
 	@echo '  clean        remove executables and objects'
 	@echo '  veryclean    revert distribution to the original status'
@@ -48,8 +46,8 @@ cp : bindir mods liblapack libblas libs libiotk
 	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
 
 ph : bindir mods libs pw
-	if test -d PH ; then \
-	( cd PH ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
+	if test -d PHonon ; then \
+	( cd PHonon ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
 	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
 
 neb : bindir mods libs pw
@@ -67,19 +65,9 @@ pp : bindir mods libs pw
 	( cd PP ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
 	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
 
-gamma : bindir mods libs pw
-	if test -d Gamma ; then \
-	( cd Gamma ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
-	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
-
 pwcond : bindir mods libs pw pp
 	if test -d PWCOND ; then \
 	( cd PWCOND ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
-	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
-
-d3 : bindir mods libs pw ph
-	if test -d D3 ; then \
-	( cd D3 ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
 	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
 
 vdw : bindir mods libs pw ph pp
@@ -125,7 +113,7 @@ xspectra : bindir mods libs pw
 	( cd XSpectra ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
 	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
 
-pwall : pw neb ph pp gamma pwcond d3 vdw tools acfdt
+pwall : pw neb ph pp pwcond vdw tools acfdt
 all   : pwall cp ld1 upf gww tddfpt
 
 ###########################################################
@@ -225,7 +213,7 @@ clean :
 		else $(MAKE) $(MFLAGS) TLDEPS= clean ; fi ) \
 	    fi \
 	done
-	- cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile clean
+	- @(cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile clean)
 	- /bin/rm -rf bin/*.x tmp
 	- cd tests; /bin/rm -rf CRASH *.out *.out2 
 

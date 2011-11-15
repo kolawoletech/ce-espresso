@@ -1,5 +1,5 @@
 !
-! Copyright (C) 2001-2008 Quantum ESPRESSO  group
+! Copyright (C) 2001-2011 Quantum ESPRESSO  group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
@@ -7,8 +7,8 @@
 !
 !
 !-----------------------------------------------------------------------
-subroutine irreducible_BZ (nrot, s, nsym, minus_q, at, bg, npk, nks, &
-                           xk, wk, t_rev)
+subroutine irreducible_BZ (nrot, s, nsym, minus_q, magnetic_sym, at, bg, &
+                           npk, nks, xk, wk, t_rev)
   !-----------------------------------------------------------------------
   !
   !     This routine finds the special points in the irreducible wedge of 
@@ -17,13 +17,11 @@ subroutine irreducible_BZ (nrot, s, nsym, minus_q, at, bg, npk, nks, &
   !     of the point group of the Bravais lattice.
   !
   USE kinds, only : DP
-  USE noncollin_module, ONLY : noncolin
-  USE spin_orb, ONLY : domag
   implicit none
   !
   integer,  intent(in) :: nrot, nsym, npk, s(3,3,48), t_rev(48)
   real(DP), intent(in) :: at (3,3), bg (3,3)
-  logical,  intent(in) :: minus_q
+  logical,  intent(in) :: minus_q, magnetic_sym
   integer,  intent(inout) :: nks
   real(DP), intent(inout) :: xk (3, npk), wk (npk)
   !
@@ -48,9 +46,9 @@ subroutine irreducible_BZ (nrot, s, nsym, minus_q, at, bg, npk, nks, &
   !
   !    Find the coset in the point group of the Bravais lattice
   !
-  IF (noncolin.AND.domag) THEN
-     call irrek_nc(at, bg, nrot, invs, nsym, irg, minus_q, npk, nks, xk, &
-                       wk, t_rev)
+  IF ( magnetic_sym ) THEN
+     call irrek_nc(at, bg, nrot, invs, nsym, irg, npk, nks, xk, &
+                   wk, t_rev)
   ELSE
      sym(1:nsym) = .true.
      sym(nsym+1:)= .false.
@@ -213,7 +211,7 @@ subroutine irrek (at, bg, nrot, invs, nsym, irg, minus_q, npk, &
   return
 end subroutine irrek
 !-----------------------------------------------------------------------
-subroutine irrek_nc (at, bg, nrot, invs, nsym, irg, minus_q, npk, &
+subroutine irrek_nc (at, bg, nrot, invs, nsym, irg, npk, &
                   nks, xk, wk, t_rev)
   !-----------------------------------------------------------------------
   !
@@ -238,8 +236,6 @@ subroutine irrek_nc (at, bg, nrot, invs, nsym, irg, minus_q, npk, &
   ! basis vectors of the Bravais and reciprocal lattice
   real(DP), intent(inout) :: xk (3, npk), wk (npk)
   ! special points and weights
-  logical, intent(in) :: minus_q
-  ! .true. if symmetries q = -q+G are acceptable
   !
   !    here the local variables
   !
@@ -290,16 +286,6 @@ subroutine irrek_nc (at, bg, nrot, invs, nsym, irg, minus_q, npk, &
                      nint (xk_new (2, ik) - xkn (2) ) ) < 1.0d-5 .and. &
                      abs  (xk_new (3, ik) - xkn (3) - &
                      nint (xk_new (3, ik) - xkn (3) ) ) < 1.0d-5
-              !
-              !  .... or equivalent to minus each other when minus_q=.t.
-              !
-              if (minus_q) satm = satm .or. &
-                   abs  (xk_new (1, ik) + xkn (1) - &
-                   nint (xk_new (1, ik) + xkn (1) ) ) < 1.0d-5 .and. &
-                   abs  (xk_new (2, ik) + xkn (2) - &
-                   nint (xk_new (2, ik) + xkn (2) ) ) < 1.0d-5 .and. &
-                   abs  (xk_new (3, ik) + xkn (3) - &
-                   nint (xk_new (3, ik) + xkn (3) ) ) < 1.0d-5
               IF ( satm ) THEN
                  wk_new(ik) = wk_new(ik) + wk(jk)
                  GOTO 100

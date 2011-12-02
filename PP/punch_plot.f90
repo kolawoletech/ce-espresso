@@ -246,6 +246,12 @@ SUBROUTINE punch_plot (filplot, plot_num, sample_bias, z, dz, &
      ELSE
         CALL errore('punch_plot','B_xc available only when noncolin=.true.',1)
      ENDIF
+
+  ELSEIF (plot_num == 19) THEN    ! reduced density gradient
+
+     IF (noncolin) CALL errore('punch_plot','rdg+noncolin not yet implemented',1)
+     CALL do_rdg (raux)           ! in elf.f90
+
   ELSE
 
      CALL infomsg ('punch_plot', 'plot_num not implemented')

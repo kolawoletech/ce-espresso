@@ -71,7 +71,8 @@ SUBROUTINE compute_e_dipole( x0, e_dipole, e_quadrupole )
   USE scf,        ONLY : rho
   USE lsda_mod,   ONLY : nspin
   USE fft_base,   ONLY : dfftp
-  USE mp_global,  ONLY : me_pool, intra_pool_comm
+  USE mp_global,  ONLY : me_pool, intra_pool_comm, &
+                         me_bgrp, intra_bgrp_comm
   USE mp,         ONLY : mp_sum
   !
   IMPLICIT NONE
@@ -95,9 +96,15 @@ SUBROUTINE compute_e_dipole( x0, e_dipole, e_quadrupole )
   !
 #if defined (__PARA)
   !
+#ifdef __BANDS
+  DO i = 1, me_bgrp
+     index0 = index0 + dfftp%nr1x*dfftp%nr2x*dfftp%npp(i)
+  END DO
+#else
   DO i = 1, me_pool
      index0 = index0 + dfftp%nr1x*dfftp%nr2x*dfftp%npp(i)
   END DO
+#endif
   !
 #endif
   !
@@ -145,8 +152,13 @@ SUBROUTINE compute_e_dipole( x0, e_dipole, e_quadrupole )
      !
   END DO
   !
+#ifdef __BANDS
+  CALL mp_sum(  e_dipole(0:3) , intra_bgrp_comm )
+  CALL mp_sum(  e_quadrupole  , intra_bgrp_comm )
+#else
   CALL mp_sum(  e_dipole(0:3) , intra_pool_comm )
   CALL mp_sum(  e_quadrupole  , intra_pool_comm )
+#endif
   !
   e_dipole(0) = e_dipole(0)*omega / DBLE( dfftp%nr1*dfftp%nr2*dfftp%nr3 )
   !
@@ -166,7 +178,7 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
   !
   USE kinds,      ONLY : DP
   USE io_global,  ONLY : stdout
-  USE constants,  ONLY : e2, pi, rytoev
+  USE constants,  ONLY : e2, pi, rytoev, au_debye
   USE ions_base,  ONLY : nat, ityp, tau, zv
   USE cell_base,  ONLY : at, bg, omega, alat, ibrav
   USE io_global,  ONLY : ionode
@@ -181,7 +193,7 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
   REAL(DP), INTENT(IN)  :: dipole_el(0:3), quadrupole_el
   REAL(DP), INTENT(OUT) :: qq
   !
-  REAL(DP) :: debye, dipole_ion(3), quadrupole_ion, dipole(3), quadrupole
+  REAL(DP) :: dipole_ion(3), quadrupole_ion, dipole(3), quadrupole
   REAL(DP) :: zvia, zvtot
   REAL(DP) :: corr1, corr2, aa, bb
   INTEGER  :: ia, ip
@@ -234,8 +246,6 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
   WRITE( stdout, '(/5X,"charge density inside the ", &
        &               "Wigner-Seitz cell:",3F14.8," el.")' ) dipole_el(0)
   !
-  debye = 2.54176D0
-  !
   WRITE( stdout, &
          '(/5X,"reference position (x0):",5X,3F14.8," bohr")' ) x0(:)*alat
   !
@@ -243,16 +253,16 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
   !
   WRITE( stdout, '(/5X,"Dipole moments (with respect to x0):")' )
   WRITE( stdout, '( 5X,"Elect",3F9.4," au (Ha),",3F9.4," Debye")' ) &
-      (-dipole_el(ip), ip = 1, 3), (-dipole_el(ip)*debye, ip = 1, 3 )
+      (-dipole_el(ip), ip = 1, 3), (-dipole_el(ip)*au_debye, ip = 1, 3 )
   WRITE( stdout, '( 5X,"Ionic",3F9.4," au (Ha),", 3F9.4," Debye")' ) &
-      ( dipole_ion(ip),ip = 1, 3), ( dipole_ion(ip)*debye,ip = 1, 3 )
+      ( dipole_ion(ip),ip = 1, 3), ( dipole_ion(ip)*au_debye,ip = 1, 3 )
 #ifdef __SOLVENT
   IF ( do_solvent ) &
     WRITE( stdout, '( 5X,"Diele",3F9.4," au (Ha),", 3F9.4," Debye")' ) &
-      (-pol_dipole(ip),ip = 1, 3), (-pol_dipole(ip)*debye,ip = 1, 3 )
+      (-pol_dipole(ip),ip = 1, 3), (-pol_dipole(ip)*au_debye,ip = 1, 3 )
 #endif
   WRITE( stdout, '( 5X,"Total",3F9.4," au (Ha),", 3F9.4," Debye")' ) &
-      ( dipole(ip),    ip = 1, 3), ( dipole(ip)*debye,    ip = 1, 3 )
+      ( dipole(ip),    ip = 1, 3), ( dipole(ip)*au_debye,    ip = 1, 3 )
   !
   ! ... print the electronic, ionic and total quadrupole moments
   !
@@ -319,7 +329,7 @@ SUBROUTINE vacuum_level( x0, zion )
   USE cell_base, ONLY : at, alat, tpiba, tpiba2
   USE ions_base, ONLY : nsp
   USE vlocal,    ONLY : strf, vloc
-  USE mp_global, ONLY : intra_pool_comm
+  USE mp_global, ONLY : intra_pool_comm, intra_bgrp_comm
   USE mp,        ONLY : mp_sum
   USE control_flags, ONLY : gamma_only
   USE basic_algebra_routines, ONLY : norm
@@ -466,9 +476,15 @@ SUBROUTINE vacuum_level( x0, zion )
         !
      END DO
      !
+#ifdef __BANDS
+     CALL mp_sum( vsph, intra_bgrp_comm )
+     CALL mp_sum( qsph, intra_bgrp_comm )
+     CALL mp_sum( qqr,  intra_bgrp_comm )
+#else
      CALL mp_sum( vsph, intra_pool_comm )
      CALL mp_sum( qsph, intra_pool_comm )
      CALL mp_sum( qqr,  intra_pool_comm )
+#endif
      !
      qq = ( zion - qqr )
      !
@@ -503,7 +519,8 @@ SUBROUTINE compute_pol_dipole( x0, pol_dipole, pol_quadrupole )
   USE cell_base,  ONLY : at, bg, omega, alat
   USE solvent_base, ONLY : epsinfty, rhopol
   USE fft_base,   ONLY : dfftp
-  USE mp_global,  ONLY : me_pool, intra_pool_comm
+  USE mp_global,  ONLY : me_pool, intra_pool_comm, &
+                         me_bgrp, intra_bgrp_comm
   USE mp,         ONLY : mp_sum
   !
   IMPLICIT NONE
@@ -529,9 +546,15 @@ SUBROUTINE compute_pol_dipole( x0, pol_dipole, pol_quadrupole )
   !
 #if defined (__PARA)
   !
+#ifdef __BANDS
+  DO i = 1, me_bgrp
+     index0 = index0 + dfftp%nr1x*dfftp%nr2x*dfftp%npp(i)
+  END DO
+#else
   DO i = 1, me_pool
      index0 = index0 + dfftp%nr1x*dfftp%nr2x*dfftp%npp(i)
   END DO
+#endif
   !
 #endif
   !
@@ -577,8 +600,13 @@ SUBROUTINE compute_pol_dipole( x0, pol_dipole, pol_quadrupole )
      !
   END DO
   !
+#ifdef __BANDS
+  CALL mp_sum(  pol_dipole(0:3) , intra_bgrp_comm )
+  CALL mp_sum(  pol_quadrupole  , intra_bgrp_comm )
+#else
   CALL mp_sum(  pol_dipole(0:3) , intra_pool_comm )
   CALL mp_sum(  pol_quadrupole  , intra_pool_comm )
+#endif
   !
   pol_dipole(0) = pol_dipole(0)*omega / DBLE( dfftp%nr1*dfftp%nr2*dfftp%nr3 )
   !

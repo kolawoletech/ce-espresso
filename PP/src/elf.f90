@@ -201,7 +201,7 @@ SUBROUTINE do_rdg (rdg)
   real(dp), intent(out) :: rdg (dfftp%nnr)
   real(dp), allocatable :: grho(:,:)
   real(dp), parameter :: fac = (1.d0/2.d0) * 1.d0/(3.d0*pi**2)**(1.d0/3.d0)
-  real(dp), parameter :: rho_cut = 1d-4
+  real(dp), parameter :: rho_cut = 0.05d0
   integer :: is, i
 
   ! gradient of rho
@@ -218,9 +218,12 @@ SUBROUTINE do_rdg (rdg)
 
   ! calculate rdg
   do i = 1, dfftp%nnr
-    rdg(i) = 0.d0
-    if (rho%of_r(i,1) > rho_cut) &
+    !rdg(i) = 100.d0
+    if (rho%of_r(i,1) > rho_cut) then
+      rdg(i) = fac * 100.d0 / abs(rho%of_r(i,1))**(4.d0/3.d0)
+    else
       rdg(i) = fac * sqrt(grho(1,i)**2 + grho(2,i)**2 + grho(3,i)**2) / abs(rho%of_r(i,1))**(4.d0/3.d0)
+    endif
   enddo
 
   deallocate( grho )

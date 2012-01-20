@@ -218,7 +218,6 @@ SUBROUTINE do_rdg (rdg)
 
   ! calculate rdg
   do i = 1, dfftp%nnr
-    !rdg(i) = 100.d0
     if (rho%of_r(i,1) > rho_cut) then
       rdg(i) = fac * 100.d0 / abs(rho%of_r(i,1))**(4.d0/3.d0)
     else

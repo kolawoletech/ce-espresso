@@ -99,6 +99,10 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pp.x 
 
                    18 = The exchange and correlation magnetic field in
                         the noncollinear case
+
+                   19 = Reduced density gradient (J. Chem. Theory Comput. 7, 625 (2011))
+                        Set the isosurface between 0.3 and 0.6 to plot the non-covalent
+                        interactions
 	    }
 	}
 

@@ -300,6 +300,9 @@ input_description -distribution {Quantum Espresso} -program ld1.x {
 		  (Use rel_dist if you want to average the electrons
 		  over all available states.)
 
+                * If config='default' the code uses zed to set the ground
+                  state electronic configuration for the atom.
+
 		Negative occupancies are used to flag unbound states;
 		they are not actually used.
 	    }
@@ -401,11 +404,14 @@ input_description -distribution {Quantum Espresso} -program ld1.x {
 	
 	var pseudotype  -type INTEGER {
 	    info {
-		1 ... norm-conserving, single-projector PP (old format)
-                      IMPORTANT: if pseudotype=1 all calculations are done using
-                      the SEMILOCAL form, not the separable nonlocal form
+		1 ... norm-conserving, single-projector PP
+                      IMPORTANT: if pseudotype=1 all calculations are done
+                      using the SEMILOCAL form, not the separable nonlocal form
 		
-		2 ... norm-conserving, multiple-projector PP in separable form
+		2 ... norm-conserving PP in separable form (obsolescent)
+                      All calculations are done using SEPARABLE non-local form
+                      INMPORTANT: multiple projectors allowed but not properly
+                      implemented, use only if you know what you are doing
 
 		3 ... ultrasoft PP
 	    }
@@ -414,8 +420,8 @@ input_description -distribution {Quantum Espresso} -program ld1.x {
 	var upf_v1_format -type LOGICAL {
             default { .false. }
 	    info {
-		.true. generates pseudo-potential file in UPF version 1 format,
-                       compatible with QE version 3
+		.true. generates pseudo-potential file in UPF version 1 format
+                       Do not use except if you need GIPAW reconstruction info
 	    }
 	}
 

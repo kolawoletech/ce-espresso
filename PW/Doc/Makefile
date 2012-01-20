@@ -22,14 +22,15 @@ $(PDFS): %.pdf: %.tex
 clean:
 	- rm -f $(PDFS) $(AUXS) $(LOGS) $(OUTS) $(TOCS) *~
 	- rm -rf user_guide/
-	- rm -f INPUT_*.html INPUT_*.txt INPUT_*.xml
 	- rm -rf input_xx.xsl
-	- rm -rf ../../Doc/INPUT_PH.* ../../Doc/INPUT_D3.*
+	- rm -f INPUT_*.html INPUT_*.txt INPUT_*.xml
+	- rm -rf ../../Doc/INPUT_PW.*
+
 
 user_guide: user_guide.pdf
 	rm -rf user_guide/
 	latex2html \
-                -t "User's Guide for the PHonon package" \
+                -t "User's Guide for the PWscf package" \
                 -html_version 3.2,math \
                 -toc_depth 5 -split 5 -toc_stars -show_section_numbers \
                 -local_icons -image_type png \
@@ -47,11 +48,8 @@ user_guide: user_guide.pdf
 	@echo ""
 
 
-defs: link_input_xx INPUT_PH.txt INPUT_D3.txt INPUT_PH.html INPUT_D3.html link_on_main_doc
-INPUT_PH.txt: %.txt: %.def
-	$(HELPDOC) $<
-INPUT_D3.txt: %.txt: %.def
-	$(HELPDOC) $<
+defs: link_input_xx INPUT_PW.html INPUT_PW.txt link_on_main_doc
+
 link_input_xx:
 	if test -f ../../doc-def/input_xx.xsl ; then \
 	(ln -s ../../doc-def/input_xx.xsl input_xx.xsl) ; \
@@ -61,15 +59,12 @@ link_input_xx:
 	echo ; \
 	fi
 
-INPUT_PH.html: %.html: %.def input_xx.xsl
+INPUT_PW.html: %.html: %.def
 	$(HELPDOC) $<
-INPUT_D3.html: %.html: %.def input_xx.xsl
+INPUT_PW.txt: %.txt: %.def
 	$(HELPDOC) $<
 
 link_on_main_doc:
-	-( cd ../../Doc ; ln -fs ../PHonon/Doc/INPUT_PH.html . ; \
-	ln -fs ../PHonon/Doc/INPUT_PH.xml . ; \
-	ln -fs ../PHonon/Doc/INPUT_PH.txt . ; \
-	ln -fs ../PHonon/Doc/INPUT_D3.html . ; \
-	ln -fs ../PHonon/Doc/INPUT_D3.xml . ; \
-	ln -fs ../PHonon/Doc/INPUT_D3.txt)
+	-( cd ../../Doc ; ln -fs ../PW/Doc/INPUT_PW.html . ; \
+	ln -fs ../PW/Doc/INPUT_PW.xml . ; \
+	ln -fs ../PW/Doc/INPUT_PW.txt .) 

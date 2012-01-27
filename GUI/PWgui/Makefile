@@ -27,10 +27,12 @@ DOC_FILES = \
 
 EXAMPLES_FILES = \
 	examples/pw/*.pw.inp examples/pw/*.in \
+	examples/neb.dat/*.dat \
 	examples/ph/*.ph.inp \
 	examples/pp/*.pp.inp \
 	examples/projwfc/*.pr.inp \
-	examples/d3/*.d3.inp 
+	examples/d3/*.d3.inp \
+	examples/atomic/*.in	
 
 IMAGES_FILES = \
 	images/*.gif \

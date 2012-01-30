@@ -184,7 +184,6 @@ then
                 *-ibm-aix* )            arch=aix    ;;
                 sparc-sun-* )           arch=sparc  ;;
                 i386-pc-solaris* )      arch=solaris;;
-                powerpc-apple-darwin* ) arch=macppc ;;
                 i686-apple-darwin* )    arch=mac686 ;;
                 *-pc-cygwin )           arch=cygwin ;;
                 sx*-nec* )              arch=necsx  ;;
@@ -228,17 +227,6 @@ aix )
 crayxt* )
         try_f90="ftn"
         try_mpif90="ftn"
-        ;;
-macppc )
-        try_mpif90="mpxlf90 mpf90"
-        try_f90="xlf90 $try_f90"
-        try_dflags="-D__XLF"
-# due to bugs in xlf 8.1 for powerpc mac os-x, the iotk library must be
-# created as a dynamical library, using "libtool" - OBSOLETE
-
-# try_arflags_dynamic="-dynamic -arch_only ppc -all_load -single_module -L/opt/ibmcmp/xlf/8.1/lib -lxlf90 -lxl -lc -o"
-# try_ar="libtool"
-# try_arflags="-static -o"
         ;;
 mac686 | cygwin )
         try_f90="ifort $try_f90"
@@ -486,9 +474,6 @@ sparc:* | solaris:sunf95 )
 cray*:* )
         try_cc="cc"
         ;;
-macppc:xlf90 )
-        try_f77="xlf $f90"
-        ;;
 necsx:* )
         try_cc="sxcc"
         ;;
@@ -677,16 +662,6 @@ crayxt*:pathf* )
         try_ldflags_static="-static"
         have_cpp=1
         ;;
-macppc:* )
-        try_fflags="-O4 -qarch=auto -qtune=auto -qsuffix=cpp=f90 \
--qdpc -qalias=nointptr"
-        try_f90flags="\$(FFLAGS) -qfree=f90"
-        try_fflags_noopt="-O0"
-        try_ldflags=""
-        pre_fdflags="-WF,"
-        xlf_flags=1
-        ;;
-
 necsx:* )
         try_fflags='      -float0 -Cvopt -eab -R5 -Wf,-Ncont,-A dbl4,-P nh,-ptr byte,-pvctl noifopt loopcnt=9999999 expand=12 fullmsg vwork=stack,-fusion,-O noif,-init stack=nan heap=nan'
         try_f90flags='  -f2003  -float0 -Cvopt -eab -R5 -Wf,-Ncont,-A dbl4,-P nh,-ptr byte,-pvctl noifopt loopcnt=9999999 expand=12 fullmsg vwork=stack,-fusion,-O noif,-init stack=nan heap=nan'
@@ -800,9 +775,6 @@ sparc:cc )
         ;;
 crayxt*:cc )
         try_cflags="-fast"
-        ;;
-macppc:xlc* )
-        try_cflags="-O4"
         ;;
 necsx:* )
         #try_cflags="-D__SX6 \$(IFLAGS) \$(MODFLAGS)"
@@ -1272,7 +1244,6 @@ then
         esac
         fi
 
-        # macppc :  try_libdirs="/usr/local/lib /sw/lib"
         if test "$have_blas" -eq 0
         then
                 # check for atlas (in several directories)
@@ -1422,7 +1393,6 @@ if test "$use_internal_lapack" -eq 0
         if test "$have_lapack" -eq 0
         then
                 # check for lapack (in several directories)
-                # macppc : try_libdirs="/usr/local/lib /sw/lib"
                 try_libdirs="/usr/local/lib"
                 try_libdirs="$libdirs $try_libdirs $ld_library_path"
 

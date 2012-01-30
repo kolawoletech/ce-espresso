@@ -21,19 +21,14 @@ SUBROUTINE init_run()
 #ifdef __PARA
   USE paw_init,           ONLY : paw_post_init
 #endif
-  USE bp,                 ONLY : lberry, lelfield
+  USE bp,                 ONLY : allocate_bp_efield, bp_global_map
 #ifdef __SOLVENT
   USE fft_base,           ONLY : dfftp
   USE solvent_base,       ONLY : do_solvent
 #endif
   USE recvec_subs,        ONLY : ggen
-! DCC
-!  USE grid_dimensions,    ONLY : nr1x, nr2x, nr3x, nr1, nr2, nr3
-!  USE gvect,              ONLY : ecutwfc
-!  USE ee_mod,             ONLY : do_comp, do_coarse
-! Wannier_ac
   USE wannier_new,        ONLY : use_wannier    
-  USE dfunct,                 only : newd
+  USE dfunct,             ONLY : newd
   USE esm,                ONLY : do_comp_esm, esm_ggen_2d
   !
   IMPLICIT NONE
@@ -71,20 +66,11 @@ SUBROUTINE init_run()
   CALL allocate_locpot()
   CALL allocate_wfc()
   CALL allocate_bp_efield()
-  IF( lberry .or. lelfield) call bp_global_map()
+  CALL bp_global_map()
 #ifdef __SOLVENT
   IF ( do_solvent ) CALL solvent_initbase( dfftp%nnr )
 #endif
-! DCC
-  ! ... Initializes EE variables
   !
-!  IF ( do_comp ) CALL init_ee(nr1x,nr2x,nr3x)
-  !
-!  IF ( do_coarse )  THEN
-!    CALL ggen_coarse()
-!    CALL data_structure_coarse( gamma_only, nr1,nr2,nr3, ecutwfc )
-!  END IF
-
   CALL memory_report()
   !
   ALLOCATE( et( nbnd, nkstot ) , wg( nbnd, nkstot ), btype( nbnd, nkstot ) )

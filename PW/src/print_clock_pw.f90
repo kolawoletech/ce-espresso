@@ -155,7 +155,7 @@ SUBROUTINE print_clock_pw()
    !    
    WRITE( stdout, * )
    !
-#if defined (__PARA)
+#if defined (__MPI)
    WRITE( stdout, '(5X,"Parallel routines")' )
    !
    CALL print_clock( 'reduce' )
@@ -163,7 +163,6 @@ SUBROUTINE print_clock_pw()
    CALL print_clock( 'ALLTOALL' )
 #endif
    !
-#ifdef EXX
    WRITE( stdout, '(5X,"EXX routines")' )
    !
    CALL print_clock( 'exx_grid' )
@@ -174,7 +173,6 @@ SUBROUTINE print_clock_pw()
    CALL print_clock( 'exxen2' )
    !CALL print_clock( 'exxen2_ngmloop' )
    CALL print_clock ('cycleig')
-#endif
    !
    IF ( okpaw ) THEN
       WRITE( stdout, * )

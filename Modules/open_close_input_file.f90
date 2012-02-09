@@ -10,10 +10,12 @@
 SUBROUTINE open_input_file_x(lxmlinput,attr,unit)
   !-----------------------------------------------------------------------------
   !
-  ! ...  this subroutine opens the input file standard input ( unit 5 )
-  ! ...  Use "-input filename" to read input from file "filename":
-  ! ...  may be useful if you have trouble reading from standard input
-  ! ...  or xml input. xml input can be opened on a different unit than 5.
+  ! ...  this subroutine opens unit "unit" (5 if unspecified) for input read
+  ! ...  Use "-in", "-inp", "-input filename" to read input from file "filename"
+  ! ...  If a filename is not specified, read from standard input (pw.x < ...)
+  ! ...  Standard input is dumped to file "input_tmp.in" and read from there
+  ! ...  do not call "errore" here: it may hang in parallel execution
+  ! ...  since this routine is called by ionode only
   ! ...  ---------------------------------------------------------------
   !
   USE kinds,         ONLY : DP
@@ -37,7 +39,7 @@ SUBROUTINE open_input_file_x(lxmlinput,attr,unit)
   CHARACTER (len=50) :: arg
   !
   INTEGER :: stderr=6, stdin=5
-  CHARACTER(LEN=256) :: dummy, input_file, temp_file
+  CHARACTER(LEN=256) :: dummy, input_file
   INTEGER :: stdtmp
   LOGICAL :: lfound
   !
@@ -71,17 +73,11 @@ SUBROUTINE open_input_file_x(lxmlinput,attr,unit)
   !
   ! ... Input from file ?
   !
-  temp_file="input_tmp.in"
-  !
-  input_file=""
-  !
+  input_file=" "
   lfound=.false.
-  stdtmp = find_free_unit()
-  OPEN(UNIT = stdtmp, FILE = trim(temp_file))
-  !
   nargs = iargc()
   !
-  ierr = -1
+  ierr = 0
   !
   DO iiarg = 1, ( nargs - 1 )
      !
@@ -93,69 +89,57 @@ SUBROUTINE open_input_file_x(lxmlinput,attr,unit)
         !
         CALL getarg( ( iiarg + 1 ) , input_file )
         !
-        OPEN ( UNIT = unit_loc, FILE = input_file, FORM = 'FORMATTED', &
-               STATUS = 'OLD', IOSTAT = ierr )
-        !
-        ! copy file
-        !
-        IF ( ierr == 0 ) THEN
-          lfound=.true.
-          dummy=""
-          do while (TRIM(dummy).ne."MAGICALME")
-            read(unit_loc,fmt='(A256)',END=10) dummy
-            write(stdtmp,'(A)') trim(dummy)
-          enddo
-        ELSE IF ( ierr > 0 ) THEN
-           !
-           ! do not call "errore" here: it may hang in parallel execution
-           ! since this routine is called by ionode only
-           WRITE (stderr, '(" *** input file ",A," not found ***")' ) TRIM( input_file )
-           !
-        ENDIF
+        lfound=.true.
+        GO TO 10
      END IF
      !
   END DO
-10 CONTINUE
   !
-  IF (lfound) THEN
-     CLOSE(unit_loc)
-  ELSE
+10 stdtmp = find_free_unit()
+  !
+  IF ( .NOT. lfound) THEN
+     !
      ! if no file specified then copy from standard input
+     !
+     input_file="input_tmp.in"
+     OPEN(UNIT = stdtmp, FILE=trim(input_file), FORM='formatted', &
+          STATUS='unknown')
+     !
      dummy=""
-     ! also input_file which is used later must now be set to
-     ! something sensible
-     input_file="stdin"
      WRITE(stdout, '(5x,a)') "Waiting for input..."
-     do while (TRIM(dummy).ne."MAGICALME")
-       read(stdin,fmt='(A256)',END=20) dummy
-       write(stdtmp,'(A)') trim(dummy)
-     enddo
+     DO WHILE ( TRIM(dummy) .NE. "MAGICALME" )
+       READ (stdin,fmt='(A256)',END=20) dummy
+       WRITE (stdtmp,'(A)') trim(dummy)
+     END DO
+     !
+20   CLOSE ( UNIT=stdtmp, STATUS='keep' )
   ENDIF
-  !
-20 CONTINUE
-  !
-  CLOSE(stdtmp)
-  OPEN ( UNIT = unit_loc, FILE = trim(temp_file) , FORM = 'FORMATTED', &
-          STATUS = 'OLD', IOSTAT = ierr )
   !
   IF (lcheckxml) THEN
     !
-    CALL test_input_xml(unit_loc,lxmlinput_loc)
+    OPEN ( UNIT = stdtmp, FILE = trim(input_file) , FORM = 'FORMATTED', &
+          STATUS = 'OLD', IOSTAT = ierr )
+    CALL test_input_xml (stdtmp, lxmlinput_loc )
+    CLOSE ( UNIT=stdtmp, status='keep')
     !
     lxmlinput = lxmlinput_loc
     !
-    IF(lxmlinput_loc) then
-       CLOSE(unit_loc)
-       WRITE(stdout, '(5x,a)') "Reading xml input from "//TRIM(input_file)
-       CALL iotk_open_read( unit_loc, "input_tmp.in", attr = attr, qe_syntax = .true., ierr = ierr)
-       IF (ierr /= 0) CALL errore('open_input_file','error opening xml file', abs(ierr))
-    ENDIF
-    !
   ENDIF
   !
-  IF(.not.lxmlinput_loc) THEN
-     CLOSE(unit_loc)
-     WRITE(stdout, '(5x,a)') "Reading input from "//TRIM(input_file)
+  IF (lxmlinput_loc) then
+     IF ( input_file .NE. "input_tmp.in") THEN
+        WRITE(stdout, '(5x,a)') "Reading xml input from "//TRIM(input_file)
+     ELSE
+        WRITE(stdout, '(5x,a)') "Reading xml input from standard input"
+     END IF
+     CALL iotk_open_read( unit_loc, input_file, attr = attr, &
+                          qe_syntax = .true., ierr = ierr)
+  ELSE 
+     IF ( input_file .NE. "input_tmp.in") THEN
+         WRITE(stdout, '(5x,a)') "Reading input from "//TRIM(input_file)
+     ELSE
+         WRITE(stdout, '(5x,a)') "Reading input from standard input"
+     END IF
      OPEN ( UNIT = unit_loc, FILE = "input_tmp.in" , FORM = 'FORMATTED', &
             STATUS = 'OLD', IOSTAT = ierr )
   ENDIF

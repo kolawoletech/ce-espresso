@@ -68,6 +68,22 @@ int F77_FUNC_(c_mkdir_int,C_MKDIR_INT)( const int * dirname , const int * length
 
 } /* end of c_mkdir */
 
+int c_mkdir_safe( const char * dirname )
+{
+   int i, retval = -1 ;
+
+   mode_t mode = 0777 ;
+   retval = mkdir( dirname , mode ) ;
+
+   if ( retval == -1  && errno != EEXIST ) {
+     fprintf( stderr , "mkdir fail: [%d] %s\n" , errno , strerror( errno ) ) ;
+     }
+   else {
+     retval = 0 ;
+     }
+   return retval ;
+}
+
 int F77_FUNC_(c_chdir_int,C_CHDIR_INT)( const int * dirname , const int * length )
 {
 

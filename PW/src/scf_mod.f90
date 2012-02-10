@@ -486,6 +486,7 @@ CONTAINS
      rho_ddot = fac*rho_ddot
      !
      IF ( gamma_only ) rho_ddot = 2.D0 * rho_ddot
+#if 0
      !
      ! ... then the magnetization
      !
@@ -510,6 +511,7 @@ CONTAINS
                                     ( rho2%of_g(ig,1) - rho2%of_g(ig,2) ), DP )
         !
      END DO
+#endif
      !
   ELSE IF ( nspin == 4 ) THEN
      !

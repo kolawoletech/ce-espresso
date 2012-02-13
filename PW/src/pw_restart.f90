@@ -476,12 +476,11 @@ MODULE pw_restart
          CALL iotk_write_attr ( attr, "UNITS", "Hartree", FIRST = .TRUE. )
          CALL iotk_write_empty( iunpun, "UNITS_FOR_ENERGIES", ATTR = attr )
          !
-         CALL iotk_write_dat(iunpun,"TWO_FERMI_ENERGIES",two_fermi_energies)
+         ! Fermi energy units in Hartree
          !
          IF (two_fermi_energies) THEN
              !
-             ! all the energy units in Hartree
-             !
+             CALL iotk_write_dat(iunpun,"TWO_FERMI_ENERGIES",two_fermi_energies)
              CALL iotk_write_dat( iunpun, "ELECTRONS_UP", nelup )
              CALL iotk_write_dat( iunpun, "ELECTRONS_DOWN", neldw )
              CALL iotk_write_dat( iunpun, "FERMI_ENERGY_UP", ef_up / e2 )
@@ -2201,7 +2200,9 @@ MODULE pw_restart
                !
             ENDIF
             !
-            CALL iotk_scan_dat(iunpun,"TWO_FERMI_ENERGIES",two_fermi_energies)
+            CALL iotk_scan_dat(iunpun,"TWO_FERMI_ENERGIES", &
+                 two_fermi_energies, FOUND = found)
+            IF ( .not. found ) two_fermi_energies=.FALSE.
             !
             IF (two_fermi_energies) THEN
                 !
@@ -2752,7 +2753,9 @@ MODULE pw_restart
             ef = 0.d0
          END IF
          !
-         CALL iotk_scan_dat( iunpun, "TWO_FERMI_ENERGIES", two_fermi_energies_ )
+         CALL iotk_scan_dat( iunpun, "TWO_FERMI_ENERGIES", &
+                 two_fermi_energies_, FOUND = found)
+         IF ( .not. found ) two_fermi_energies_=.FALSE.
          !
          IF ( two_fermi_energies_ ) THEN
              !
@@ -2786,56 +2789,64 @@ MODULE pw_restart
                isk(ik) = 1
                !
                IF (lkpoint_dir) THEN
-                  CALL iotk_scan_begin(iunpun, "DATAFILE"//TRIM(iotk_index(1)))
+                  CALL iotk_scan_begin(iunpun, "DATAFILE"//TRIM(iotk_index(1)) &
+                                             , FOUND = found)
+                  IF (.NOT. found ) GO TO 10 ! workaround: PW-CP compatibility
                   CALL iotk_scan_dat  ( iunpun, "EIGENVALUES", et(:,ik)  )
                   CALL iotk_scan_dat  ( iunpun, "OCCUPATIONS", wg(:,ik) )
                   CALL iotk_scan_end(iunpun, "DATAFILE"//TRIM(iotk_index(1)) )
                ELSE
                   CALL iotk_scan_begin( iunout, &
-                             "DATA_EIG"//TRIM( iotk_index( ik ) )//"_SPIN_UP")
+                  "DATA_EIG"//TRIM( iotk_index(ik) )//"_SPIN_UP", FOUND=found )
+                  IF (.NOT. found ) GO TO 10 ! workaround: PW-CP compatibility
                   CALL iotk_scan_dat  ( iunout, "EIGENVALUES", et(:,ik)  )
                   CALL iotk_scan_dat  ( iunout, "OCCUPATIONS", wg(:,ik) )
                   CALL iotk_scan_end( iunout, &
                              "DATA_EIG"//TRIM( iotk_index( ik ) )//"_SPIN_UP")
                ENDIF
                !
+  10           CONTINUE
                ik_eff = ik + num_k_points
-               !
                isk(ik_eff) = 2
                !
                IF (lkpoint_dir) THEN
-                  CALL iotk_scan_begin(iunpun,"DATAFILE"//TRIM(iotk_index(2)) )
+                  CALL iotk_scan_begin(iunpun,"DATAFILE"//TRIM(iotk_index(2)) &
+                                             , FOUND = found)
+                  IF (.NOT. found ) GO TO 20 ! workaround: PW-CP compatibility
                   CALL iotk_scan_dat  ( iunpun, "EIGENVALUES", et(:,ik_eff) )
                   CALL iotk_scan_dat  ( iunpun, "OCCUPATIONS", wg(:,ik_eff) )
                   CALL iotk_scan_end( iunpun, "DATAFILE"//TRIM(iotk_index(2)) )
                ELSE
                   CALL iotk_scan_begin( iunout, &
-                             "DATA_EIG"//TRIM( iotk_index( ik ) )//"_SPIN_DW")
+                  "DATA_EIG"//TRIM( iotk_index(ik) )//"_SPIN_DW", FOUND=found )
+                  IF (.NOT. found ) GO TO 20 ! workaround: PW-CP compatibility
                   CALL iotk_scan_dat  ( iunout, "EIGENVALUES", et(:,ik_eff) )
                   CALL iotk_scan_dat  ( iunout, "OCCUPATIONS", wg(:,ik_eff) )
                   CALL iotk_scan_end( iunout, &
                              "DATA_EIG"//TRIM( iotk_index( ik ) )//"_SPIN_DW")
                ENDIF
-               !
+  20           CONTINUE
                !
             ELSE
                !
                isk(ik) = 1
                !
                IF (lkpoint_dir) THEN
-                  CALL iotk_scan_begin( iunpun, "DATAFILE" )
+                  CALL iotk_scan_begin( iunpun, "DATAFILE" , FOUND = found)
+                  IF (.NOT. found ) GO TO 15 ! workaround: PW-CP compatibility
                   CALL iotk_scan_dat  ( iunpun, "EIGENVALUES", et(:,ik) )
                   CALL iotk_scan_dat  ( iunpun, "OCCUPATIONS", wg(:,ik) )
                   CALL iotk_scan_end  ( iunpun, "DATAFILE" )
                ELSE
                   CALL iotk_scan_begin( iunout, &
-                             "DATA_EIG"//TRIM( iotk_index( ik ) ))
+                  "DATA_EIG"//TRIM( iotk_index(ik) ), FOUND = found )
+                  IF (.NOT. found ) GO TO 15 ! workaround: PW-CP compatibility
                   CALL iotk_scan_dat  ( iunout, "EIGENVALUES", et(:,ik) )
                   CALL iotk_scan_dat  ( iunout, "OCCUPATIONS", wg(:,ik) )
                   CALL iotk_scan_end( iunout, &
                              "DATA_EIG"//TRIM( iotk_index( ik ) ))
                ENDIF
-               !
+  15           CONTINUE
                !
             END IF
             !
@@ -3321,7 +3332,7 @@ MODULE pw_restart
             CALL iotk_scan_dat(iunpun, "ecutvcut", ecutvcut)
             CALL iotk_scan_dat(iunpun, "exx_fraction", exx_fraction)
             CALL iotk_scan_dat(iunpun, "screening_parameter", screening_parameter)
-            call iotk_scan_dat(iunpun, "exx_is_active", exx_is_active)
+            CALL iotk_scan_dat(iunpun, "exx_is_active", exx_is_active)
             CALL iotk_scan_end( iunpun, "EXACT_EXCHANGE" )
          END IF
          CALL iotk_close_read( iunpun )
@@ -3340,9 +3351,9 @@ MODULE pw_restart
       CALL mp_bcast( screening_parameter, ionode_id, intra_image_comm )
       CALL mp_bcast( exx_is_active, ionode_id, intra_image_comm )
       !
-      call set_exx_fraction(exx_fraction)
-      call set_screening_parameter(screening_parameter)
-      if (exx_is_active) call start_exx
+      CALL set_exx_fraction(exx_fraction)
+      CALL set_screening_parameter(screening_parameter)
+      IF (exx_is_active) CALL start_exx( ) 
       !
       RETURN
       !

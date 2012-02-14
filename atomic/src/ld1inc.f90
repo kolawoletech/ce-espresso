@@ -354,5 +354,10 @@ MODULE ld1inc
   REAL ( dp ) :: wfc_ae_recon(ndmx,nwfx)
   REAL ( dp ) :: wfc_ps_recon(ndmx,nwfsx)
   REAL ( dp ) :: wfc_us_recon(ndmx,nwfsx)
+
   !
+  ! Potential shift
+  !
+  REAL ( dp ) :: vshift(0:lmx)
+
 END MODULE ld1inc

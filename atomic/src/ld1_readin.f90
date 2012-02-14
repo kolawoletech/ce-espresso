@@ -39,7 +39,7 @@ subroutine ld1_readin
                          rmatch_augfun, which_augfun,         & !paw
                          rmatch_augfun_nc,                    &
                          rhos, bmat, lsmall, &              ! extra for paw2us
-                         lgipaw_reconstruction, lsave_wfc, &
+                         lgipaw_reconstruction, lsave_wfc, vshift, &
                          relpert, noscf, max_out_wfc, &
                          rcutv ! LDA-1/2
 
@@ -149,7 +149,8 @@ subroutine ld1_readin
        file_recon, &    ! output file needed for the paw reconstruction
        lsave_wfc,&      ! set to true to save all-electron and ps wfc to file
        lgipaw_reconstruction, & ! write data for (GI)PAW reconstruction
-       use_paw_as_gipaw  ! EMINE: if true gipaw data will be read from paw
+       use_paw_as_gipaw, & ! EMINE: if true gipaw data will be read from paw
+       vshift           ! shift potential
 
    !
   prefix       = 'ld1'
@@ -216,6 +217,7 @@ subroutine ld1_readin
   lgipaw_reconstruction = .false.
   use_paw_as_gipaw = .false. !EMINE
   relpert = .false.
+  vshift(:) = 0.d0
 
   ! read the namelist input
 
@@ -700,7 +702,7 @@ subroutine bcast_inputp()
                          file_wfcusgen, file_recon, which_augfun, &
                          rmatch_augfun, lgipaw_reconstruction, lsave_wfc, &
                          rmatch_augfun_nc, & 
-                         use_paw_as_gipaw !EMINE
+                         use_paw_as_gipaw, vshift !EMINE
 implicit none
 #ifdef __MPI
   call mp_bcast( pseudotype, ionode_id )
@@ -729,6 +731,7 @@ implicit none
   call mp_bcast( rmatch_augfun_nc, ionode_id )
   call mp_bcast( lsave_wfc, ionode_id )
   call mp_bcast( lgipaw_reconstruction, ionode_id )
+  call mp_bcast( vshift, ionode_id )
 #endif
   return
 end subroutine bcast_inputp

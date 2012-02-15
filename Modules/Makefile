@@ -10,6 +10,7 @@ atom.o \
 autopilot.o \
 basic_algebra_routines.o \
 bfgs_module.o \
+fd_gradient.o  \
 cell_base.o  \
 check_stop.o  \
 clocks.o \
@@ -22,12 +23,14 @@ dspev_drv.o \
 electrons_base.o \
 environment.o \
 error_handler.o \
+fd_gradient.o \
 fft_base.o \
 fft_interfaces.o \
 fft_parallel.o \
 fft_scalar.o \
 fft_types.o \
 funct.o \
+generate_function.o \
 griddim.o \
 image_io_routines.o \
 input_parameters.o \

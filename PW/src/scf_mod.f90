@@ -85,9 +85,6 @@ MODULE scf
   REAL(DP) :: v_of_0    ! vltot(G=0)      
   REAL(DP), ALLOCATABLE :: &
        vltot(:),       &! the local potential in real space
-#ifdef __SOLVENT
-       vltot_zero(:),  &! backup of local potential in real space
-#endif
        vrs(:,:),       &! the total pot. in real space (smooth grid)
        rho_core(:),    &! the core charge in real space
        kedtau(:,:)      ! position dependent kinetic energy enhancement factor
@@ -486,7 +483,6 @@ CONTAINS
      rho_ddot = fac*rho_ddot
      !
      IF ( gamma_only ) rho_ddot = 2.D0 * rho_ddot
-#if 0
      !
      ! ... then the magnetization
      !
@@ -511,7 +507,6 @@ CONTAINS
                                     ( rho2%of_g(ig,1) - rho2%of_g(ig,2) ), DP )
         !
      END DO
-#endif
      !
   ELSE IF ( nspin == 4 ) THEN
      !

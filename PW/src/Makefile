@@ -41,7 +41,6 @@ cdiaghg.o \
 cegterg.o \
 clean_pw.o \
 close_files.o \
-commutator_Hx_psi.o \
 compute_becsum.o \
 compute_deff.o \
 compute_dip.o \
@@ -170,7 +169,6 @@ save_in_electrons.o \
 save_in_ions.o \
 scale_h.o \
 scf_mod.o \
-set_hubbard_l.o \
 set_kplusq.o \
 set_kup_and_kdw.o \
 set_rhoc.o \

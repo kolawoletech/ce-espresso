@@ -40,6 +40,7 @@ check_restart_recover.o \
 clean_pw_ph.o \
 clinear.o \
 close_phq.o \
+commutator_Hx_psi.o \
 compute_alphasum.o \
 compute_becalp.o \
 compute_becsum_ph.o \
@@ -117,7 +118,6 @@ psyme.o \
 psym_dmag.o \
 psym_dmage.o \
 punch_plot_e.o \
-punch_plot_ph.o \
 q_points.o \
 q_points_wannier.o \
 q2qstar_ph.o \

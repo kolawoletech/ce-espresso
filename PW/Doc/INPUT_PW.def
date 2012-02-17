@@ -6,7 +6,8 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 	Input data format: { } = optional, [ ] = it depends, | = or
 	
 	All quantities whose dimensions are not explicitly specified are in
-	RYDBERG ATOMIC UNITS
+	RYDBERG ATOMIC UNITS. Charge is "number" charge (i.e. not multiplied 
+        by e); potentials are in energy units (i.e. they are multiplied by e)
 
         BEWARE: TABS, DOS <CR><LF> CHARACTERS ARE POTENTIAL SOURCES OF TROUBLE 
 
@@ -1571,7 +1572,7 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 
 		    if ion_temperature='reduce-T':
 		           every 'nraise' steps the instantaneous temperature is
-		           reduced by -delta_T (.e. delta_t is added to the temperature)
+		           reduced by -delta_T (i.e. delta_t < 0 is added to T)
 
 		    The instantaneous temperature is calculated at the end of
 		    every ionic move and BEFORE rescaling. This is the temperature

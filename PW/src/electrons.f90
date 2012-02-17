@@ -237,7 +237,9 @@ SUBROUTINE electrons()
      !
      IF ( iter > 1 .AND. ik_ == 0 ) THEN
         !
-        IF ( iter == 2 ) ethr = 1.D-2
+        !<ceres>
+        !IF ( iter == 2 ) ethr = 1.D-2
+        !</ceres>
         ethr = MIN( ethr, 0.1D0*dr2 / MAX( 1.D0, nelec ) )
         ! ... do not allow convergence threshold to become too small:
         ! ... iterative diagonalization may become unstable
@@ -813,10 +815,10 @@ SUBROUTINE electrons()
           END DO
           !
 #ifdef __BANDS
-          CALL mp_sum( magtot, intra_bgrp_comm )
+          CALL mp_sum( magtot_nc, intra_bgrp_comm )
           CALL mp_sum( absmag, intra_bgrp_comm )
 #else
-          CALL mp_sum( magtot, intra_pool_comm )
+          CALL mp_sum( magtot_nc, intra_pool_comm )
           CALL mp_sum( absmag, intra_pool_comm )
 #endif
           !

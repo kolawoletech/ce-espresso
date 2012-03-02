@@ -370,9 +370,11 @@ MODULE input_parameters
 
         LOGICAL :: lda_plus_u = .false.
           ! Use DFT+U method - following are the needed parameters
+        INTEGER :: lda_plus_u_kind = 0
         INTEGER, PARAMETER :: nspinx=2
         REAL(DP) :: starting_ns_eigenvalue(lqmax,nspinx,nsx) = -1.0_DP
         REAL(DP) :: hubbard_u(nsx) = 0.0_DP
+        REAL(DP) :: hubbard_j(3,nsx) = 0.0_DP
         REAL(DP) :: hubbard_alpha(nsx) = 0.0_DP
         CHARACTER(len=80) :: U_projection_type = 'atomic'
 
@@ -483,7 +485,8 @@ MODULE input_parameters
              nr3s, nr1b, nr2b, nr3b, nosym, nosym_evc, noinv, use_all_frac,   &
              force_symmorphic, starting_magnetization,                        &
              occupations, degauss, nspin, ecfixed,                            &
-             qcutz, q2sigma, lda_plus_U, Hubbard_U, Hubbard_alpha,            &
+             qcutz, q2sigma, lda_plus_U, lda_plus_u_kind,                     &
+             Hubbard_U, Hubbard_J, Hubbard_alpha,                             &
              edir, emaxpos, eopreg, eamp, smearing, starting_ns_eigenvalue,   &
              U_projection_type, input_dft, la2F, assume_isolated,             &
              nqx1, nqx2, nqx3,                                                &
@@ -514,6 +517,12 @@ MODULE input_parameters
         !    2: prints 3D cube files of physical properties
         REAL(DP) :: environ_thr = 1.d-1
         ! how early in scf should the corrective pot start being calculated
+        CHARACTER( LEN = 256 ) :: environ_type = 'input'
+        ! keyword to set up all the environment parameters at once to a specific set
+        ! vacuum = all the flags are off (perm=1.d0, surf=0.0, pres=0.0)
+        ! water = parameters optimized for water solutions in Andreussi et al. 
+        !         J. Chem. Phys. 136, 064102 (perm=78, surf=50, pres=-0.35)
+        ! input = do not use any predefined set, use paramters from input
 !
 ! Switching function parameters
 !
@@ -531,7 +540,7 @@ MODULE input_parameters
 !
 ! Dielectric solvent parameters
 !
-        REAL(DP) :: env_static_permittivity = 78.D0
+        REAL(DP) :: env_static_permittivity = 1.D0
         ! static dielectric permittivity of the solvation model. If set equal
         ! to one (=vacuum) no dielectric effects
         CHARACTER( LEN = 256 ) :: eps_mode = 'electronic'
@@ -581,7 +590,7 @@ MODULE input_parameters
         ! external pressure for PV energy, if equal to zero no pressure term 
 
         NAMELIST / environ /                                           &
-             verbose, environ_thr,                                     &
+             verbose, environ_thr, environ_type,                       &
              stype, rhomax, rhomin, tbeta,                             &
              env_static_permittivity, eps_mode,                        &
              solvationrad, atomicspread,                               &
@@ -1360,13 +1369,11 @@ MODULE input_parameters
         LOGICAL   :: tocc = .false.
         LOGICAL   :: tcell = .false.
         LOGICAL   :: tdipole = .false.
-        LOGICAL   :: tsetnfi = .false.
         LOGICAL   :: tionvel = .false.
         LOGICAL   :: tconstr = .false.
         LOGICAL   :: tesr = .false.
         LOGICAL   :: tksout = .false.
         LOGICAL   :: ttemplate = .false.
-        LOGICAL   :: tvhmean = .false.
         LOGICAL   :: twannier = .false.
 
 !
@@ -1417,25 +1424,10 @@ MODULE input_parameters
           !  number that gives the number of points between the present point
           !  and the next. The weight of the last point is not used.
 !
-!    NEWNFI
-!
-        LOGICAL :: tnewnfi_card = .false.
-        INTEGER :: newnfi_card = 0
-
-!
 !    OCCUPATIONS
 !
         REAL(DP), ALLOCATABLE :: f_inp(:,:)
         LOGICAL   :: tf_inp = .false.
-
-!
-!    VHMEAN
-!
-! ...   card planar mean of the Hartree potential
-        LOGICAL :: tvhmean_inp = .false.
-        INTEGER :: vhnr_inp = 0, vhiunit_inp = 0
-        REAL(DP)  :: vhrmin_inp = 0.0_dP, vhrmax_inp = 0.0_DP
-        CHARACTER :: vhasse_inp = 'X'
 
 !
 !    DIPOLE
@@ -1467,17 +1459,6 @@ MODULE input_parameters
       REAL(DP),          ALLOCATABLE :: constr_inp(:,:)
       REAL(DP),          ALLOCATABLE :: constr_target_inp(:)
       LOGICAL,           ALLOCATABLE :: constr_target_set(:)
-
-!
-!    COLLECTIVE_VARS
-!
-      INTEGER  :: ncolvar_inp    = 0
-      REAL(DP) :: colvar_tol_inp = 1.E-6_DP
-      !
-      CHARACTER(len=20), ALLOCATABLE :: colvar_type_inp(:)
-      REAL(DP),          ALLOCATABLE :: colvar_inp(:,:)
-      REAL(DP),          ALLOCATABLE :: colvar_target_inp(:)
-      LOGICAL,           ALLOCATABLE :: colvar_target_set(:)
 
 !
 !    KOHN_SHAM
@@ -1572,28 +1553,6 @@ CONTAINS
     !
   END SUBROUTINE allocate_input_constr
 
-  SUBROUTINE allocate_input_colvar()
-    !
-    IF ( allocated( colvar_type_inp ) )   DEALLOCATE( colvar_type_inp )
-    IF ( allocated( colvar_inp ) )        DEALLOCATE( colvar_inp )
-    IF ( allocated( colvar_target_inp ) ) DEALLOCATE( colvar_target_inp )
-    IF ( allocated( colvar_target_set ) ) DEALLOCATE( colvar_target_set )
-    !
-    ALLOCATE( colvar_type_inp(   ncolvar_inp ) )
-    ALLOCATE( colvar_target_inp(     ncolvar_inp ) )
-    ALLOCATE( colvar_target_set( ncolvar_inp ) )
-    !
-    ALLOCATE( colvar_inp( nc_fields, ncolvar_inp ) )
-    !
-    colvar_type_inp   = ' '
-    colvar_inp        = 0.0_DP
-    colvar_target_inp     = 0.0_DP
-    colvar_target_set = .false.
-    !
-    RETURN
-    !
-  END SUBROUTINE allocate_input_colvar
-  !
   SUBROUTINE allocate_input_iprnks( nksx, nspin )
     !
     INTEGER, INTENT(in) :: nksx, nspin
@@ -1627,11 +1586,6 @@ CONTAINS
     IF ( allocated( constr_inp ) )        DEALLOCATE( constr_inp )
     IF ( allocated( constr_target_inp ) ) DEALLOCATE( constr_target_inp )
     IF ( allocated( constr_target_set ) ) DEALLOCATE( constr_target_set )
-    !
-    IF ( allocated( colvar_type_inp ) )   DEALLOCATE( colvar_type_inp )
-    IF ( allocated( colvar_inp ) )        DEALLOCATE( colvar_inp )
-    IF ( allocated( colvar_target_inp ) ) DEALLOCATE( colvar_target_inp )
-    IF ( allocated( colvar_target_set ) ) DEALLOCATE( colvar_target_set )
     !
     IF ( allocated( iprnks ) )       DEALLOCATE( iprnks )
     !

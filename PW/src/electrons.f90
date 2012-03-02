@@ -61,7 +61,7 @@ SUBROUTINE electrons()
   USE funct,                ONLY : dft_is_hybrid, exx_is_active
   USE control_flags,        ONLY : adapt_thr, tr2_init, tr2_multi
   USE funct,                ONLY : dft_is_meta
-  USE mp_global,            ONLY : intra_pool_comm, npool, intra_bgrp_comm, nbgrp, mpime, &
+  USE mp_global,            ONLY : intra_bgrp_comm, nbgrp, mpime, &
                                    inter_bgrp_comm, my_bgrp_id
   USE mp,                   ONLY : mp_sum
   !
@@ -76,7 +76,8 @@ SUBROUTINE electrons()
                                    vltot_zero, environ_thr,                 &
                                    env_static_permittivity,                 & 
                                    env_surface_tension, env_pressure,       &
-                                   deenviron, esolvent, ecavity, epressure
+                                   env_slab_geometry, deenviron,            &
+                                   esolvent, ecavity, epressure, eslab
 #endif
   USE dfunct,                 only : newd
   USE esm,                  ONLY : do_comp_esm, esm_printpot
@@ -180,8 +181,9 @@ SUBROUTINE electrons()
 #ifdef __ENVIRON
   IF ( do_environ ) THEN
     vltot_zero = vltot
-    CALL environ_initions( nat, nsp, ityp, zv, tau ) 
-    CALL environ_initcell( dfftp%nr1*dfftp%nr2*dfftp%nr3, omega ) 
+    CALL environ_initions( dfftp%nnr, nat, nsp, ityp, zv, tau ) 
+    CALL environ_initcell( dfftp%nnr, dfftp%nr1*dfftp%nr2*dfftp%nr3, &
+                           omega, alat ) 
   END IF
 #endif
   !  
@@ -303,15 +305,29 @@ SUBROUTINE electrons()
            !
            hwf_energy = hwf_energy + eth
            !
-           IF ( iverbosity > 0 .OR. first ) CALL write_ns()
+           IF ( iverbosity > 0 .OR. first ) THEN
+            IF (noncolin) THEN
+              CALL write_ns_nc()
+            ELSE
+              CALL write_ns()
+            ENDIF
+           ENDIF
            !
            IF ( first .AND. istep == 0 .AND. starting_pot == 'atomic' ) THEN
               CALL ns_adj()
-               rhoin%ns = rho%ns
+              IF (noncolin) THEN
+                rhoin%ns_nc = rho%ns_nc
+              ELSE
+                rhoin%ns = rho%ns
+              ENDIF
            END IF
            IF ( iter <= niter_with_fixed_ns ) THEN
               WRITE( stdout, '(/,5X,"RESET ns to initial values (iter <= mixing_fixed_ns)",/)')
-              rho%ns = rhoin%ns
+              IF (noncolin) THEN
+                rho%ns_nc = rhoin%ns_nc
+              ELSE
+                rho%ns = rhoin%ns
+              ENDIF
            END IF
            !
         END IF
@@ -443,7 +459,7 @@ SUBROUTINE electrons()
        vltot = vltot_zero
        !
        CALL calc_eenviron( dfftp%nnr, nspin, rhoin%of_r, vltot_zero, &
-                           deenviron, esolvent, ecavity, epressure )
+                           deenviron, esolvent, ecavity, epressure, eslab )
        !
        update_venviron = .NOT. conv_elec .AND. dr2 .LT. environ_thr
        !
@@ -494,7 +510,13 @@ SUBROUTINE electrons()
      !
      IF ( conv_elec .OR. MOD( iter, iprint ) == 0 ) THEN
         !
-        IF ( lda_plus_U .AND. iverbosity < 1 ) CALL write_ns ( )
+        IF ( lda_plus_U .AND. iverbosity == 0 ) THEN
+          IF (noncolin) THEN
+            CALL write_ns_nc()
+          ELSE
+            CALL write_ns()
+          ENDIF
+        ENDIF
         CALL print_ks_energies()
         !
      END IF
@@ -574,7 +596,7 @@ SUBROUTINE electrons()
      !
      ! ... adds the external environment contribution to the energy
      !
-     IF ( do_environ ) etot = etot + deenviron + esolvent + ecavity + epressure
+     IF ( do_environ ) etot = etot + deenviron + esolvent + ecavity + epressure + eslab
 #endif
      !
      IF ( ( conv_elec .OR. MOD( iter, iprint ) == 0 ) .AND. .NOT. lmd ) THEN
@@ -630,7 +652,9 @@ SUBROUTINE electrons()
         IF ( env_static_permittivity .GT. 1.D0 ) WRITE( stdout, 9201 ) esolvent
         IF ( env_surface_tension .GT. 0.D0 ) WRITE( stdout, 9202 ) ecavity
         IF ( env_pressure .NE. 0.D0 ) WRITE( stdout, 9203 ) epressure
+        IF ( env_slab_geometry ) WRITE( stdout, 9204 ) eslab
      ENDIF
+     !
 #endif
      !
      IF ( lsda ) WRITE( stdout, 9017 ) magtot, absmag
@@ -755,6 +779,7 @@ SUBROUTINE electrons()
 9201 FORMAT( '     solvation energy          =',F17.8,' Ry' ) 
 9202 FORMAT( '     cavitation energy         =',F17.8,' Ry' ) 
 9203 FORMAT( '     PV energy                 =',F17.8,' Ry' ) 
+9204 FORMAT( '     slab energy correction    =',F17.8,' Ry' )
 #endif
   !
   CONTAINS
@@ -785,13 +810,8 @@ SUBROUTINE electrons()
           magtot = magtot * omega / ( dfftp%nr1*dfftp%nr2*dfftp%nr3 )
           absmag = absmag * omega / ( dfftp%nr1*dfftp%nr2*dfftp%nr3 )
           !
-#ifdef __BANDS
           CALL mp_sum( magtot, intra_bgrp_comm )
           CALL mp_sum( absmag, intra_bgrp_comm )
-#else
-          CALL mp_sum( magtot, intra_pool_comm )
-          CALL mp_sum( absmag, intra_pool_comm )
-#endif
           !
        ELSE IF ( noncolin ) THEN
           !
@@ -814,13 +834,8 @@ SUBROUTINE electrons()
              !
           END DO
           !
-#ifdef __BANDS
           CALL mp_sum( magtot_nc, intra_bgrp_comm )
           CALL mp_sum( absmag, intra_bgrp_comm )
-#else
-          CALL mp_sum( magtot_nc, intra_pool_comm )
-          CALL mp_sum( absmag, intra_pool_comm )
-#endif
           !
           DO i = 1, 3
              !
@@ -874,16 +889,17 @@ SUBROUTINE electrons()
        !
        delta_e = omega * delta_e / ( dfftp%nr1*dfftp%nr2*dfftp%nr3 )
        !
-#ifdef __BANDS
        CALL mp_sum( delta_e, intra_bgrp_comm )
-#else
-       CALL mp_sum( delta_e, intra_pool_comm )
-#endif
        !
        if (lda_plus_u) then
-          delta_e_hub = - SUM (rho%ns(:,:,:,:)*v%ns(:,:,:,:))
-          if (nspin==1) delta_e_hub = 2.d0 * delta_e_hub
-          delta_e = delta_e + delta_e_hub
+         if (noncolin) then
+           delta_e_hub = - SUM (rho%ns_nc(:,:,:,:)*v%ns_nc(:,:,:,:))
+           delta_e = delta_e + delta_e_hub
+         else
+           delta_e_hub = - SUM (rho%ns(:,:,:,:)*v%ns(:,:,:,:))
+           if (nspin==1) delta_e_hub = 2.d0 * delta_e_hub
+           delta_e = delta_e + delta_e_hub
+         endif
        end if
        !
        IF (okpaw) delta_e = delta_e - SUM(ddd_paw(:,:,:)*rho%bec(:,:,:))
@@ -914,16 +930,17 @@ SUBROUTINE electrons()
        !
        delta_escf = omega * delta_escf / ( dfftp%nr1*dfftp%nr2*dfftp%nr3 )
        !
-#ifdef __BANDS
        CALL mp_sum( delta_escf, intra_bgrp_comm )
-#else
-       CALL mp_sum( delta_escf, intra_pool_comm )
-#endif
        !
        if (lda_plus_u) then
-          delta_escf_hub = - SUM((rhoin%ns(:,:,:,:)-rho%ns(:,:,:,:))*v%ns(:,:,:,:))
-          if (nspin==1) delta_escf_hub = 2.d0 * delta_escf_hub
-          delta_escf = delta_escf + delta_escf_hub
+         if (noncolin) then
+           delta_escf_hub = - SUM((rhoin%ns_nc(:,:,:,:)-rho%ns_nc(:,:,:,:))*v%ns_nc(:,:,:,:))
+           delta_escf = delta_escf + delta_escf_hub
+         else
+           delta_escf_hub = - SUM((rhoin%ns(:,:,:,:)-rho%ns(:,:,:,:))*v%ns(:,:,:,:))
+           if (nspin==1) delta_escf_hub = 2.d0 * delta_escf_hub
+           delta_escf = delta_escf + delta_escf_hub
+         endif
        end if
 
        IF (okpaw) delta_escf = delta_escf - &

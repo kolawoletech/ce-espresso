@@ -97,8 +97,10 @@ SUBROUTINE iosys()
   USE start_k,       ONLY : init_start_k
   !
   USE ldaU,          ONLY : Hubbard_U_     => hubbard_u, &
+                            Hubbard_J_ => hubbard_j, &
                             Hubbard_alpha_ => hubbard_alpha, &
                             lda_plus_u_    => lda_plus_u, &
+                            lda_plus_u_kind_    => lda_plus_u_kind, &
                             niter_with_fixed_ns, starting_ns, U_projection
   !
   USE martyna_tuckerman, ONLY: do_comp_mt
@@ -121,7 +123,8 @@ SUBROUTINE iosys()
                            tolrhopol_ => tolrhopol,                             &
                            env_surface_tension_ => env_surface_tension,         &
                            delta_ => delta,                                     &
-                           env_pressure_ => env_pressure
+                           env_pressure_ => env_pressure,                       &
+                           env_slab_geometry, slab_axis
 #endif
   !
   USE esm,           ONLY: do_comp_esm, &
@@ -234,7 +237,8 @@ SUBROUTINE iosys()
                                starting_magnetization,                      &
                                occupations, degauss, smearing, nspin,       &
                                ecfixed, qcutz, q2sigma, lda_plus_U,         &
-                               Hubbard_U, Hubbard_alpha, input_dft, la2F,   &
+                               lda_plus_U_kind, Hubbard_U, Hubbard_J,       &
+                               Hubbard_alpha, input_dft, la2F,              &
                                starting_ns_eigenvalue, U_projection_type,   &
                                x_gamma_extrapolation, nqx1, nqx2, nqx3,     &
                                exxdiv_treatment, yukawa, ecutvcut,          &
@@ -253,13 +257,13 @@ SUBROUTINE iosys()
   !
   ! ... ENVIRON namelist
   !
-  USE input_parameters, ONLY : verbose, environ_thr,              &
-                               stype, rhomax, rhomin, tbeta,      &
-                               env_static_permittivity, eps_mode, &
-                               solvationrad, atomicspread,        &
-                               ifdtype, nfdpoint,                 &
-                               mixrhopol, tolrhopol,              &
-                               env_surface_tension, delta,        &
+  USE input_parameters, ONLY : verbose, environ_thr, environ_type,  &
+                               stype, rhomax, rhomin, tbeta,        &
+                               env_static_permittivity, eps_mode,   &
+                               solvationrad, atomicspread,          &
+                               ifdtype, nfdpoint,                   &
+                               mixrhopol, tolrhopol,                &
+                               env_surface_tension, delta,          &
                                env_pressure 
 #endif
   !
@@ -297,8 +301,7 @@ SUBROUTINE iosys()
   !
   USE input_parameters,   ONLY : k_points, xk, wk, nk1, nk2, nk3,  &
                                  k1, k2, k3, nkstot
-  USE input_parameters, ONLY : nconstr_inp, ncolvar_inp, trd_ht, rd_ht, &
-                               cell_units
+  USE input_parameters, ONLY : nconstr_inp, trd_ht, rd_ht, cell_units
   !
   USE constraints_module,    ONLY : init_constraint
   USE read_namelists_module, ONLY : read_namelists, sm_not_set
@@ -588,8 +591,8 @@ SUBROUTINE iosys()
      !
   END SELECT
   !
-  IF ( noncolin .and. lda_plus_u ) CALL errore('iosys', &
-       'LDA+U not implemented with noncollinear magnetization', 1)
+  IF (lda_plus_u.and.lda_plus_u_kind.eq.0.and.noncolin) CALL errore('iosys', &
+       'simplified LDA+U not implemented with noncol. magnetism, use lda_plus_u_kind = 1', 1)
   !
   two_fermi_energies = ( tot_magnetization /= -1._DP)
   IF ( two_fermi_energies .and. tot_magnetization < 0._DP) &
@@ -832,6 +835,7 @@ SUBROUTINE iosys()
   END SELECT
   !
   Hubbard_U(:)    = Hubbard_U(:) / rytoev
+  Hubbard_J(:,:)  = Hubbard_J(:,:) / rytoev
   Hubbard_alpha(:)= Hubbard_alpha(:) / rytoev
   !
   ethr = diago_thr_init
@@ -1132,8 +1136,10 @@ SUBROUTINE iosys()
   spline_ps_ = spline_ps
   !
   Hubbard_U_(1:ntyp)      = hubbard_u(1:ntyp)
+  Hubbard_J_(1:3,1:ntyp)  = hubbard_j(1:3,1:ntyp)
   Hubbard_alpha_(1:ntyp)  = hubbard_alpha(1:ntyp)
   lda_plus_u_             = lda_plus_u
+  lda_plus_u_kind_        = lda_plus_u_kind
   la2F_                   = la2F
   nspin_                  = nspin
   starting_magnetization_ = starting_magnetization
@@ -1201,24 +1207,44 @@ SUBROUTINE iosys()
     tbeta_  = LOG( rhomax / rhomin )
   END IF
   !
-  env_static_permittivity_ = env_static_permittivity
   eps_mode_ = eps_mode
   ALLOCATE( solvationrad_( ntyp ) )
   solvationrad_( 1:ntyp ) = solvationrad( 1:ntyp )
   ALLOCATE( atomicspread_( ntyp ) )
   atomicspread_( 1:ntyp ) = atomicspread( 1:ntyp )
   !
-  ifdtype_ = ifdtype
-  nfdpoint_ = nfdpoint
+  ifdtype_   = ifdtype
+  nfdpoint_  = nfdpoint
   !
   mixrhopol_ = mixrhopol
   tolrhopol_ = tolrhopol
   !
-  env_surface_tension_ = &
-    env_surface_tension*1.D-3*bohr_radius_si**2/rydberg_si
-  delta_      = delta
+  delta_     = delta
   !
-  env_pressure_ = env_pressure*1.D9/rydberg_si*bohr_radius_si**3
+  SELECT CASE (TRIM(environ_type))
+  ! if a specific environ is selected use hardcoded parameters
+  CASE ('vacuum')
+    ! vacuum, all flags off
+    env_static_permittivity_ = 1.D0
+    env_surface_tension_ = 0.D0
+    env_pressure_ = 0.D0
+    env_slab_geometry = .false.
+  CASE ('water')
+    ! water, experimental and SCCS tuned parameters
+    env_static_permittivity_ = 78.3D0
+    env_surface_tension_ = 50.D0*1.D-3*bohr_radius_si**2/rydberg_si
+    env_pressure_ = -0.35D0*1.D9/rydberg_si*bohr_radius_si**3
+    env_slab_geometry = .false.
+  CASE ('input')
+    ! take values from input, this is the default option
+    env_static_permittivity_ = env_static_permittivity
+    env_surface_tension_ = &
+      env_surface_tension*1.D-3*bohr_radius_si**2/rydberg_si
+    env_pressure_ = env_pressure*1.D9/rydberg_si*bohr_radius_si**3
+    env_slab_geometry = .false.
+  CASE DEFAULT
+    call errore ('iosys','unrecognized value for environ_type',1) 
+  END SELECT    
   !
 #endif
   !
@@ -1267,6 +1293,35 @@ SUBROUTINE iosys()
       do_comp_mt     = .false.
       do_makov_payne = .false.
       !
+#ifdef __ENVIRON
+    CASE( 'slabx' )
+      !
+      do_environ_    = .true.
+      env_slab_geometry   = .true.
+      slab_axis      = 1
+      do_makov_payne = .false.
+      do_comp_mt     = .false.
+      do_comp_esm    = .false.
+      !
+    CASE( 'slaby' ) 
+      !
+      do_environ_    = .true.
+      env_slab_geometry   = .true.
+      slab_axis      = 2
+      do_makov_payne = .false.
+      do_comp_mt     = .false.
+      do_comp_esm    = .false.
+      !
+    CASE( 'slabz' ) 
+      !
+      do_environ_    = .true.
+      env_slab_geometry   = .true.
+      slab_axis      = 3
+      do_makov_payne = .false.
+      do_comp_mt     = .false.
+      do_comp_esm    = .false.
+      !
+#endif
     CASE( 'none' )
       !
       do_makov_payne = .false.
@@ -1395,7 +1450,7 @@ SUBROUTINE iosys()
   !
   ! ... variables for constrained dynamics are set here
   !
-  lconstrain = ( ncolvar_inp + nconstr_inp > 0 )
+  lconstrain = ( nconstr_inp > 0 )
   !
   IF ( lconstrain ) THEN
      IF ( lbfgs .OR. lmovecell ) CALL errore( 'iosys', &

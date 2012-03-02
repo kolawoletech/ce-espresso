@@ -114,7 +114,6 @@ make_pointlists.o \
 makov_payne.o \
 martyna_tuckerman.o \
 memory_report.o \
-mix_pot.o \
 mix_rho.o \
 move_ions.o \
 ms2.o \
@@ -136,6 +135,7 @@ paw_onecenter.o \
 paw_symmetry.o \
 plugin_initialization.o \
 plugin_forces.o \
+plus_u_full.o \
 potinit.o \
 print_clock_pw.o \
 print_ks_energies.o \

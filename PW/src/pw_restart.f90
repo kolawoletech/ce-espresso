@@ -94,8 +94,8 @@ MODULE pw_restart
                                        igk, nbnd, ecutwfc
       USE ener,                 ONLY : ef, ef_up, ef_dw
       USE fixed_occ,            ONLY : tfixed_occ, f_inp
-      USE ldaU,                 ONLY : lda_plus_u, Hubbard_lmax, Hubbard_l, &
-                                       Hubbard_U, Hubbard_alpha
+      USE ldaU,                 ONLY : lda_plus_u, lda_plus_u_kind, Hubbard_lmax,  &
+                                       Hubbard_l, Hubbard_U, Hubbard_J, Hubbard_alpha
       USE spin_orb,             ONLY : lspinorb, domag
       USE symm_base,            ONLY : nrot, nsym, invsym, s, ft, irt, &
                                        t_rev, sname, time_reversal, no_t_rev
@@ -224,11 +224,7 @@ MODULE pw_restart
       !
       ngm_g = ngm
       !
-#ifdef __BANDS
       CALL mp_sum( ngm_g, intra_bgrp_comm )
-#else
-      CALL mp_sum( ngm_g, intra_pool_comm )
-#endif
       !
       ! ... collect all G-vectors across processors within the pools
       !
@@ -244,11 +240,7 @@ MODULE pw_restart
          !
       END DO
       !
-#ifdef __BANDS
       CALL mp_sum( mill_g, intra_bgrp_comm )
-#else
-      CALL mp_sum( mill_g, intra_pool_comm )
-#endif
       !
       ! ... build the igk_l2g array, yielding the correspondence between
       ! ... the local k+G index and the global G index - see also ig_l2g
@@ -279,9 +271,8 @@ MODULE pw_restart
       ngk_g(iks:ike) = ngk(1:nks)
       !
       CALL mp_sum( ngk_g, intra_image_comm )
-#ifdef __BANDS
-     ngk_g = ngk_g / nbgrp
-#endif
+      !
+      ngk_g = ngk_g / nbgrp
       !
       ! ... compute the maximum G vector index among all G+k an processors
       !
@@ -396,10 +387,10 @@ MODULE pw_restart
          dft_name = get_dft_name()
          inlc = get_inlc()
          !
-         CALL write_xc( DFT = dft_name, NSP = nsp, LDA_PLUS_U = lda_plus_u, &
-                        HUBBARD_LMAX = Hubbard_lmax, HUBBARD_L = Hubbard_l, &
-                        HUBBARD_U = Hubbard_U, HUBBARD_ALPHA = Hubbard_alpha, &
-                        INLC = inlc, VDW_TABLE_NAME = vdw_table_name, &
+         CALL write_xc( DFT = dft_name, NSP = nsp, LDA_PLUS_U = lda_plus_u,                  &
+                        LDA_PLUS_U_KIND = lda_plus_u_kind, HUBBARD_LMAX = Hubbard_lmax,      &
+                        HUBBARD_L = Hubbard_l, HUBBARD_U = Hubbard_U, HUBBARD_J = Hubbard_J, &
+                        HUBBARD_ALPHA = Hubbard_alpha, INLC = inlc, VDW_TABLE_NAME = vdw_table_name, &
                         PSEUDO_DIR = pseudo_dir, DIRNAME = dirname)
          IF ( dft_is_hybrid() ) CALL write_exx &
                          ( x_gamma_extrapolation, nq1, nq2, nq3, &
@@ -845,17 +836,10 @@ MODULE pw_restart
                 !
              END IF
              !
-#ifdef __BANDS
              CALL write_wfc( iunout, ik, nkstot, kunit, ispin, nspin, &
                              evc, npw_g, gamma_only, nbnd, igk_l2g_kdip(:,ik-iks+1),   &
                              ngk(ik-iks+1), filename, 1.D0, &
                              ionode, root_bgrp, intra_bgrp_comm, inter_bgrp_comm, intra_image_comm )
-#else
-             CALL write_wfc( iunout, ik, nkstot, kunit, ispin, nspin, &
-                             evc, npw_g, gamma_only, nbnd, igk_l2g_kdip(:,ik-iks+1),   &
-                             ngk(ik-iks+1), filename, 1.D0, &
-                             ionode, root_pool, intra_pool_comm, inter_pool_comm, intra_image_comm )
-#endif
              !
              ik_eff = ik + num_k_points
              !
@@ -880,17 +864,10 @@ MODULE pw_restart
                 !
              END IF
              !
-#ifdef __BANDS
              CALL write_wfc( iunout, ik_eff, nkstot, kunit, ispin, nspin, &
                              evc, npw_g, gamma_only, nbnd, igk_l2g_kdip(:,ik_eff-iks+1), &
                              ngk(ik_eff-iks+1), filename, 1.D0, &
                              ionode, root_bgrp, intra_bgrp_comm, inter_bgrp_comm, intra_image_comm )
-#else
-             CALL write_wfc( iunout, ik_eff, nkstot, kunit, ispin, nspin, &
-                             evc, npw_g, gamma_only, nbnd, igk_l2g_kdip(:,ik_eff-iks+1), &
-                             ngk(ik_eff-iks+1), filename, 1.D0, &
-                             ionode, root_pool, intra_pool_comm, inter_pool_comm, intra_image_comm )
-#endif
              !
            ELSE
              !
@@ -920,19 +897,11 @@ MODULE pw_restart
                    !!! TEMP
                    nkl=(ipol-1)*npwx+1
                    nkr= ipol   *npwx
-#ifdef __BANDS
                    CALL write_wfc( iunout, ik, nkstot, kunit, ipol, npol,   &
                                    evc(nkl:nkr,:), npw_g, gamma_only, nbnd, &
                                    igk_l2g_kdip(:,ik-iks+1), ngk(ik-iks+1), &
                                    filename, 1.D0, &
                                    ionode, root_bgrp, intra_bgrp_comm, inter_bgrp_comm, intra_image_comm )
-#else
-                   CALL write_wfc( iunout, ik, nkstot, kunit, ipol, npol,   &
-                                   evc(nkl:nkr,:), npw_g, gamma_only, nbnd, &
-                                   igk_l2g_kdip(:,ik-iks+1), ngk(ik-iks+1), &
-                                   filename, 1.D0, &
-                                   ionode, root_pool, intra_pool_comm, inter_pool_comm, intra_image_comm )
-#endif
                    !
                 END DO
                 !
@@ -952,19 +921,11 @@ MODULE pw_restart
                    !
                 END IF
                 !
-#ifdef __BANDS
                 CALL write_wfc( iunout, ik, nkstot, kunit, ispin, nspin, &
                                 evc, npw_g, gamma_only, nbnd,            &
                                 igk_l2g_kdip(:,ik-iks+1),                &
                                 ngk(ik-iks+1), filename, 1.D0, &
                                 ionode, root_bgrp, intra_bgrp_comm, inter_bgrp_comm, intra_image_comm )
-#else
-                CALL write_wfc( iunout, ik, nkstot, kunit, ispin, nspin, &
-                                evc, npw_g, gamma_only, nbnd,            &
-                                igk_l2g_kdip(:,ik-iks+1),                &
-                                ngk(ik-iks+1), filename, 1.D0, &
-                                ionode, root_pool, intra_pool_comm, inter_pool_comm, intra_image_comm )
-#endif
                 !
              END IF
              !
@@ -2258,8 +2219,8 @@ MODULE pw_restart
       !
       USE ions_base, ONLY : nsp
       USE funct,     ONLY : enforce_input_dft
-      USE ldaU,      ONLY : lda_plus_u, Hubbard_lmax, &
-                            Hubbard_l, Hubbard_U, Hubbard_alpha
+      USE ldaU,      ONLY : lda_plus_u, lda_plus_u_kind, Hubbard_lmax, &
+                            Hubbard_l, Hubbard_U, Hubbard_J, Hubbard_alpha
       USE kernel_table, ONLY : vdw_table_name
       !
       IMPLICIT NONE
@@ -2299,11 +2260,15 @@ MODULE pw_restart
             !
             CALL iotk_scan_dat( iunpun, "NUMBER_OF_SPECIES", nsp_ )
             !
+            CALL iotk_scan_dat( iunpun, "LDA_PLUS_U_KIND", lda_plus_u_kind )
+            !
             CALL iotk_scan_dat( iunpun, "HUBBARD_LMAX", Hubbard_lmax )
             !
             CALL iotk_scan_dat( iunpun, "HUBBARD_L", Hubbard_l(1:nsp_) )
             !
             CALL iotk_scan_dat( iunpun, "HUBBARD_U", Hubbard_U(1:nsp_) )
+            !
+            CALL iotk_scan_dat( iunpun, "HUBBARD_J", Hubbard_J(1:3,1:nsp_) )
             !
             CALL iotk_scan_dat( iunpun, "HUBBARD_ALPHA", Hubbard_alpha(1:nsp_) )
             !
@@ -2336,9 +2301,11 @@ MODULE pw_restart
       !
       IF ( lda_plus_u ) THEN
          !
+         CALL mp_bcast( lda_plus_u_kind, ionode_id, intra_image_comm )
          CALL mp_bcast( Hubbard_lmax,  ionode_id, intra_image_comm )
          CALL mp_bcast( Hubbard_l ,    ionode_id, intra_image_comm )
          CALL mp_bcast( Hubbard_U,     ionode_id, intra_image_comm )
+         CALL mp_bcast( Hubbard_J,     ionode_id, intra_image_comm )
          CALL mp_bcast( Hubbard_alpha, ionode_id, intra_image_comm )
          !
       END IF
@@ -2974,11 +2941,7 @@ MODULE pw_restart
       !
       ngm_g = ngm
       !
-#ifdef __BANDS
       CALL mp_sum( ngm_g, intra_bgrp_comm )
-#else
-      CALL mp_sum( ngm_g, intra_pool_comm )
-#endif
       !
       ! ... build the igk_l2g array, yielding the correspondence between
       ! ... the local k+G index and the global G index - see also ig_l2g
@@ -3097,17 +3060,10 @@ MODULE pw_restart
                !
             END IF
             !
-#ifdef __BANDS
             CALL read_wfc( iunout, ik, nkstot, kunit, ispin, nspin,      &
                            evc, npw_g, nbnd, igk_l2g_kdip(:,ik-iks+1),   &
                            ngk(ik-iks+1), filename, scalef, &
                            ionode, root_bgrp, intra_bgrp_comm, inter_bgrp_comm, intra_image_comm )
-#else
-            CALL read_wfc( iunout, ik, nkstot, kunit, ispin, nspin,      &
-                           evc, npw_g, nbnd, igk_l2g_kdip(:,ik-iks+1),   &
-                           ngk(ik-iks+1), filename, scalef, &
-                           ionode, root_pool, intra_pool_comm, inter_pool_comm, intra_image_comm )
-#endif
             !
             IF ( ( ik >= iks ) .AND. ( ik <= ike ) ) THEN
                !
@@ -3129,17 +3085,10 @@ MODULE pw_restart
                !
             END IF
             !
-#ifdef __BANDS
             CALL read_wfc( iunout, ik_eff, nkstot, kunit, ispin, nspin,      &
                            evc, npw_g, nbnd, igk_l2g_kdip(:,ik_eff-iks+1),   &
                            ngk(ik_eff-iks+1), filename, scalef, &
                            ionode, root_bgrp, intra_bgrp_comm, inter_bgrp_comm, intra_image_comm )
-#else
-            CALL read_wfc( iunout, ik_eff, nkstot, kunit, ispin, nspin,      &
-                           evc, npw_g, nbnd, igk_l2g_kdip(:,ik_eff-iks+1),   &
-                           ngk(ik_eff-iks+1), filename, scalef, &
-                           ionode, root_pool, intra_pool_comm, inter_pool_comm, intra_image_comm )
-#endif
             !
             IF ( ( ik_eff >= iks ) .AND. ( ik_eff <= ike ) ) THEN
                !
@@ -3167,19 +3116,11 @@ MODULE pw_restart
                   !!! TEMP
                   nkl=(ipol-1)*npwx+1
                   nkr= ipol   *npwx
-#ifdef __BANDS
                   CALL read_wfc( iunout, ik, nkstot, kunit, ispin,          &
                                  npol, evc(nkl:nkr,:), npw_g, nbnd,         &
                                  igk_l2g_kdip(:,ik-iks+1), ngk(ik-iks+1),   &
                                  filename, scalef, & 
                                  ionode, root_bgrp, intra_bgrp_comm, inter_bgrp_comm, intra_image_comm )
-#else
-                  CALL read_wfc( iunout, ik, nkstot, kunit, ispin,          &
-                                 npol, evc(nkl:nkr,:), npw_g, nbnd,         &
-                                 igk_l2g_kdip(:,ik-iks+1), ngk(ik-iks+1),   &
-                                 filename, scalef, & 
-                                 ionode, root_pool, intra_pool_comm, inter_pool_comm, intra_image_comm )
-#endif
                   !
                END DO
                !
@@ -3192,17 +3133,10 @@ MODULE pw_restart
                   !
                END IF
                !
-#ifdef __BANDS
                CALL read_wfc( iunout, ik, nkstot, kunit, ispin, nspin,         &
                               evc, npw_g, nbnd, igk_l2g_kdip(:,ik-iks+1),      &
                               ngk(ik-iks+1), filename, scalef, &
                               ionode, root_bgrp, intra_bgrp_comm, inter_bgrp_comm, intra_image_comm )
-#else
-               CALL read_wfc( iunout, ik, nkstot, kunit, ispin, nspin,         &
-                              evc, npw_g, nbnd, igk_l2g_kdip(:,ik-iks+1),      &
-                              ngk(ik-iks+1), filename, scalef, &
-                              ionode, root_pool, intra_pool_comm, inter_pool_comm, intra_image_comm )
-#endif
                !
             END IF
             !
@@ -3463,11 +3397,7 @@ MODULE pw_restart
       END DO
       
       !
-#ifdef __BANDS
       CALL mp_sum( itmp, intra_bgrp_comm )
-#else
-      CALL mp_sum( itmp, intra_pool_comm )
-#endif
       !
       ngg = 0
       DO ig = 1, npw_g

@@ -37,7 +37,7 @@ SUBROUTINE sum_band()
   USE noncollin_module,     ONLY : noncolin, npol, nspin_mag
   USE spin_orb,             ONLY : lspinorb, domag, fcoef
   USE wvfct,                ONLY : nbnd, npwx, npw, igk, wg, et, btype
-  USE mp_global,            ONLY : inter_pool_comm
+  USE mp_global,            ONLY : inter_pool_comm, intra_bgrp_comm
   USE mp,                   ONLY : mp_bcast, mp_sum
   USE funct,                ONLY : dft_is_meta
   USE paw_symmetry,         ONLY : PAW_symmetrize
@@ -104,9 +104,15 @@ SUBROUTINE sum_band()
   !
   ! ... Needed for LDA+U
   !
-  IF ( lda_plus_u ) CALL new_ns(rho%ns)
+  IF (lda_plus_u) THEN
+   IF(noncolin) THEN
+    CALL new_ns_nc(rho%ns_nc)
+   ELSE
+    CALL new_ns(rho%ns)
+   ENDIF
+  ENDIF
   !
-  IF ( okvan.OR.one_atom_occupations ) CALL allocate_bec_type (nkb,nbnd, becp)
+  IF ( okvan.OR.one_atom_occupations ) CALL allocate_bec_type (nkb,nbnd, becp,intra_bgrp_comm)
   !
   ! ... specific routines are called to sum for each k point the contribution
   ! ... of the wavefunctions to the charge
@@ -229,7 +235,7 @@ SUBROUTINE sum_band()
        !
        USE becmod,        ONLY : bec_type, becp, calbec
        USE mp_global,     ONLY : me_pool
-       USE mp,            ONLY : mp_sum
+       USE mp,            ONLY : mp_sum, mp_get_comm_null
        !
        IMPLICIT NONE
        !
@@ -237,7 +243,7 @@ SUBROUTINE sum_band()
        !
        REAL(DP) :: w1, w2
          ! weights
-       INTEGER  :: idx, ioff, incr, v_siz, j
+       INTEGER  :: idx, ioff, incr, v_siz, j, ibnd_loc
        COMPLEX(DP), ALLOCATABLE :: tg_psi(:)
        REAL(DP),    ALLOCATABLE :: tg_rho(:)
        LOGICAL  :: use_tg
@@ -474,7 +480,9 @@ SUBROUTINE sum_band()
           !
           CALL start_clock( 'sum_band:becsum' )
           !
-          DO ibnd = 1, nbnd
+          DO ibnd_loc = 1, becp%nbnd_loc
+             !
+             ibnd = ibnd_loc + becp%ibnd_begin - 1
              !
              w1 = wg(ibnd,ik)
              ijkb0 = 0
@@ -495,7 +503,7 @@ SUBROUTINE sum_band()
                             !
                             becsum(ijh,na,current_spin) = &
                                             becsum(ijh,na,current_spin) + &
-                                            w1 *becp%r(ikb,ibnd) *becp%r(ikb,ibnd)
+                                            w1 *becp%r(ikb,ibnd_loc) *becp%r(ikb,ibnd_loc)
                             !
                             ijh = ijh + 1
                             !
@@ -505,7 +513,7 @@ SUBROUTINE sum_band()
                                !
                                becsum(ijh,na,current_spin) = &
                                      becsum(ijh,na,current_spin) + &
-                                     w1 * 2.D0 *becp%r(ikb,ibnd) *becp%r(jkb,ibnd)
+                                     w1 * 2.D0 *becp%r(ikb,ibnd_loc) *becp%r(jkb,ibnd_loc)
                                !
                                ijh = ijh + 1
                                !
@@ -536,6 +544,8 @@ SUBROUTINE sum_band()
           CALL stop_clock( 'sum_band:becsum' )
           !
        END DO k_loop
+       !
+       IF( becp%comm /= mp_get_comm_null() ) call mp_sum( becsum, becp%comm )
        !
        IF( dffts%have_task_groups ) THEN
           DEALLOCATE( tg_psi )

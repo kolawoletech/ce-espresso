@@ -91,23 +91,9 @@ CONTAINS
       !
       tf_inp = .false.
       !
-      ! ... Hartree planar mean
-      !
-      tvhmean_inp = .false.
-      vhnr_inp    = 0
-      vhiunit_inp = 0
-      vhrmin_inp  = 0.0_DP
-      vhrmax_inp  = 0.0_DP
-      vhasse_inp  = 'K'
-      !
       ! ... ion_velocities
       !
       tavel = .false.
-      !
-      ! ... setnfi
-      !
-      newnfi_card  = -1
-      tnewnfi_card = .false.
       !
       CALL init_autopilot()
       !
@@ -155,6 +141,8 @@ CONTAINS
       IF ( trim(card) == 'AUTOPILOT' ) THEN
          !
          CALL card_autopilot( input_line )
+         IF ( prog == 'PW' .and. ionode ) &
+            WRITE( stdout,'(A)') 'Warning: card '//trim(input_line)//' ignored'
          !
       ELSEIF ( trim(card) == 'ATOMIC_SPECIES' ) THEN
          !
@@ -168,36 +156,20 @@ CONTAINS
          !
          CALL card_atomic_forces( input_line, prog )
          !
-      ELSEIF ( trim(card) == 'SETNFI' ) THEN
-         !
-         CALL card_setnfi( input_line )
-         IF ( ( prog == 'PW' .or. prog == 'CP' ) .and. ionode ) &
-            WRITE( stdout,'(A)') 'Warning: card '//trim(input_line)//' ignored'
-         !
       ELSEIF ( trim(card) == 'CONSTRAINTS' ) THEN
          !
          CALL card_constraints( input_line )
          !
-!      ELSEIF ( trim(card) == 'COLLECTIVE_VARS' ) THEN
-         !
-!         CALL card_collective_vars( input_line )
-         !
-      ELSEIF ( trim(card) == 'VHMEAN' ) THEN
-         !
-         CALL card_vhmean( input_line )
-         IF ( ( prog == 'PW' .or. prog == 'CP' ) .and. ionode ) &
-            WRITE( stdout,'(A)') 'Warning: card '//trim(input_line)//' ignored'
-         !
       ELSEIF ( trim(card) == 'DIPOLE' ) THEN
          !
          CALL card_dipole( input_line )
-         IF ( ( prog == 'PW' .or. prog == 'CP' ) .and. ionode ) &
+         IF ( prog == 'PW' .and. ionode ) &
             WRITE( stdout,'(A)') 'Warning: card '//trim(input_line)//' ignored'
          !
       ELSEIF ( trim(card) == 'ESR' ) THEN
          !
          CALL card_esr( input_line )
-         IF ( ( prog == 'PW' .or. prog == 'CP' ) .and. ionode ) &
+         IF ( prog == 'PW' .and. ionode ) &
             WRITE( stdout,'(A)') 'Warning: card '//trim(input_line)//' ignored'
          !
       ELSEIF ( trim(card) == 'K_POINTS' ) THEN
@@ -690,8 +662,8 @@ CONTAINS
                   ('card_kpoints', 'invalid offsets: must be 0 or 1', 1)
          IF ( nk1 <= 0 .or. nk2 <= 0 .or. nk3 <= 0 ) CALL errore &
                   ('card_kpoints', 'invalid values for nk1, nk2, nk3', 1)
-
-         !
+         ALLOCATE ( xk(3,1), wk(1) ) ! prevents problems with debug flags
+         !                           ! when init_startk is called in iosys
       ELSEIF ( ( k_points == 'tpiba' ) .or. ( k_points == 'crystal' ) ) THEN
          !
          ! ... input k-points are in 2pi/a units
@@ -777,52 +749,6 @@ CONTAINS
             & // trim(k_points) // ' k points', 1)
       !
    END SUBROUTINE card_kpoints
-   !
-   !------------------------------------------------------------------------
-   !    BEGIN manual
-   !----------------------------------------------------------------------
-   !
-   ! SETNFI
-   !
-   !   Reset the step counter to the specified value
-   !
-   ! Syntax:
-   !
-   !  SETNFI
-   !     nfi
-   !
-   ! Example:
-   !
-   !  SETNFI
-   !     100
-   !
-   ! Where:
-   !
-   !    nfi (integer) new value for the step counter
-   !
-   !----------------------------------------------------------------------
-   !    END manual
-   !------------------------------------------------------------------------
-   !
-   SUBROUTINE card_setnfi( input_line )
-      !
-      IMPLICIT NONE
-      !
-      CHARACTER(len=256) :: input_line
-      !
-      !
-      IF ( tsetnfi ) THEN
-         CALL errore( ' card_setnfi ', ' two occurrences', 2 )
-      ENDIF
-      CALL read_line( input_line )
-      READ(input_line,*) newnfi_card
-      tnewnfi_card = .true.
-      tsetnfi = .true.
-      !
-      RETURN
-      !
-   END SUBROUTINE card_setnfi
-   !
    !
    !------------------------------------------------------------------------
    !    BEGIN manual
@@ -916,55 +842,6 @@ CONTAINS
       RETURN
       !
    END SUBROUTINE card_occupations
-   !
-   !
-   !------------------------------------------------------------------------
-   !    BEGIN manual
-   !----------------------------------------------------------------------
-   !
-   ! VHMEAN
-   !
-   !   Calculation of potential average along a given axis
-   !
-   ! Syntax:
-   !
-   !   VHMEAN
-   !   unit nr rmin rmax asse
-   !
-   ! Example:
-   !
-   !   ????
-   !
-   ! Where:
-   !
-   !   ????
-   !
-   !----------------------------------------------------------------------
-   !    END manual
-   !------------------------------------------------------------------------
-   !
-   SUBROUTINE card_vhmean( input_line )
-      !
-      IMPLICIT NONE
-      !
-      CHARACTER(len=256) :: input_line
-      !
-      !
-      IF ( tvhmean ) THEN
-         CALL errore( ' card_vhmean ', ' two occurrences', 2 )
-      ENDIF
-      !
-      tvhmean_inp = .true.
-      CALL read_line( input_line )
-      READ(input_line,*) &
-         vhiunit_inp, vhnr_inp, vhrmin_inp, vhrmax_inp, vhasse_inp
-      tvhmean = .true.
-      !
-      RETURN
-      !
-   END SUBROUTINE card_vhmean
-   !
-   !
    !
    !------------------------------------------------------------------------
    !    BEGIN manual

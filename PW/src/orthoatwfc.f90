@@ -96,7 +96,12 @@ SUBROUTINE orthoatwfc
      overlap(:,:) = (0.d0,0.d0)
      work(:,:) = (0.d0,0.d0)
      
-     CALL atomic_wfc (ik, wfcatom)
+     IF (noncolin) THEN
+       CALL atomic_wfc_nc_updown (ik, wfcatom)
+     ELSE
+       CALL atomic_wfc (ik, wfcatom)
+     ENDIF
+
      !
      ! write atomic wfc on unit iunat
      !
@@ -117,13 +122,9 @@ SUBROUTINE orthoatwfc
            CALL zgemm ('c', 'n', natomwfc, natomwfc, npw, (1.d0, 0.d0), &
              wfcatom, npwx, swfcatom, npwx, (0.d0, 0.d0), overlap, natomwfc)
         END IF
-#ifdef __MPI
-#ifdef __BANDS
+        !
         CALL mp_sum(  overlap, intra_bgrp_comm )
-#else
-        CALL mp_sum(  overlap, intra_pool_comm )
-#endif
-#endif
+        !
         IF (U_projection=="norm-atomic") THEN
            DO i = 1, natomwfc
               DO j = i+1, natomwfc

@@ -20,14 +20,14 @@ SUBROUTINE force_hub(forceh)
    USE cell_base,            ONLY : at, bg
    USE ldaU,                 ONLY : hubbard_lmax, hubbard_l, hubbard_u, &
                                     hubbard_alpha, U_projection, &
-                                    swfcatom, oatwfc
+                                    swfcatom, lda_plus_u_kind, oatwfc
    USE symme,                ONLY : symvector
    USE io_files,             ONLY : prefix, iunocc
    USE wvfct,                ONLY : nbnd, npwx, npw, igk
    USE control_flags,        ONLY : gamma_only
    USE lsda_mod,             ONLY : lsda, nspin, current_spin, isk
    USE scf,                  ONLY : v
-   USE mp_global,            ONLY : me_pool, inter_pool_comm, intra_pool_comm
+   USE mp_global,            ONLY : inter_pool_comm
    USE mp,                   ONLY : mp_sum
    USE basis,                ONLY : natomwfc
    USE becmod,               ONLY : bec_type, becp, calbec, allocate_bec_type, deallocate_bec_type
@@ -53,6 +53,8 @@ SUBROUTINE force_hub(forceh)
 
    IF (U_projection .NE. "atomic") CALL errore("force_hub", &
                    " forces for this U_projection_type not implemented",1)
+   IF (lda_plus_u_kind.eq.1) CALL errore("force_hub", &
+                   " forces in full LDA+U scheme are not yet implemented",1)
 
    call start_clock('force_hub')
    ldim= 2 * Hubbard_lmax + 1
@@ -108,10 +110,9 @@ SUBROUTINE force_hub(forceh)
          END DO
       END DO
    END DO
-
-#ifdef __MPI
+   !
    CALL mp_sum( forceh, inter_pool_comm )
-#endif
+   !
    DEALLOCATE(dns, spsi)
    call deallocate_bec_type (proj)
    call deallocate_bec_type (becp)
@@ -298,7 +299,7 @@ SUBROUTINE dprojdtau_k (wfcatom, spsi, alpha, ipol, offset, dproj)
    USE uspp_param,           ONLY : nhm, nh
    USE wavefunctions_module, ONLY : evc
    USE becmod,               ONLY : bec_type, becp, calbec
-   USE mp_global,            ONLY : intra_pool_comm
+   USE mp_global,            ONLY : intra_bgrp_comm
    USE mp,                   ONLY : mp_sum
    
    IMPLICIT NONE
@@ -353,10 +354,9 @@ SUBROUTINE dprojdtau_k (wfcatom, spsi, alpha, ipol, offset, dproj)
 
       DEALLOCATE ( dwfc ) 
    END IF
-#ifdef __MPI
-   CALL mp_sum( dproj, intra_pool_comm )
-#endif
-
+   !
+   CALL mp_sum( dproj, intra_bgrp_comm )
+   !
    jkb2 = 0
    DO nt=1,ntyp
       DO na=1,nat
@@ -450,7 +450,7 @@ SUBROUTINE dprojdtau_gamma (wfcatom, spsi, alpha, ipol, offset, dproj)
    USE uspp_param,           ONLY : nhm, nh
    USE wavefunctions_module, ONLY : evc
    USE becmod,               ONLY : bec_type, becp, calbec
-   USE mp_global,            ONLY : intra_pool_comm
+   USE mp_global,            ONLY : intra_bgrp_comm
    USE mp,                   ONLY : mp_sum
    
    IMPLICIT NONE
@@ -505,10 +505,9 @@ SUBROUTINE dprojdtau_gamma (wfcatom, spsi, alpha, ipol, offset, dproj)
                   dproj(offset+1,1), natomwfc)
       DEALLOCATE ( dwfc ) 
    END IF
-
-#ifdef __MPI
-   CALL mp_sum( dproj, intra_pool_comm )
-#endif
+   !
+   CALL mp_sum( dproj, intra_bgrp_comm )
+   ! 
    jkb2 = 0
    DO nt=1,ntyp
       DO na=1,nat

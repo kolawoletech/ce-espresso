@@ -41,7 +41,7 @@ subroutine init_us_1
   USE uspp_param,   ONLY : upf, lmaxq, nbetam, nh, nhm, lmaxkb
   USE spin_orb,     ONLY : lspinorb, rot_ylm, fcoef
   USE paw_variables,ONLY : okpaw
-  USE mp_global,    ONLY : intra_pool_comm
+  USE mp_global,    ONLY : intra_bgrp_comm
   USE mp,           ONLY : mp_sum
   !
   implicit none
@@ -238,7 +238,7 @@ subroutine init_us_1
   !   here for the US types we compute the Fourier transform of the
   !   Q functions.
   !   
-  call divide (nqxq, startq, lastq)
+  call divide (intra_bgrp_comm, nqxq, startq, lastq)
   !
   do nt = 1, ntyp
      if ( upf(nt)%tvanp ) then
@@ -307,7 +307,7 @@ subroutine init_us_1
         enddo
         qrad (:, :, :, nt) = qrad (:, :, :, nt)*prefr
 #ifdef __MPI
-        call mp_sum ( qrad (:, :, :, nt), intra_pool_comm )
+        call mp_sum ( qrad (:, :, :, nt), intra_bgrp_comm )
 #endif
      endif
      ! ntyp
@@ -364,17 +364,17 @@ subroutine init_us_1
 #ifdef __MPI
 100 continue
   if (lspinorb) then
-    call mp_sum(  qq_so , intra_pool_comm )
-    call mp_sum(  qq , intra_pool_comm )
+    call mp_sum(  qq_so , intra_bgrp_comm )
+    call mp_sum(  qq , intra_bgrp_comm )
   else
-    call mp_sum(  qq , intra_pool_comm )
+    call mp_sum(  qq , intra_bgrp_comm )
   endif
 #endif
   !
   !     fill the interpolation table tab
   !
   pref = fpi / sqrt (omega)
-  call divide (nqx, startq, lastq)
+  call divide (intra_bgrp_comm, nqx, startq, lastq)
   tab (:,:,:) = 0.d0
   do nt = 1, ntyp
      do nb = 1, upf(nt)%nbeta
@@ -392,7 +392,7 @@ subroutine init_us_1
   enddo
 
 #ifdef __MPI
-  call mp_sum(  tab, intra_pool_comm )
+  call mp_sum(  tab, intra_bgrp_comm )
 #endif
 
   ! initialize spline interpolation

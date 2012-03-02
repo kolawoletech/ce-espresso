@@ -69,13 +69,32 @@ SUBROUTINE add_vuspsi( lda, n, m, hpsi )
      SUBROUTINE add_vuspsi_gamma()
        !-----------------------------------------------------------------------
        !
+       USE mp, ONLY: mp_get_comm_null, mp_circular_shift_left
+       !
        IMPLICIT NONE
+       INTEGER, EXTERNAL :: ldim_block, lind_block, gind_block
        REAL(DP), ALLOCATABLE :: ps (:,:)
        INTEGER :: ierr
+       INTEGER :: nproc, mype, m_loc, m_begin, ibnd_loc, icyc, icur_blk, m_max
        !
        IF ( nkb == 0 ) RETURN
        !
-       ALLOCATE (ps (nkb,m), STAT=ierr )
+       m_loc   = m
+       m_begin = 1
+       m_max   = m
+       nproc   = 1
+       mype    = 0
+       !
+       IF( becp%comm /= mp_get_comm_null() ) THEN
+          nproc   = becp%nproc
+          mype    = becp%mype
+          m_loc   = becp%nbnd_loc
+          m_begin = becp%ibnd_begin
+          m_max   = SIZE( becp%r, 2 )
+          IF( ( m_begin + m_loc - 1 ) > m ) m_loc = m - m_begin + 1
+       END IF
+       !
+       ALLOCATE (ps (nkb,m_max), STAT=ierr )
        IF( ierr /= 0 ) &
           CALL errore( ' add_vuspsi_gamma ', ' cannot allocate ps ', ABS( ierr ) )
        !
@@ -89,7 +108,7 @@ SUBROUTINE add_vuspsi( lda, n, m, hpsi )
              !
              IF ( ityp(na) == nt ) THEN
                 !
-                DO ibnd = 1, m
+                DO ibnd = 1, m_loc
                    !
                    DO jh = 1, nh(nt)
                       !
@@ -116,8 +135,36 @@ SUBROUTINE add_vuspsi( lda, n, m, hpsi )
           !
        END DO
        !
-       CALL DGEMM( 'N', 'N', ( 2 * n ), m, nkb, 1.D0, vkb, &
+       IF( becp%comm /= mp_get_comm_null() ) THEN
+          !
+          ! parallel block multiplication of vkb and ps
+          !
+          icur_blk = mype
+          !
+          DO icyc = 0, nproc - 1
+
+             m_loc   = ldim_block( becp%nbnd , nproc, icur_blk )
+             m_begin = gind_block( 1,  becp%nbnd, nproc, icur_blk )
+
+             IF( ( m_begin + m_loc - 1 ) > m ) m_loc = m - m_begin + 1
+
+             IF( m_loc > 0 ) THEN
+                CALL DGEMM( 'N', 'N', ( 2 * n ), m_loc, nkb, 1.D0, vkb, &
+                   ( 2 * lda ), ps, nkb, 1.D0, hpsi( 1, m_begin ), ( 2 * lda ) )
+             END IF
+
+             ! block rotation
+             !
+             CALL mp_circular_shift_left( ps, icyc, becp%comm )
+
+             icur_blk = icur_blk + 1
+             IF( icur_blk == nproc ) icur_blk = 0
+
+          END DO
+       ELSE
+          CALL DGEMM( 'N', 'N', ( 2 * n ), m, nkb, 1.D0, vkb, &
                    ( 2 * lda ), ps, nkb, 1.D0, hpsi, ( 2 * lda ) )
+       END IF
        !
        DEALLOCATE (ps)
        !

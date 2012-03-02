@@ -77,7 +77,7 @@ subroutine compute_nldyn (wdyn, wgg, becq, alpq)
   END IF
 
   dynwrk (:,:) = (0.d0, 0.d0)
-  call divide (nbnd, startb, lastb)
+  call divide (intra_pool_comm, nbnd, startb, lastb)
   do ik = 1, nksq
      ikk = ikks(ik)
      ikq = ikqs(ik)

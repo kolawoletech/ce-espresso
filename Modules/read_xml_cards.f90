@@ -7,14 +7,11 @@
 !-------------------------------------------------------------!
 !
 ! cards not yet implemented:
-! SETNFI
 ! KSOUT
 ! AUTOPILOT
 ! ATOMIC_FORCES
-! COLLECTIVE_VARS
 ! PLOT_WANNIER
 ! WANNIER_AC
-! VHMEAN
 ! DIPOLE
 ! ESR
 !
@@ -137,23 +134,9 @@ CONTAINS
        ! ... not yet implemented in xml reading
        iesr_inp = 1
        !
-    CASE ('VHMEAN')
-       ! ... not yet implemented in xml reading
-       tvhmean_inp = .false.
-       vhnr_inp    = 0
-       vhiunit_inp = 0
-       vhrmin_inp  = 0.0_DP
-       vhrmax_inp  = 0.0_DP
-       vhasse_inp  = 'K'
-       !
     CASE ('ION_VELOCITIES')
        ! ... not yet implemented in xml reading
        tavel = .false.
-       !
-    CASE ('SETNFI')
-       ! ... not yet implemented in xml reading
-       newnfi_card  = -1
-       tnewnfi_card = .FALSE.
        !
     CASE DEFAULT
        CALL errore ( 'card_default', 'You want to initialize a card that does &

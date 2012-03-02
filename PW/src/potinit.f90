@@ -46,7 +46,7 @@ SUBROUTINE potinit()
   USE io_files,             ONLY : tmp_dir, prefix, iunocc, input_drho
   USE spin_orb,             ONLY : domag
   USE mp,                   ONLY : mp_bcast, mp_sum
-  USE mp_global,            ONLY : intra_image_comm, inter_pool_comm, intra_pool_comm, inter_bgrp_comm, intra_bgrp_comm, mpime
+  USE mp_global,            ONLY : intra_image_comm, inter_bgrp_comm, intra_bgrp_comm, mpime
   USE io_global,            ONLY : ionode, ionode_id
   USE pw_restart,           ONLY : pw_readfile
   USE io_rho_xml,           ONLY : read_rho
@@ -121,8 +121,16 @@ SUBROUTINE potinit()
             FMT = '(/5X,"Initial potential from superposition of free atoms")' )
      !
      CALL atomic_rho( rho%of_r, nspin )
+
      ! ... in the lda+U case set the initial value of ns
-     IF ( lda_plus_u ) CALL init_ns()
+     IF (lda_plus_u) THEN
+        IF (noncolin) THEN
+          CALL init_ns_nc()
+        ELSE
+          CALL init_ns()
+        ENDIF
+     ENDIF
+
      ! ... in the paw case uses atomic becsum
      IF ( okpaw )      CALL PAW_atomic_becsum()
      !
@@ -155,11 +163,7 @@ SUBROUTINE potinit()
      !
   END IF
   !
-#ifdef __BANDS
   CALL mp_sum(  charge , intra_bgrp_comm )
-#else
-  CALL mp_sum(  charge , intra_pool_comm )
-#endif
   !
   IF ( lscf .AND. ABS( charge - nelec ) > ( 1.D-7 * charge ) ) THEN
      !
@@ -216,12 +220,15 @@ SUBROUTINE potinit()
   !
   IF ( lda_plus_u ) THEN
      !
-     WRITE( stdout, '(/5X,"Parameters of the lda+U calculation:")')
-     WRITE( stdout, '(5X,"Number of iteration with fixed ns =",I3)') &
+     WRITE( stdout, '(5X,"Number of +U iterations with fixed ns =",I3)') &
          niter_with_fixed_ns
-     WRITE( stdout, '(5X,"Starting ns and Hubbard U :")')
+     WRITE( stdout, '(5X,"Starting occupations:")')
      !
-     CALL write_ns()
+     IF (noncolin) THEN
+       CALL write_ns_nc()
+     ELSE
+       CALL write_ns()
+     ENDIF
      !
   END IF
   !

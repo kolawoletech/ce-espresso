@@ -20,7 +20,7 @@ subroutine init_at_1()
   USE ions_base,  ONLY : ntyp => nsp
   USE us,         ONLY : tab_at, nqx, dq
   USE uspp_param, ONLY : upf
-  USE mp_global,  ONLY : intra_pool_comm
+  USE mp_global,  ONLY : intra_bgrp_comm
   USE mp,         ONLY : mp_sum
   !
   implicit none
@@ -41,7 +41,7 @@ subroutine init_at_1()
   pref = fpi/sqrt(omega)
   ! needed to normalize atomic wfcs (not a bad idea in general and 
   ! necessary to compute correctly lda+U projections)
-  call divide (nqx, startq, lastq)
+  call divide (intra_bgrp_comm, nqx, startq, lastq)
   tab_at(:,:,:) = 0.d0
   do nt = 1, ntyp
      do nb = 1, upf(nt)%nwfc
@@ -60,7 +60,7 @@ subroutine init_at_1()
      enddo
  enddo
 #ifdef __MPI
-  call mp_sum ( tab_at, intra_pool_comm )
+  call mp_sum ( tab_at, intra_bgrp_comm )
 #endif
 
   deallocate(aux ,vchi)

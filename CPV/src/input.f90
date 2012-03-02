@@ -133,8 +133,6 @@ MODULE input
                                tprnsfac_   => tprnsfac, &
                                ampre_      => ampre, &
                                trane_      => trane, &
-                               newnfi_     => newnfi, &
-                               tnewnfi_    => tnewnfi, &
                                tdipole_    => tdipole, &
                                nomore_     => nomore, &
                                memchk_     => memchk, &
@@ -186,7 +184,7 @@ MODULE input
                                forc_maxiter_  => forc_maxiter
      USE control_flags, ONLY : force_pairing_ => force_pairing
      USE control_flags, ONLY : remove_rigid_rot_ => remove_rigid_rot
-     USE control_flags, ONLY : iesr, tvhmean, vhrmin, vhrmax, vhasse
+     USE control_flags, ONLY : iesr
      USE control_flags, ONLY : textfor
      USE control_flags, ONLY : do_makov_payne, twfcollect
      USE control_flags, ONLY : lwf, lwfnscf, lwfpbe0, lwfpbe0nscf ! Lingzhu Kong
@@ -220,12 +218,10 @@ MODULE input
         tapos, tavel, ecutwfc, emass, emass_cutoff, taspc, trd_ht, ibrav,      &
         ortho_eps, ortho_max, ntyp, tolp, calculation, disk_io, dt,            &
         tcg, ndr, ndw, iprint, isave, tstress, k_points, tprnfor, verbosity,   &
-        tdipole_card, tnewnfi_card, newnfi_card,                               &
         ampre, nstep, restart_mode, ion_positions, startingwfc, printwfc,      &
         orthogonalization, electron_velocities, nat, if_pos, phase_space,      &
         tefield, epol, efield, tefield2, epol2, efield2, remove_rigid_rot,     &
-        iesr_inp, vhrmax_inp, vhrmin_inp, tvhmean_inp, vhasse_inp, saverho,    &
-        rd_for, assume_isolated, wf_collect
+        iesr_inp, saverho, tdipole_card, rd_for, assume_isolated, wf_collect
      !
      IMPLICIT NONE
      !
@@ -247,11 +243,6 @@ MODULE input
      forc_conv_thr_ = forc_conv_thr
      ekin_maxiter_  = electron_maxstep
      iesr           = iesr_inp
-     !
-     tvhmean = tvhmean_inp
-     vhrmin  = vhrmin_inp
-     vhrmax  = vhrmax_inp
-     vhasse  = vhasse_inp
      !
      remove_rigid_rot_ = remove_rigid_rot
      twfcollect = wf_collect
@@ -362,8 +353,6 @@ MODULE input
      END SELECT
      !
      tdipole_  = tdipole_card
-     newnfi_   = newnfi_card
-     tnewnfi_  = tnewnfi_card
      !
      ! ... set the restart flags
      !
@@ -786,7 +775,7 @@ MODULE input
            etot_conv_thr, ekin_conv_thr, nspin, f_inp, nbnd,                   &
            press, cell_damping, cell_dofree, tf_inp,                           &
            refg, greash, grease, greasp, epol, efield, tcg, maxiter, conv_thr, &
-           passop, tot_charge, tot_magnetization, ncolvar_inp, niter_cg_restart
+           passop, tot_charge, tot_magnetization, niter_cg_restart
      !
      USE input_parameters, ONLY : wf_efield, wf_switch, sw_len, efx0, efy0,    &
                                   efz0, efx1, efy1, efz1, wfsd, wfdt, maxwfdt, &
@@ -932,7 +921,7 @@ MODULE input
      !
      ! ... variables for constrained dynamics are set here
      !
-     lconstrain = ( ncolvar_inp + nconstr_inp > 0 )
+     lconstrain = ( nconstr_inp > 0 )
      !
 !========================================================================
 !Lingzhu Kong

@@ -68,6 +68,9 @@
       INTERFACE mp_alltoall
         MODULE PROCEDURE mp_alltoall_c3d, mp_alltoall_i3d
       END INTERFACE
+      INTERFACE mp_circular_shift_left
+        MODULE PROCEDURE mp_circular_shift_left_d2d
+      END INTERFACE
 
 
       CHARACTER(LEN=80), PRIVATE :: err_msg = ' '
@@ -2184,6 +2187,61 @@ SUBROUTINE mp_alltoall_i3d( sndbuf, rcvbuf, gid )
 END SUBROUTINE mp_alltoall_i3d
 
 
+SUBROUTINE mp_circular_shift_left_d2d( buf, itag, gid )
+   IMPLICIT NONE
+   REAL(DP) :: buf( :, : )
+   INTEGER, INTENT(IN) :: itag
+   INTEGER, OPTIONAL, INTENT(IN) :: gid
+   INTEGER :: nsiz, group, ierr, npe, sour, dest, mype
+
+#if defined (__MPI)
+
+   INTEGER :: istatus( mpi_status_size )
+   !
+   group = mpi_comm_world
+   IF( PRESENT( gid ) ) group = gid
+   !
+   CALL mpi_comm_size( group, npe, ierr )
+   IF (ierr/=0) CALL mp_stop( 8100 )
+   CALL mpi_comm_rank( group, mype, ierr )
+   IF (ierr/=0) CALL mp_stop( 8101 )
+   !
+   sour = mype + 1
+   IF( sour == npe ) sour = 0
+   dest = mype - 1
+   IF( dest == -1 ) dest = npe - 1
+   !
+   CALL MPI_Sendrecv_replace( buf, SIZE(buf), MPI_DOUBLE_PRECISION, &
+        dest, itag, sour, itag, group, istatus, ierr)
+   !
+   IF (ierr/=0) CALL mp_stop( 8102 )
+   !
+#else
+   ! do nothing
+#endif
+   RETURN
+END SUBROUTINE mp_circular_shift_left_d2d
+
+
+      FUNCTION mp_get_comm_null( )
+        IMPLICIT NONE
+        INTEGER :: mp_get_comm_null
+#if defined(__MPI)
+           mp_get_comm_null = MPI_COMM_NULL
+#else
+           mp_get_comm_null = 0
+#endif
+      END FUNCTION mp_get_comm_null
+
+      FUNCTION mp_get_comm_self( )
+        IMPLICIT NONE
+        INTEGER :: mp_get_comm_self
+#if defined(__MPI)
+           mp_get_comm_self = MPI_COMM_SELF
+#else
+           mp_get_comm_self = 0
+#endif
+      END FUNCTION mp_get_comm_self
 
 !------------------------------------------------------------------------------!
     END MODULE mp

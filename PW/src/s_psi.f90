@@ -94,6 +94,7 @@ SUBROUTINE s_psi( lda, n, m, psi, spsi )
        ! ... gamma version
        !
        USE becmod, ONLY : bec_type, becp
+       USE mp, ONLY: mp_get_comm_null, mp_circular_shift_left
        !
        IMPLICIT NONE  
        !
@@ -101,11 +102,29 @@ SUBROUTINE s_psi( lda, n, m, psi, spsi )
        !
        INTEGER :: ikb, jkb, ih, jh, na, nt, ijkb0, ibnd, ierr
          ! counters
+       INTEGER :: nproc, mype, m_loc, m_begin, ibnd_loc, icyc, icur_blk, m_max
+         ! data distribution indexes
+       INTEGER, EXTERNAL :: ldim_block, lind_block, gind_block
+         ! data distribution functions
        REAL(DP), ALLOCATABLE :: ps(:,:)
          ! the product vkb and psi
        !
+       m_loc   = m
+       m_begin = 1
+       m_max   = m
+       nproc   = 1
+       mype    = 0
        !
-       ALLOCATE( ps( nkb, m ), STAT=ierr )
+       IF( becp%comm /= mp_get_comm_null() ) THEN
+          nproc   = becp%nproc
+          mype    = becp%mype
+          m_loc   = becp%nbnd_loc
+          m_begin = becp%ibnd_begin
+          m_max   = SIZE(becp%r,2)
+          IF( ( m_begin + m_loc - 1 ) > m ) m_loc = m - m_begin + 1
+       END IF
+       !
+       ALLOCATE( ps( nkb, m_max ), STAT=ierr )
        IF( ierr /= 0 ) &
           CALL errore( ' s_psi_gamma ', ' cannot allocate memory (ps) ', ABS(ierr) )
        !    
@@ -116,13 +135,13 @@ SUBROUTINE s_psi( lda, n, m, psi, spsi )
           IF ( upf(nt)%tvanp ) THEN
              DO na = 1, nat
                 IF ( ityp(na) == nt ) THEN
-                   DO ibnd = 1, m
+                   DO ibnd_loc = 1, m_loc
                       DO jh = 1, nh(nt)
                          jkb = ijkb0 + jh
                          DO ih = 1, nh(nt)
                             ikb = ijkb0 + ih
-                            ps(ikb,ibnd) = ps(ikb,ibnd) + &
-                                           qq(ih,jh,nt) * becp%r(jkb,ibnd)
+                            ps(ikb,ibnd_loc) = ps(ikb,ibnd_loc) + &
+                                           qq(ih,jh,nt) * becp%r(jkb,ibnd_loc)
                          END DO
                       END DO
                    END DO
@@ -136,7 +155,34 @@ SUBROUTINE s_psi( lda, n, m, psi, spsi )
           END IF
        END DO
        !
-       IF ( m == 1 ) THEN
+       IF( becp%comm /= mp_get_comm_null() ) THEN
+          !
+          ! parallel block multiplication of vkb and ps
+          !
+          icur_blk = mype
+          !
+          DO icyc = 0, nproc - 1
+
+             m_loc   = ldim_block( becp%nbnd , nproc, icur_blk )
+             m_begin = gind_block( 1,  becp%nbnd, nproc, icur_blk )
+
+             IF( ( m_begin + m_loc - 1 ) > m ) m_loc = m - m_begin + 1
+
+             IF( m_loc > 0 ) THEN
+                CALL DGEMM( 'N', 'N', 2 * n, m_loc, nkb, 1.D0, vkb, &
+                            2 * lda, ps, nkb, 1.D0, spsi( 1, m_begin ), 2 * lda )
+             END IF
+
+             ! block rotation
+             !
+             CALL mp_circular_shift_left( ps, icyc, becp%comm )
+
+             icur_blk = icur_blk + 1
+             IF( icur_blk == nproc ) icur_blk = 0
+
+          END DO
+          !
+       ELSE IF ( m == 1 ) THEN
           !
           CALL DGEMV( 'N', 2 * n, nkb, 1.D0, vkb, &
                       2 * lda, ps, 1, 1.D0, spsi, 1 )

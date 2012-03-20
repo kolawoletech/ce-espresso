@@ -932,7 +932,6 @@ CONTAINS
       ALLOCATE( dgp( 3, nat ) )
       ALLOCATE( dg0( 3, nat, nconstr ) )
       !
-!       ALLOCATE( gp(    nconstr ) )
       ALLOCATE( ltest( nconstr ) )
       !
       invdtsq  = 1.0_DP / dt**2
@@ -1023,7 +1022,6 @@ CONTAINS
       !
       DEALLOCATE( dgp )
       DEALLOCATE( dg0 )
-!       DEALLOCATE( gp )
       DEALLOCATE( ltest )
       !
       RETURN

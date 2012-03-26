@@ -50,7 +50,7 @@ MODULE exx
   INTEGER, ALLOCATABLE :: index_xk(:)    ! index_xk(nkqs)  
   INTEGER, ALLOCATABLE :: index_sym(:)   ! index_sym(nkqs)
 !
-!  Used for k points pool paralellization. All pools needs these quantities.
+!  Used for k points pool parallelization. All pools needs these quantities.
 !  They are allocated only if needed.
 !
   REAL(DP),    ALLOCATABLE :: xk_collect(:,:)
@@ -210,12 +210,11 @@ CONTAINS
   USE cell_base,  ONLY : bg, at, alat
   USE lsda_mod,   ONLY : nspin
   USE noncollin_module, ONLY : nspin_lsda
-  USE klist,      ONLY : xk, wk
+  USE klist,      ONLY : xk, wk, nkstot, nks
   USE wvfct,      ONLY : nbnd
   USE io_global,  ONLY : stdout
   !
   USE mp_global,  ONLY : nproc, npool, nimage
-  USE klist,      ONLY : nkstot, nks
   !
   IMPLICIT NONE
   !
@@ -509,7 +508,7 @@ CONTAINS
   USE cell_base, ONLY : bg, at
   USE lsda_mod,  ONLY : nspin
   USE io_global, ONLY : stdout
-  USE klist
+  USE klist,     ONLY : nkstot, xk
   implicit none
   real (DP) :: sxk(3), dxk(3), xk_cryst(3), xkk_cryst(3)
   integer :: iq1, iq2, iq3, isym, ik, ikk, ikq, iq
@@ -960,6 +959,7 @@ endif
        temppsic(:) = ( 0.D0, 0.D0 )
 
        IF(gamma_only) THEN
+          prod_tot(:) = (0.d0,0.d0)
           CALL exx_grid_convert( psi(:,im), npw, exx_fft_g2r, psi_t,&
             & 1, igkt )
           temppsic(exx_fft_g2r%nlt(1:exx_fft_g2r%npwt)) =&
@@ -973,7 +973,7 @@ endif
           CALL invfft ('Wave', temppsic, dffts)
        ENDIF
 
-       prod_tot(:) = (0.d0,0.d0)
+
        result(:)   = (0.d0,0.d0)
 
        DO iqi=1,nqi

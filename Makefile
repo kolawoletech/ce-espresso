@@ -12,19 +12,17 @@ default :
 	@echo '  tddfpt       time dependent dft code'
 	@echo '  pp           postprocessing programs'
 	@echo '  pwcond       ballistic conductance'
-	@echo '  vdw          vdW calculation'
 	@echo '  w90          Maximally localised Wannier Functions'
 	@echo '  want         Quantum Transport with Wannier functions'
 	@echo '  plumed       Patch for calculating free-energy paths with pw or cp'
-	@echo '  gww          GW with Wannier Functions'
 	@echo '  gipaw        NMR and EPR spectra'
-	@echo '  epw          Electron-Phonon Coupling'
 	@echo '  yambo        electronic excitations with plane waves'
 	@echo '  ld1          utilities for pseudopotential generation'
 	@echo '  upf          utilities for pseudopotential conversion'
 	@echo '  xspectra     X-ray core-hole spectroscopy calculations '
+	@echo '  gui          Graphical User Interface
 	@echo '  pwall        same as "make pw ph pp pwcond neb"'
-	@echo '  all          same as "make pwall cp ld1 upf gww tddfpt"'
+	@echo '  all          same as "make pwall cp ld1 upf tddfpt"'
 	@echo '  clean        remove executables and objects'
 	@echo '  veryclean    revert distribution to the original status'
 	@echo '  tar          create a tarball of the source tree'
@@ -46,19 +44,13 @@ cp : bindir mods liblapack libblas libs libiotk
 	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
 
 ph : bindir mods libs pw
-	if test -d PHonon ; then \
-	( cd PHonon ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
-	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
+	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile phonon
 
 neb : bindir mods libs pw
-	if test -d NEB ; then \
-	( cd NEB ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
-	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
+	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile $@
 
 tddfpt : bindir mods libs pw ph
-	if test -d TDDFPT ; then \
-	( cd TDDFPT ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
-	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
+	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile $@
 
 pp : bindir mods libs pw
 	if test -d PP ; then \
@@ -66,14 +58,7 @@ pp : bindir mods libs pw
 	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
 
 pwcond : bindir mods libs pw pp
-	if test -d PWCOND ; then \
-	( cd PWCOND ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
-	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
-
-vdw : bindir mods libs pw ph pp
-	if test -d VdW ; then \
-	( cd VdW ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
-	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
+	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile $@
 
 acfdt : bindir mods libs pw ph
 	if test -d ACFDT ; then \
@@ -83,18 +68,8 @@ acfdt : bindir mods libs pw ph
 gipaw : pw
 	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile $@
 
-epw : pw ph
-	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile $@
-
-gww   : bindir pw ph
-	if test -d GWW ; then \
-	( cd GWW ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
-	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
-
 ld1 : bindir liblapack libblas mods libs
-	if test -d atomic ; then \
-	( cd atomic ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
-	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
+	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile $@
 
 upf : mods libs
 	if test -d upftools ; then \
@@ -107,12 +82,13 @@ pw_export : libiotk bindir mods libs pw
 	else $(MAKE) $(MFLAGS) TLDEPS= pw_export.x ; fi ) ; fi
 
 xspectra : bindir mods libs pw
-	if test -d XSpectra ; then \
-	( cd XSpectra ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
-	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi
+	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile $@
 
-pwall : pw neb ph pp pwcond vdw acfdt
-all   : pwall cp ld1 upf gww tddfpt
+gui : touch_dummy
+	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile $@
+
+pwall : pw neb ph pp pwcond acfdt
+all   : pwall cp ld1 upf tddfpt
 
 ###########################################################
 # Auxiliary targets used by main targets:
@@ -169,23 +145,24 @@ touch-dummy :
 	$(dummy-variable)
 
 #########################################################
-# Links and copies. "make links" is likely obsolete.
-# "make inst INSTALLDIR=/some/place" will copy all 
+# "make links" produces links to all executables in bin/
+# while "make inst" INSTALLDIR=/some/place" links all
 # available executables to /some/place/ (must exist and
 # be writable), prepending "qe_" to all executables (e.g.:
 # /some/place/qe_pw.x). This allows installation of QE
 # into system directories with no danger of name conflicts
 #########################################################
 inst : 
-	( for exe in */*.x ../GWW/*.x ; do \
+	( for exe in */*/*.x */bin/* ; do \
 	   file=`basename $$exe`; if test "$(INSTALLDIR)" != ""; then \
-		cp $(PWD)/$$exe $(INSTALLDIR)/qe_$$file ; fi ; \
+		if test ! -L $(PWD)/$$exe; then ln -fs $(PWD)/$$exe $(INSTALLDIR)/qe_$$file ; fi ; \
+		fi ; \
 	done )
 
 links : bindir
 	( cd bin/ ; \
 	rm -f *.x ; \
-	for exe in ../*/*.x ; do \
+	for exe in ../*/*/*.x ../*/bin/* ; do \
 	    if test ! -L $$exe ; then ln -fs $$exe . ; fi \
 	done \
 	)
@@ -199,10 +176,10 @@ links : bindir
 clean :
 	touch make.sys 
 	for dir in \
-		CPV PHonon/D3 PHonon/Gamma Modules PHonon/PH PP PW PWCOND \
-		NEB VdW ACFDT EE \
-		atomic/src clib flib pwtools upftools iotk GIPAW XSpectra \
-		dev-tools GWW extlibs TDDFPT Environ EPW \
+		CPV Modules PP PW \
+		ACFDT \
+		clib flib pwtools upftools iotk \
+		dev-tools extlibs Environ \
 	; do \
 	    if test -d $$dir ; then \
 		( cd $$dir ; \
@@ -212,7 +189,8 @@ clean :
 	done
 	- @(cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile clean)
 	- /bin/rm -rf bin/*.x tmp
-	- cd tests; /bin/rm -rf CRASH *.out *.out2 
+	- cd PW/tests; /bin/rm -rf CRASH *.out *.out? ; cd -
+	- cd CPV/tests; /bin/rm -rf CRASH *.out *.out? 
 
 # remove configuration files too
 distclean veryclean : clean
@@ -224,7 +202,6 @@ distclean veryclean : clean
 	- rm -f espresso.tar.gz
 	- cd examples ; ./make_clean
 	- cd PHonon/examples ; ./make_clean
-	- cd atomic_doc ; ./make_clean
 	- for dir in Doc; do \
 	    test -d $$dir && ( cd $$dir ; $(MAKE) $(MFLAGS) TLDEPS= clean ) \
 	done
@@ -260,7 +237,7 @@ tar-gui :
 # in order to build the .pdf files in Doc, "pdflatex" is needed;
 # in order to build html files for user guide and developer manual,
 # "latex2html" and "convert" (from Image-Magick) are needed.
-doc :
+doc : touch-dummy
 	if test -d Doc ; then \
 	( cd Doc ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
 	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi ) ; fi

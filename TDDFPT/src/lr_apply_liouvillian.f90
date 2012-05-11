@@ -11,7 +11,6 @@ SUBROUTINE lr_apply_liouvillian( evc1, evc1_new, sevc1_new, interaction )
   !---------------------------------------------------------------------
   !
   ! Modified by Osman Baris Malcioglu in 2009
-#include "f_defs.h"
   !
   USE ions_base,            ONLY : ityp, nat, ntyp=>nsp
   USE cell_base,            ONLY : tpiba2

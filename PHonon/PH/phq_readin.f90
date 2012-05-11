@@ -147,7 +147,8 @@ SUBROUTINE phq_readin()
   !                a different mesh than that used for the charge density.
   !
   ! dvscf_star%open : if .true. write in dvscf_star%dir the dvscf_q' for all q' in the
-  !                   star of q with suffix dvscf_star%ext. The dvscf_q' is written in the basis dvscf_star%basis
+  !                   star of q with suffix dvscf_star%ext. The dvscf_q' is written in the basis dvscf_star%basis;
+  !                   if dvscf_star%pat is .true. also save a pattern file.
   ! dvscf_star%dir, dvscf_star%ext, dvscf_star%basis : see dvscf_star%open
   ! drho_star%open  : like dvscf_star%open but for drho_q
   ! drho_star%dir, drho_star%ext, drho_star%basis : see drho_star%open
@@ -178,7 +179,8 @@ SUBROUTINE phq_readin()
   CALL mp_bcast(title, ionode_id )
   !
   ! Rewind the input if the title is actually the beginning of inputph namelist
-  IF( imatches("&inputph", title)) THEN
+  !
+  IF( imatches("&inputph", title) ) THEN
     WRITE(*, '(6x,a)') "Title line not specified: using 'default'."
     title='default'
     IF (ionode) REWIND(5, iostat=ios)
@@ -207,8 +209,6 @@ SUBROUTINE phq_readin()
   zue          = .FALSE.
   fpol         = .FALSE.
   electron_phonon=' '
-!  elph         = .FALSE.
-!  elph_mat     = .FALSE.
   elph_nbnd_min = 1
   elph_nbnd_max = 0
   el_ph_sigma = 0.02
@@ -248,6 +248,7 @@ SUBROUTINE phq_readin()
   !
   drho_star%open = .FALSE.
   drho_star%basis = 'modes'
+  drho_star%pat  = .TRUE.
   drho_star%ext = 'drho'
   CALL get_env( 'ESPRESSO_FILDRHO_DIR', drho_star%dir)
   IF ( TRIM( drho_star%dir ) == ' ' ) &
@@ -255,6 +256,7 @@ SUBROUTINE phq_readin()
   !
   dvscf_star%open = .FALSE.
   dvscf_star%basis = 'cartesian'
+  dvscf_star%pat  = .FALSE.
   dvscf_star%ext = 'dvscf'
   CALL get_env( 'ESPRESSO_FILDVSCF_DIR', dvscf_star%dir)
   IF ( TRIM( dvscf_star%dir ) == ' ' ) &
@@ -263,9 +265,8 @@ SUBROUTINE phq_readin()
   ! ...  reading the namelist inputph
   !
   IF (ionode) READ( 5, INPUTPH, IOSTAT = ios )
-
-  CALL mp_bcast(ios, ionode_id)
   !
+  CALL mp_bcast(ios, ionode_id)
   CALL errore( 'phq_readin', 'reading inputph namelist', ABS( ios ) )
   !
   IF (ionode) tmp_dir = trimcheck (outdir)
@@ -300,7 +301,9 @@ SUBROUTINE phq_readin()
 
   IF (modenum < 0) CALL errore ('phq_readin', ' Wrong modenum ', 1)
   IF (dek <= 0.d0) CALL errore ( 'phq_readin', ' Wrong dek ', 1)
+  !
   epsil = epsil .OR. lraman .OR. elop
+  trans = trans .OR. ldisp
   !
   ! Set default value for fildrho and fildvscf if they are required
   IF ( (lraman.OR.elop.OR.drho_star%open) .AND. fildrho == ' ') fildrho = 'drho'

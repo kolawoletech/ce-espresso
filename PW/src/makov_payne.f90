@@ -23,8 +23,7 @@ SUBROUTINE makov_payne( etot )
   USE scf,       ONLY : rho
   USE lsda_mod,  ONLY : nspin
 #ifdef __ENVIRON
-  USE environ_base, ONLY : do_environ, env_static_permittivity, &
-                           pol_dipole, pol_quadrupole, rhopol
+  USE environ_base, ONLY : do_environ
 #endif
   !
   IMPLICIT NONE
@@ -53,9 +52,8 @@ SUBROUTINE makov_payne( etot )
   CALL compute_dipole( dfftp%nnr, nspin, rho%of_r, x0, e_dipole, e_quadrupole )
   !
 #ifdef __ENVIRON
-  IF ( do_environ .AND. env_static_permittivity .GT. 1.D0 ) &
-    CALL compute_dipole( dfftp%nnr, 1, rhopol, x0, pol_dipole, pol_quadrupole )
-#endif  
+  IF ( do_environ ) CALL environ_makov_payne( dfftp%nnr, nspin, rho%of_r, x0 )
+#endif
   !
   CALL write_dipole( etot, x0, e_dipole, e_quadrupole, qq )
   !
@@ -76,7 +74,7 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
   USE cell_base,  ONLY : at, bg, omega, alat, ibrav
   USE io_global,  ONLY : ionode
 #ifdef __ENVIRON
-  USE environ_base, ONLY : do_environ, pol_dipole, pol_quadrupole
+  USE environ_base, ONLY : do_environ
 #endif
   !
   IMPLICIT NONE
@@ -128,13 +126,6 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
   !
   dipole(:)  = -dipole_el(1:3) + dipole_ion(:)
   quadrupole = -quadrupole_el  + quadrupole_ion
-#ifdef __ENVIRON
-  IF ( do_environ ) THEN 
-    qq = qq - pol_dipole(0)
-    dipole(:)  = dipole(:) - pol_dipole(1:3) 
-    quadrupole = quadrupole - pol_quadrupole  
-  ENDIF
-#endif
   !
   WRITE( stdout, '(/5X,"charge density inside the ", &
        &               "Wigner-Seitz cell:",3F14.8," el.")' ) dipole_el(0)
@@ -149,11 +140,6 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
       (-dipole_el(ip), ip = 1, 3), (-dipole_el(ip)*au_debye, ip = 1, 3 )
   WRITE( stdout, '( 5X,"Ionic",3F9.4," au (Ha),", 3F9.4," Debye")' ) &
       ( dipole_ion(ip),ip = 1, 3), ( dipole_ion(ip)*au_debye,ip = 1, 3 )
-#ifdef __ENVIRON
-  IF ( do_environ ) &
-    WRITE( stdout, '( 5X,"Diele",3F9.4," au (Ha),", 3F9.4," Debye")' ) &
-      (-pol_dipole(ip),ip = 1, 3), (-pol_dipole(ip)*au_debye,ip = 1, 3 )
-#endif
   WRITE( stdout, '( 5X,"Total",3F9.4," au (Ha),", 3F9.4," Debye")' ) &
       ( dipole(ip),    ip = 1, 3), ( dipole(ip)*au_debye,    ip = 1, 3 )
   !
@@ -163,11 +149,6 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
       -quadrupole_el
   WRITE( stdout, '( 5X,"     Ions quadrupole moment",F20.8," a.u. (Ha)")' ) &
       quadrupole_ion
-#ifdef __ENVIRON
-  IF ( do_environ ) &
-    WRITE( stdout, '( 5X,"Dielectr. quadrupole moment",F20.8," a.u. (Ha)")' )  &
-      -pol_quadrupole
-#endif
   WRITE( stdout, '( 5X,"    Total quadrupole moment",F20.8," a.u. (Ha)")' ) &
       quadrupole
   !
@@ -202,7 +183,12 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
        &              " eV (total)")' ) -corr1-corr2, (-corr1-corr2)*rytoev
   !
   WRITE( stdout,'(/"!    Total+Makov-Payne energy  = ",F16.8," Ry")' ) &
-      etot - corr1 - corr2
+      etot - corr1 - corr2 
+  !
+#ifdef __ENVIRON
+  IF ( do_environ ) CALL environ_write_dipole(etot, x0, dipole, quadrupole, &
+                                              qq, corr1, corr2)
+#endif
   !
   RETURN
   !

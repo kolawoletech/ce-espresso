@@ -176,6 +176,7 @@ MODULE read_namelists_module
        qcutz   = 0.0_DP
        q2sigma = 0.01_DP
        input_dft = 'none'
+       ecutfock  = -1.0_DP
 !
 ! ... set starting_magnetization to an invalid value:
 ! ... in PW starting_magnetization MUST be set for at least one atomic type
@@ -284,10 +285,13 @@ MODULE read_namelists_module
        eps_mode        = 'electronic'
        solvationrad(:) = 3.D0
        atomicspread(:) = 0.5D0
+       add_jellium = .false.
        !
        ifdtype  = 1
        nfdpoint = 2
        !
+       mixtype   = 'linear'
+       ndiis     = 1
        mixrhopol = 0.5
        tolrhopol = 1.D-10
        !
@@ -295,6 +299,11 @@ MODULE read_namelists_module
        delta = 0.00001D0
        !
        env_pressure = 0.D0
+       !
+       cion = 0.0D0
+       zion = 1.0D0
+       rhopb = 0.0001D0
+       solvent_temperature = 300.0D0
        !
        RETURN
        !
@@ -450,7 +459,6 @@ MODULE read_namelists_module
        adaptive_thr   =  .false.
        conv_thr_init  =  0.1E-2_DP
        conv_thr_multi =  0.1_DP
-       ecutfock       =  -1.0_DP
        !
        RETURN
        !
@@ -916,10 +924,13 @@ MODULE read_namelists_module
        CALL mp_bcast( eps_mode,                   ionode_id )
        CALL mp_bcast( solvationrad,               ionode_id )
        CALL mp_bcast( atomicspread,               ionode_id )
+       CALL mp_bcast( add_jellium,                ionode_id )
        !
        CALL mp_bcast( ifdtype,                    ionode_id )
        CALL mp_bcast( nfdpoint,                   ionode_id )
        !
+       CALL mp_bcast( mixtype,                    ionode_id )
+       CALL mp_bcast( ndiis,                      ionode_id )
        CALL mp_bcast( mixrhopol,                  ionode_id )
        CALL mp_bcast( tolrhopol,                  ionode_id )
        !
@@ -927,6 +938,11 @@ MODULE read_namelists_module
        CALL mp_bcast( delta,                      ionode_id )
        !
        CALL mp_bcast( env_pressure,               ionode_id )
+       !
+       CALL mp_bcast( cion,                       ionode_id )
+       CALL mp_bcast( zion,                       ionode_id )
+       CALL mp_bcast( rhopb,                      ionode_id )
+       CALL mp_bcast( solvent_temperature,        ionode_id )
        !
       RETURN
        !
@@ -1073,7 +1089,6 @@ MODULE read_namelists_module
        CALL mp_bcast( adaptive_thr,       ionode_id )
        CALL mp_bcast( conv_thr_init,      ionode_id )
        CALL mp_bcast( conv_thr_multi,     ionode_id )
-       CALL mp_bcast( ecutfock,           ionode_id )
        RETURN
        !
      END SUBROUTINE

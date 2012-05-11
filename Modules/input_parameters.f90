@@ -396,9 +396,9 @@ MODULE input_parameters
         CHARACTER(len=80) :: exxdiv_treatment = 'gygi-baldereschi'
           ! define how ro cure the Coulomb divergence in EXX
           ! Allowed values are:
-        CHARACTER(len=80) :: exxdiv_treatment_allowed(8)
-        DATA exxdiv_treatment_allowed / 'gygi-baldereschi', 'gygi-bald', 'g-b', &
-             'yukawa', 'vcut_ws', 'vcut_spherical', 'erfc_simple', 'none' /
+        CHARACTER(len=80) :: exxdiv_treatment_allowed(6)
+        DATA exxdiv_treatment_allowed / 'gygi-baldereschi', 'gygi-bald', 'g-b',&
+             'vcut_ws', 'vcut_spherical', 'none' /
           !
         LOGICAL  :: x_gamma_extrapolation = .true.
         REAL(DP) :: yukawa = 0.0_DP
@@ -489,7 +489,7 @@ MODULE input_parameters
              Hubbard_U, Hubbard_J, Hubbard_alpha,                             &
              edir, emaxpos, eopreg, eamp, smearing, starting_ns_eigenvalue,   &
              U_projection_type, input_dft, la2F, assume_isolated,             &
-             nqx1, nqx2, nqx3,                                                &
+             nqx1, nqx2, nqx3, ecutfock,                                      &
              exxdiv_treatment, x_gamma_extrapolation, yukawa, ecutvcut,       &
              exx_fraction, screening_parameter,                               &
 #ifdef __ENVIRON
@@ -559,6 +559,9 @@ MODULE input_parameters
         ! ionic dielectric function is adopted
         REAL(DP) :: atomicspread(nsx) = 0.5D0
         ! gaussian spreads of the atomic density of charge
+        LOGICAL :: add_jellium = .false.
+        ! depending on periodic boundary corrections, one may need to explicitly
+        ! polarize the compensatinig jellium background
 !
 ! Numerical differentiators paramters
 !
@@ -572,10 +575,15 @@ MODULE input_parameters
 !
 ! Iterative solver parameters
 !
+        CHARACTER( LEN=256 ) :: mixtype = 'linear'
+        ! mixing method for iterative calculation of polarization charges
+        ! 'linear', 'anderson', 'diis', 'broyden'
         REAL(DP) :: mixrhopol = 0.5D0
         ! mixing param to be used in iter calculation of polarization charges
         REAL(DP) :: tolrhopol = 1.D-10
         ! convergence threshold for polarization charges in iterative procedure
+        INTEGER :: ndiis=1
+        ! order of DIIS interpolation of iterative polarization charge
 !
 ! Cavitation energy parameters
 !
@@ -588,16 +596,28 @@ MODULE input_parameters
 !
         REAL(DP) :: env_pressure = 0.D0
         ! external pressure for PV energy, if equal to zero no pressure term 
+!
+! Ionic countercharge parameters
+!
+        REAL(DP) :: cion = 0.D0
+        ! molar concentration of ionic countercharge (M=mol/L)
+        REAL(DP) :: zion = 1.D0
+        ! valence of ionic countercharge
+        REAL(DP) :: rhopb = 0.0001D0
+        ! density threshold for the onset of ionic countercharge
+        REAL(DP) :: solvent_temperature = 300.D0
+        ! temperature of the solution
 
         NAMELIST / environ /                                           &
              verbose, environ_thr, environ_type,                       &
              stype, rhomax, rhomin, tbeta,                             &
              env_static_permittivity, eps_mode,                        &
-             solvationrad, atomicspread,                               &
+             solvationrad, atomicspread, add_jellium,                  &
              ifdtype, nfdpoint,                                        &
-             mixrhopol, tolrhopol,                                     &
+             mixtype, ndiis, mixrhopol, tolrhopol,                     &
              env_surface_tension, delta,                               &
-             env_pressure
+             env_pressure,                                             &
+             cion, zion, rhopb, solvent_temperature
 #endif
 !
 !=----------------------------------------------------------------------------=!
@@ -957,7 +977,7 @@ MODULE input_parameters
           mixing_mode, mixing_beta, mixing_ndim, mixing_fixed_ns,      &
           tqr, diago_cg_maxiter, diago_david_ndim, diagonalization ,   &
           startingpot, startingwfc , conv_thr,                         &
-          adaptive_thr, conv_thr_init, conv_thr_multi, ecutfock,       &
+          adaptive_thr, conv_thr_init, conv_thr_multi,                 &
           diago_thr_init, n_inner, fermi_energy, rotmass, occmass,     &
           rotation_damping, occupation_damping, rotation_dynamics,     &
           occupation_dynamics, tcg, maxiter, etresh, passop, epol,     &

@@ -105,7 +105,7 @@ SUBROUTINE iosys()
   !
   USE martyna_tuckerman, ONLY: do_comp_mt
 #ifdef __ENVIRON
-  USE constants,    ONLY : rydberg_si, bohr_radius_si
+  USE constants,    ONLY : rydberg_si, bohr_radius_si, amu_si, k_boltzmann_ry
   USE environ_base, ONLY : do_environ_ => do_environ,                           &
                            verbose_ => verbose,                                 &
                            environ_thr_ => environ_thr,                         &
@@ -117,14 +117,21 @@ SUBROUTINE iosys()
                            eps_mode_ => eps_mode,                               &
                            solvationrad_ => solvationrad,                       &
                            atomicspread_ => atomicspread,                       &
+                           add_jellium_ => add_jellium,                         &
                            ifdtype_ => ifdtype,                                 &
                            nfdpoint_ => nfdpoint,                               &
+                           mixtype_ => mixtype,                                 &
+                           ndiis_ => ndiis,                                     &
                            mixrhopol_ => mixrhopol,                             &
                            tolrhopol_ => tolrhopol,                             &
                            env_surface_tension_ => env_surface_tension,         &
                            delta_ => delta,                                     &
                            env_pressure_ => env_pressure,                       &
-                           env_slab_geometry, slab_axis
+                           env_slab_geometry, slab_axis,                        &
+                           cion_ => cion,                                       &
+                           zion_ => zion,                                       &
+                           rhopb_ => rhopb,                                     &
+                           solvent_temperature_ => solvent_temperature
 #endif
   !
   USE esm,           ONLY: do_comp_esm, &
@@ -258,14 +265,15 @@ SUBROUTINE iosys()
   !
   ! ... ENVIRON namelist
   !
-  USE input_parameters, ONLY : verbose, environ_thr, environ_type,  &
-                               stype, rhomax, rhomin, tbeta,        &
-                               env_static_permittivity, eps_mode,   &
-                               solvationrad, atomicspread,          &
-                               ifdtype, nfdpoint,                   &
-                               mixrhopol, tolrhopol,                &
-                               env_surface_tension, delta,          &
-                               env_pressure 
+  USE input_parameters, ONLY : verbose, environ_thr, environ_type,      &
+                               stype, rhomax, rhomin, tbeta,            &
+                               env_static_permittivity, eps_mode,       &
+                               solvationrad, atomicspread, add_jellium, &
+                               ifdtype, nfdpoint,                       &
+                               mixtype, ndiis, mixrhopol, tolrhopol,    &
+                               env_surface_tension, delta,              &
+                               env_pressure,                            &
+                               cion, zion, rhopb, solvent_temperature 
 #endif
   !
   ! ... ELECTRONS namelist
@@ -1071,6 +1079,7 @@ SUBROUTINE iosys()
      IF ( lgauss .OR. ltetra ) CALL errore( 'iosys', &
           'Berry Phase/electric fields only for insulators!', 1 )
   END IF
+
   !
   ! ... Copy values from input module to PW internals
   !
@@ -1209,14 +1218,22 @@ SUBROUTINE iosys()
   solvationrad_( 1:ntyp ) = solvationrad( 1:ntyp )
   ALLOCATE( atomicspread_( ntyp ) )
   atomicspread_( 1:ntyp ) = atomicspread( 1:ntyp )
+  add_jellium_ = add_jellium
   !
   ifdtype_   = ifdtype
   nfdpoint_  = nfdpoint
   !
+  mixtype_   = mixtype
+  ndiis_     = ndiis
   mixrhopol_ = mixrhopol
   tolrhopol_ = tolrhopol
   !
   delta_     = delta
+  !
+  cion_       = cion*bohr_radius_si**3/amu_si
+  zion_       = zion
+  rhopb_      = rhopb
+  solvent_temperature_ = solvent_temperature
   !
   SELECT CASE (TRIM(environ_type))
   ! if a specific environ is selected use hardcoded parameters
@@ -1329,6 +1346,9 @@ SUBROUTINE iosys()
       !
       call errore ('iosys','unrecognized value for assume_isolated',1)
   END SELECT
+#ifdef __ENVIRON
+  IF ( do_comp_mt .OR. env_slab_geometry ) add_jellium = .false.
+#endif
   !
   ! ... read following cards
   !

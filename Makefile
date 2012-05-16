@@ -20,13 +20,14 @@ default :
 	@echo '  ld1          utilities for pseudopotential generation'
 	@echo '  upf          utilities for pseudopotential conversion'
 	@echo '  xspectra     X-ray core-hole spectroscopy calculations '
-	@echo '  gui          Graphical User Interface
+	@echo '  gui          Graphical User Interface '
 	@echo '  pwall        same as "make pw ph pp pwcond neb"'
 	@echo '  all          same as "make pwall cp ld1 upf tddfpt"'
 	@echo '  clean        remove executables and objects'
 	@echo '  veryclean    revert distribution to the original status'
 	@echo '  tar          create a tarball of the source tree'
-	@echo '  tar-gui      create a tarball of the GUI sources'
+	@if test -d GUI/; then \
+	 echo '  tar-gui      create a standalone PWgui tarball from the GUI sources'; fi
 	@echo '  doc          build documentation'
 	@echo '  links        create links to all executables in bin/'
 
@@ -84,7 +85,7 @@ pw_export : libiotk bindir mods libs pw
 xspectra : bindir mods libs pw
 	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile $@
 
-gui : touch_dummy
+gui : touch-dummy
 	cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile $@
 
 pwall : pw neb ph pp pwcond acfdt

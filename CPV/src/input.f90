@@ -188,7 +188,7 @@ MODULE input
      USE control_flags, ONLY : textfor
      USE control_flags, ONLY : do_makov_payne, twfcollect
      USE control_flags, ONLY : lwf, lwfnscf, lwfpbe0, lwfpbe0nscf ! Lingzhu Kong
-     USE control_flags, ONLY : lneb, lpath
+     USE control_flags, ONLY : lneb, lsmd, lpath
      !
      ! ...  Other modules
      !
@@ -283,7 +283,11 @@ MODULE input
      emaec_ = emass_cutoff
      ! no longer implemented!
      lneb = ( TRIM( calculation ) == 'neb' )
-     lpath = lneb
+     IF ( lneb ) CALL errore ( 'iosys', &
+                 'NEB no longer implemented, use "neb.x" instead', 1)
+     lsmd = ( TRIM( calculation ) == 'smd' )
+     IF ( lsmd ) CALL errore ( 'iosys', 'SMD no longer implemented', 1)
+     lpath = lneb .OR. lsmd
 !====================================================================
 !Lingzhu Kong
      lwf = ( TRIM( calculation ) == 'cp-wf'      .OR. &
@@ -742,10 +746,6 @@ MODULE input
       IF( .NOT. tavel .AND. TRIM(ion_velocities)=='from_input' ) &
         CALL errore(' iosys ',' ION_VELOCITIES not present in stdin ', 1 )
 
-      IF( ( TRIM( calculation ) == 'smd' ) .AND. ( TRIM( cell_dynamics ) /= 'none' ) ) THEN
-        CALL errore(' smiosys ',' cell_dynamics not implemented : '//TRIM(cell_dynamics), 1 )
-      END IF
-
       RETURN
    END SUBROUTINE set_control_flags
    !
@@ -753,7 +753,7 @@ MODULE input
    SUBROUTINE modules_setup()
      !-------------------------------------------------------------------------
      !
-     USE control_flags,    ONLY : lconstrain, lneb, tpre, thdyn, tksw
+     USE control_flags,    ONLY : lconstrain, tpre, thdyn, tksw
 
      USE constants,        ONLY : amu_au, pi
      !
@@ -764,7 +764,7 @@ MODULE input
            ecutrho, ecfixed, qcutz, q2sigma, tk_inp, wmass,                   &
            ion_radius, emass, emass_cutoff, temph, fnoseh, nr1b, nr2b, nr3b,  &
            tempw, fnosep, nr1, nr2, nr3, nr1s, nr2s, nr3s, ekincw, fnosee,    &
-           outdir, prefix, nkstot, xk,                                        &
+           outdir, prefix, nkstot, xk, vdw_table_name,                        &
            occupations, n_inner, fermi_energy, rotmass, occmass,              &
            rotation_damping, occupation_damping, occupation_dynamics,         &
            rotation_dynamics, degauss, smearing, nhpcl, nhptyp, ndega,        &
@@ -818,6 +818,9 @@ MODULE input
      USE ensemble_dft,     ONLY : ensemble_initval,tens
      USE wannier_base,     ONLY : wannier_init
      USE efield_module,    ONLY : tefield
+     USE funct,            ONLY : dft_is_nonlocc
+     USE kernel_table,     ONLY : vdw_table_name_ => vdw_table_name, &
+                                  initialize_kernel_table
      !
      IMPLICIT NONE
      !
@@ -945,6 +948,13 @@ MODULE input
      !
      CALL ldaU_init0 ( ntyp, lda_plus_u, Hubbard_U )
      CALL ldaUpen_init( SIZE(sigma_pen), step_pen, sigma_pen, alpha_pen, A_pen )
+     !
+     ! ... initialize kernel table for nonlocal functionals
+     !
+     IF ( dft_is_nonlocc( ) ) THEN
+        vdw_table_name_ = vdw_table_name
+        CALL initialize_kernel_table()
+     ENDIF
      !
      RETURN
      !

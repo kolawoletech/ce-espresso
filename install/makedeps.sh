@@ -91,7 +91,6 @@ for dir in $dirs; do
         then
             mv make.depend make.depend.tmp
             sed '/@environ_base@/d' make.depend.tmp > make.depend
-            mv make.depend.tmp make.depend
         fi
 
         rm -f make.depend.tmp

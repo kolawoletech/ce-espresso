@@ -19,6 +19,7 @@ SUBROUTINE q_points_wannier ( )
   USE dfile_autoname, ONLY : dfile_get_qlist
   USE dfile_star,     ONLY : dvscf_star
   USE io_files, ONLY : prefix
+  USE control_ph, ONLY : last_q
 
   implicit none
 
@@ -39,24 +40,13 @@ SUBROUTINE q_points_wannier ( )
        call errore('q_points','nq1 or nq2 or nq3 <= 0',1)
 
   nqs=nq1*nq2*nq3
-
+ 
+  if(last_q.lt.nqs.and.last_q.gt.0) nqs=last_q
   allocate (x_q(3,nqmax))
   allocate(wan_index_dyn(nqs))
 
-!  !here read q_points
+! here read q_points
   CALL dfile_get_qlist(x_q, nqs, dvscf_star%ext, TRIM(dvscf_star%dir)//prefix, wan_index_dyn )
-!  IF (ionode) inquire (file =TRIM(dvscf_dir)//'Q_POINTS.D', exist = exst)
-!  if(.not.exst) call errore('q_points_wannier','Q_POINTS.D not existing in dvscf_dir ',1)
-
-!  iq_unit = find_free_unit()
-!  OPEN (unit = iq_unit, file = trim(dvscf_dir)//'Q_POINTS.D', status = 'unknown')
-!  rewind(iq_unit) 
-  
-!  do i=1,nqs
-!     read(iq_unit,*) x_q(1,i), x_q(2,i), x_q(3,i), idum, wan_index_dyn(i)
-!  enddo
-
-!  close(iq_unit)
   !
   ! Check if the Gamma point is one of the points and put
   ! 
@@ -67,7 +57,7 @@ SUBROUTINE q_points_wannier ( )
           abs(x_q(3,iq)) .lt. 1.0e-10_dp ) then
         exist_gamma = .true.
         if (iq .ne. 1) then
-           call errore('q_points_wannier','first q in Q_POINTS.D must be Gamma',1)
+           call errore('q_points_wannier','first q in dirfile must be Gamma',1)
         end if
      end if
   end do
@@ -83,7 +73,7 @@ SUBROUTINE q_points_wannier ( )
   end do
   !
   IF ( .NOT. exist_gamma) &
-     CALL errore('q_points','Gamma is not a q point',1)
+     CALL errore('q_points_wannier','Gamma is not a q point',1)
 
   !
   ! ... write the information on the grid of q-points to file

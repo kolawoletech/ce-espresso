@@ -39,7 +39,7 @@ PROGRAM matdyn
   !     flfrc     file produced by q2r containing force constants (needed)
   !               It is the same as in the input of q2r.x (+ the .xml extension
   !               if the dynamical matrices produced by ph.x were in xml
-  !               format).
+  !               format). No default value: must be specified.
   !      asr      (character) indicates the type of Acoustic Sum Rule imposed
   !               - 'no': no Acoustic Sum Rules imposed (default)
   !               - 'simple':  previous implementation of the asr used
@@ -63,33 +63,42 @@ PROGRAM matdyn
   !               using tetrahedra and a uniform q-point grid (see below)
   !               NB: may not work properly in noncubic materials
   !               if .false. calculate phonon bands from the list of q-points
-  !               supplied in input
+  !               supplied in input (default)
   !     nk1,nk2,nk3  uniform q-point grid for DOS calculation (includes q=0)
+  !                  (must be specified if dos=.true., ignored otherwise)
   !     deltaE    energy step, in cm^(-1), for DOS calculation: from min
-  !               to max phonon energy (default: 1 cm^(-1) if ndos is
-  !               not specified)
+  !               to max phonon energy (default: 1 cm^(-1) if ndos, see
+  !               below, is not specified)
   !     ndos      number of energy steps for DOS calculations
-  !               (no default: calculated from deltaE if not specified)
+  !               (default: calculated from deltaE if not specified)
   !     fldos     output file for dos (default: 'matdyn.dos')
   !               the dos is in states/cm(-1) plotted vs omega in cm(-1)
   !               and is normalised to 3*nat, i.e. the number of phonons
   !     flfrq     output file for frequencies (default: 'matdyn.freq')
   !     flvec     output file for normal modes (default: 'matdyn.modes')
+  !     fldyn     output file for dynamical matrix (default: ' ' i.e. does not write)
   !     at        supercell lattice vectors - must form a superlattice of the
-  !               original lattice
-  !     l1,l2,l3  supercell lattice vectors are original cell vectors
-  !               multiplied by l1, l2, l3 respectively
-  !     ntyp      number of atom types in the supercell
-  !     amass     masses of atoms in the supercell
+  !               original lattice (default: use original cell)
+  !     l1,l2,l3  supercell lattice vectors are original cell vectors times
+  !               l1, l2, l3 respectively (default: 1, ignored if at specified)
+  !     ntyp      number of atom types in the supercell (default: ntyp of the
+  !               original cell)
+  !     amass     masses of atoms in the supercell (a.m.u.), one per atom type
+  !               (default: use masses read from file flfrc)
   !     readtau   read  atomic positions of the supercell from input
-  !               (used to specify different masses)
+  !               (used to specify different masses) (default: .false.)
   !     fltau     write atomic positions of the supercell to file "fltau"
   !               (default: fltau=' ', do not write)
   !     la2F      if .true. interpolates also the el-ph coefficients.
   !     q_in_band_form if .true. the q points are given in band form:
   !               Only the first and last point of one or more lines 
   !               are given. See below. (default: .false.).
-  !     q_in_cryst_coord if .true. input q points are in crystalline coordinates
+  !     q_in_cryst_coord if .true. input q points are in crystalline 
+  !              coordinates (default: .false.)
+  !     eigen_similarity: use similarity of the displacements to order 
+  !                       frequencies  (default: .false.)
+  !                NB: You cannot use this option with the symmetry
+  !                analysis of the modes.
   !
   !  if (readtau) atom types and positions in the supercell follow:
   !     (tau(i,na),i=1,3), ityp(na)
@@ -134,9 +143,9 @@ PROGRAM matdyn
   INTEGER, PARAMETER:: ntypx=10, nrwsx=200
   REAL(DP), PARAMETER :: eps=1.0d-6
   INTEGER :: nr1, nr2, nr3, nsc, nk1, nk2, nk3, ntetra, ibrav
-  CHARACTER(LEN=256) :: flfrc, flfrq, flvec, fltau, fldos, filename
+  CHARACTER(LEN=256) :: flfrc, flfrq, flvec, fltau, fldos, filename, fldyn
   CHARACTER(LEN=10)  :: asr
-  LOGICAL :: dos, has_zstar, q_in_cryst_coord
+  LOGICAL :: dos, has_zstar, q_in_cryst_coord, eigen_similarity
   COMPLEX(DP), ALLOCATABLE :: dyn(:,:,:,:), dyn_blk(:,:,:,:)
   COMPLEX(DP), ALLOCATABLE :: z(:,:)
   REAL(DP), ALLOCATABLE:: tau(:,:), q(:,:), w2(:,:), freq(:,:)
@@ -163,7 +172,7 @@ PROGRAM matdyn
   REAL(DP) :: celldm(6), delta, pathL
   REAL(DP), ALLOCATABLE :: xqaux(:,:)
   INTEGER, ALLOCATABLE :: nqb(:)
-  INTEGER :: n, i, j, it, nq, nqx, na, nb, ndos, iout, nqtot
+  INTEGER :: n, i, j, it, nq, nqx, na, nb, ndos, iout, nqtot, iout_dyn
   LOGICAL, EXTERNAL :: has_xml
   CHARACTER(LEN=15), ALLOCATABLE :: name_rap_mode(:)
   INTEGER, ALLOCATABLE :: num_rap_mode(:,:)
@@ -177,7 +186,7 @@ PROGRAM matdyn
   !
   NAMELIST /input/ flfrc, amass, asr, flfrq, flvec, at, dos,  &
        &           fldos, nk1, nk2, nk3, l1, l2, l3, ntyp, readtau, fltau, &
-                   la2F, ndos, DeltaE, q_in_band_form, q_in_cryst_coord
+       &           la2F, ndos, DeltaE, q_in_band_form, q_in_cryst_coord, fldyn
   !
   CALL mp_startup()
   CALL environment_start('MATDYN')
@@ -200,6 +209,7 @@ PROGRAM matdyn
      fldos='matdyn.dos'
      flfrq='matdyn.freq'
      flvec='matdyn.modes'
+     fldyn=' '
      fltau=' '
      amass(:) =0.d0
      amass_blk(:) =0.d0
@@ -210,6 +220,7 @@ PROGRAM matdyn
      l3=1
      la2F=.false.
      q_in_band_form=.FALSE.
+     eigen_similarity=.FALSE.
      q_in_cryst_coord = .FALSE.
      !
      !
@@ -228,6 +239,7 @@ PROGRAM matdyn
      CALL mp_bcast(fldos,ionode_id)
      CALL mp_bcast(flfrq,ionode_id)
      CALL mp_bcast(flvec,ionode_id)
+     CALL mp_bcast(fldyn,ionode_id)
      CALL mp_bcast(fltau,ionode_id)
      CALL mp_bcast(amass,ionode_id)
      CALL mp_bcast(amass_blk,ionode_id)
@@ -238,7 +250,9 @@ PROGRAM matdyn
      CALL mp_bcast(l3,ionode_id)
      CALL mp_bcast(la2f,ionode_id)
      CALL mp_bcast(q_in_band_form,ionode_id)
+     CALL mp_bcast(eigen_similarity,ionode_id)
      CALL mp_bcast(q_in_cryst_coord,ionode_id)
+
      !
      ! read force constants
      !
@@ -414,6 +428,14 @@ PROGRAM matdyn
         IF (ionode) OPEN (unit=iout,file=flvec,status='unknown',form='formatted')
      END IF
 
+     IF (fldyn.EQ.' ') THEN
+        iout_dyn=0
+     ELSE
+        iout_dyn=44
+        OPEN (unit=iout_dyn,file=fldyn,status='unknown',form='formatted')
+     END IF
+
+
      ALLOCATE ( dyn(3,3,nat,nat), dyn_blk(3,3,nat_blk,nat_blk) )
      ALLOCATE ( z(3*nat,3*nat), w2(3*nat,nq) )
      ALLOCATE ( tmp_w2(3*nat), abs_similarity(3*nat,3*nat), mask(3*nat) )
@@ -474,6 +496,10 @@ PROGRAM matdyn
            !
         END IF
         !
+        
+        if(iout_dyn.ne.0) call write_dyn_on_file(q(1,n),dyn,nat, iout_dyn)
+        
+
         CALL dyndiag(nat,ntyp,amass,ityp,dyn,w2(1,n),z)
         !
         ! Cannot use the small group of \Gamma to analize the symmetry
@@ -481,6 +507,7 @@ PROGRAM matdyn
         !
         IF (xmlifc.AND..NOT.lo_to_split) THEN
              ALLOCATE(name_rap_mode(3*nat))
+             WRITE(stdout,'(10x,"xq=",3F8.4)') q(:,n)
              CALL find_representations_mode_q(nat,ntyp,q(:,n), &
                        w2(:,n),z,tau,ityp,amass,name_rap_mode, &
                        num_rap_mode(:,n), nspin_mag)
@@ -488,23 +515,26 @@ PROGRAM matdyn
             code_group_old=code_group
             DEALLOCATE(name_rap_mode)
         ENDIF
-        ! ... order phonon dispersions using similarity of eigenvalues
-        ! ... Courtesy of Takeshi Nishimatsu, IMR, Tohoku University 
-        IF (.NOT.ALLOCATED(tmp_z)) THEN
-           ALLOCATE(tmp_z(3*nat,3*nat))
-        ELSE
-           abs_similarity = ABS ( MATMUL ( CONJG( TRANSPOSE(z)), tmp_z ) )
-           mask(:) = .true.
-           DO na=1,3*nat
-              location = maxloc( abs_similarity(:,na), mask(:) )
-              mask(location(1)) = .false.
-              tmp_w2(na) = w2(location(1),n)
-              tmp_z(:,na) = z(:,location(1))
-            END DO
-            w2(:,n) = tmp_w2(:)
-            z(:,:) = tmp_z(:,:)
-        END IF
-        tmp_z(:,:) = z(:,:)
+
+        IF (eigen_similarity) THEN
+           ! ... order phonon dispersions using similarity of eigenvalues
+           ! ... Courtesy of Takeshi Nishimatsu, IMR, Tohoku University 
+           IF (.NOT.ALLOCATED(tmp_z)) THEN
+              ALLOCATE(tmp_z(3*nat,3*nat))
+           ELSE
+              abs_similarity = ABS ( MATMUL ( CONJG( TRANSPOSE(z)), tmp_z ) )
+              mask(:) = .true.
+              DO na=1,3*nat
+                 location = maxloc( abs_similarity(:,na), mask(:) )
+                 mask(location(1)) = .false.
+                 tmp_w2(na) = w2(location(1),n)
+                 tmp_z(:,na) = z(:,location(1))
+              END DO
+              w2(:,n) = tmp_w2(:)
+              z(:,:) = tmp_z(:,:)
+           END IF
+           tmp_z(:,:) = z(:,:)
+        ENDIF
         !
         if(la2F.and.ionode) then
            write(300,*) n
@@ -516,10 +546,12 @@ PROGRAM matdyn
         IF (ionode) CALL writemodes(nax,nat,q(1,n),w2(1,n),z,iout)
         !
      END DO  !nq
-     DEALLOCATE (tmp_z, tmp_w2, abs_similarity, mask)
+     DEALLOCATE (tmp_w2, abs_similarity, mask)
+     IF (eigen_similarity) DEALLOCATE(tmp_z)
      if(la2F.and.ionode) close(300)
      !
      IF(iout .NE. stdout.and.ionode) CLOSE(unit=iout)
+     IF(iout_dyn .NE. 0) CLOSE(unit=iout_dyn)
      !
      ALLOCATE (freq(3*nat, nq))
      DO n=1,nq
@@ -632,6 +664,7 @@ SUBROUTINE readfc ( flfrc, nr1, nr2, nr3, epsil, nat,    &
   USE ifconstants,ONLY : tau => tau_blk, ityp => ityp_blk, frc, zeu
   USE io_global,  ONLY : ionode, ionode_id, stdout
   USE mp,         ONLY : mp_bcast 
+  USE constants,  ONLY : amconv
   !
   IMPLICIT NONE
   ! I/O variable
@@ -679,7 +712,7 @@ SUBROUTINE readfc ( flfrc, nr1, nr2, nr3, epsil, nat,    &
      CALL mp_bcast(amass_from_file,ionode_id)
      IF (i.NE.nt) CALL errore ('readfc','wrong data read',nt)
      IF (amass(nt).EQ.0.d0) THEN
-        amass(nt) = amass_from_file
+        amass(nt) = amass_from_file/amconv
      ELSE
         WRITE(stdout,*) 'for atomic type',nt,' mass from file not used'
      END IF

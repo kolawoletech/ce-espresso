@@ -44,7 +44,8 @@ SUBROUTINE cprmain( tau_out, fion_out, etot_out )
   USE gvect,       ONLY : gstart, mill, eigts1, eigts2, eigts3
   USE ions_base,                ONLY : na, nat, amass, nax, nsp, rcmax
   USE ions_base,                ONLY : ind_srt, ions_cofmass, ions_kinene, &
-                                       ions_temp, ions_thermal_stress, if_pos, extfor
+                                       ions_temp, ions_thermal_stress, &
+                                       if_pos, extfor
   USE ions_base,                ONLY : ions_vrescal, fricp, greasp, &
                                        iforce, ndfrz, ions_shiftvar, ityp, &
                                        atm, ind_bck, cdm, cdms, ions_cofmsub
@@ -116,7 +117,7 @@ SUBROUTINE cprmain( tau_out, fion_out, etot_out )
                                        me_bgrp, inter_bgrp_comm, nbgrp
   USE ldaU_cp,                  ONLY : lda_plus_u, vupsi
   USE fft_base,                 ONLY : dfftp
-  USE london_module,            ONLY : energy_london, force_london
+  USE london_module,            ONLY : energy_london, force_london, stres_london
   !
   IMPLICIT NONE
   !
@@ -328,7 +329,16 @@ SUBROUTINE cprmain( tau_out, fion_out, etot_out )
      !
      ! DFT+D (Grimme) dispersion forces (factor 0.5 converts to Ha/a.u.)
      !
-     IF (llondon) fion = fion + force_london ( alat, nat, ityp, at, bg, tau0 )
+     IF ( llondon ) THEN
+        ALLOCATE( usrt_tau0( 3, nat ), usrt_fion( 3, nat ) )
+        usrt_tau0(:,:) = tau0(:,ind_bck(:))/alat
+        usrt_fion =  0.5_dp*force_london ( alat, nat,ityp, at,bg, usrt_tau0 )
+        fion(:,:) = fion(:,:) + usrt_fion(:,ind_srt(:))
+        IF ( tpre ) stress = stress + 0.5_dp * stres_london ( alat , nat , &
+                              ityp , at , bg , usrt_tau0 , omega )
+        DEALLOCATE (usrt_fion, usrt_tau0)
+
+     END IF
      !
      IF ( tpre ) THEN
         !
@@ -501,13 +511,13 @@ SUBROUTINE cprmain( tau_out, fion_out, etot_out )
            !
            CALL gram_bgrp( vkb, bec_bgrp, nkb, cm_bgrp, ngw )
            !
-           IF ( iverbosity > 3 ) CALL dotcsc( eigr, cm_bgrp, ngw, nbsp_bgrp )
+           IF ( iverbosity > 2 ) CALL dotcsc( eigr, cm_bgrp, ngw, nbsp_bgrp )
            !
         END IF
         !
         !  correction to displacement of ions
         !
-        IF ( iverbosity > 2 ) CALL print_lambda( lambda, descla, nbsp, 9, 1.D0 )
+        IF ( iverbosity > 1 ) CALL print_lambda( lambda, descla, nbsp, 9, 1.D0 )
         !
         IF ( tortho ) THEN
            CALL updatc( ccc, lambda, phi_bgrp, bephi, becp_bgrp, bec_bgrp, cm_bgrp, descla )
@@ -526,7 +536,7 @@ SUBROUTINE cprmain( tau_out, fion_out, etot_out )
            CALL caldbec_bgrp( eigr, cm_bgrp, dbec, descla )
         END IF
         !
-        IF ( iverbosity > 2 ) CALL dotcsc( eigr, cm_bgrp, ngw, nbsp_bgrp )
+        IF ( iverbosity > 1 ) CALL dotcsc( eigr, cm_bgrp, ngw, nbsp_bgrp )
         !
      END IF
      !
@@ -650,8 +660,12 @@ SUBROUTINE cprmain( tau_out, fion_out, etot_out )
      !
      ! DFT+D (Grimme) dispersion contribution to energy (0.5 converts to Ha)
      !
-     IF ( llondon ) etot = etot + &
-                           0.5_dp*energy_london (alat, nat, ityp, at, bg, tau0)
+     IF ( llondon ) THEN
+        ALLOCATE( usrt_tau0( 3, nat ) )
+        usrt_tau0(:,:) = tau0(:,ind_bck(:))/alat
+        etot = etot + 0.5_dp*energy_london (alat, nat,ityp,at,bg, usrt_tau0)
+        DEALLOCATE (usrt_tau0)
+     END IF
      !
      epot = eht + epseu + exc
      !
@@ -886,7 +900,7 @@ SUBROUTINE cprmain( tau_out, fion_out, etot_out )
                   xnhp0, xnhpm, vnhp, nhpcl,nhpdim,ekincm, xnhh0, xnhhm,    &
                   vnhh, velh, fion, tps, z0t, f, rhor )
   !
-  IF( iverbosity > 2 ) CALL print_lambda( lambda, descla, nbsp, nbsp, 1.D0 )
+  IF( iverbosity > 1 ) CALL print_lambda( lambda, descla, nbsp, nbsp, 1.D0 )
   !
   IF (lda_plus_u) DEALLOCATE( forceh )
 

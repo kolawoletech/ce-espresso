@@ -43,6 +43,10 @@ SUBROUTINE print_ks_energies()
       ibnd_dw,      &! counter on bands
       ibnd         
   !
+  IF (nkstot >= 100 .and. iverbosity <= 0 ) THEN
+     WRITE( stdout, '(/,5x,a)') &
+     "Number of k-points >= 100: set verbosity='high' to print the bands."
+  ELSE
   !
   ALLOCATE ( ngk_g (nkstot) ) 
   !
@@ -82,6 +86,8 @@ SUBROUTINE print_ks_energies()
   END DO
   !
   DEALLOCATE ( ngk_g )
+  !
+  ENDIF 
   !
   IF ( .NOT. lbands ) THEN
      !

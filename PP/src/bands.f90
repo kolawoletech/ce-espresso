@@ -1,5 +1,5 @@
 !
-! Copyright (C) 2001-2009 Quantum ESPRESSO group
+! Copyright (C) 2001-2012 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
@@ -29,12 +29,12 @@ PROGRAM do_bands
   CHARACTER(LEN=256), EXTERNAL :: trimcheck
   !
   CHARACTER (len=256) :: filband, filp, outdir
-  LOGICAL :: lsigma(4), lsym, lp, no_overlap
+  LOGICAL :: lsigma(4), lsym, lp, no_overlap, plot_2d
   INTEGER :: spin_component, firstk, lastk
   INTEGER :: ios
   !
   NAMELIST / bands / outdir, prefix, filband, filp, spin_component, lsigma,&
-                       lsym, lp, filp, firstk, lastk, no_overlap
+                       lsym, lp, filp, firstk, lastk, no_overlap, plot_2d
   !
   ! initialise environment
   !
@@ -56,6 +56,7 @@ PROGRAM do_bands
   firstk=0
   lastk=10000000
   spin_component = 1
+  plot_2d=.false.
   no_overlap=.false.
   !
   ios = 0
@@ -90,6 +91,13 @@ PROGRAM do_bands
   CALL mp_bcast( lsym, ionode_id )
   CALL mp_bcast( lsigma, ionode_id )
   CALL mp_bcast( no_overlap, ionode_id )
+  CALL mp_bcast( plot_2d, ionode_id )
+
+  IF (plot_2d) THEN
+     lsym=.false.
+     lp=.false.
+     no_overlap=.true.
+  ENDIF
 
   IF ( npool > 1 .and..not.(lsym.or.no_overlap)) CALL errore('bands', &
                                              'pools not implemented',npool)
@@ -109,9 +117,13 @@ PROGRAM do_bands
   CALL openfil_pp()
   !
   IF (lsym) no_overlap=.true.
-  CALL punch_band(filband,spin_component,lsigma,no_overlap)
-  IF (lsym) CALL sym_band(filband,spin_component,firstk,lastk)
-  IF (lp) CALL write_p_avg(filp,spin_component,firstk,lastk)
+  IF (plot_2d) THEN
+     CALL punch_band_2d(filband,spin_component)
+  ELSE
+     CALL punch_band(filband,spin_component,lsigma,no_overlap)
+     IF (lsym) CALL sym_band(filband,spin_component,firstk,lastk)
+     IF (lp) CALL write_p_avg(filp,spin_component,firstk,lastk)
+  END IF
   !
   CALL stop_pp
   STOP
@@ -127,15 +139,15 @@ SUBROUTINE punch_band (filband, spin_component, lsigma, no_overlap)
   !    method works in many, but not in all the cases.
   !
   !
-  USE atom
+  USE kinds,                ONLY : dp
   USE ions_base,            ONLY : nat, ityp, ntyp => nsp
-  USE cell_base
+  USE cell_base,            ONLY : at, tpiba2
   USE constants,            ONLY : rytoev
-  USE gvect
+  USE gvect,                ONLY : g, ngm
   USE lsda_mod,             ONLY : nspin
-  USE klist
+  USE klist,                ONLY : xk, nks, nkstot
   USE io_files,             ONLY : iunpun, nwordwfc, iunwfc
-  USE wvfct
+  USE wvfct,                ONLY : nbnd, et, ecutwfc, igk, npw, npwx, g2kin
   USE uspp,                 ONLY : nkb, vkb, qq
   USE uspp_param,           ONLY : upf, nh, nhm
   USE noncollin_module,     ONLY : noncolin, npol

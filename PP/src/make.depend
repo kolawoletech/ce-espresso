@@ -586,5 +586,8 @@ write_p_avg.o : ../../PW/src/pwcom.o
 xctest.o : ../../Modules/funct.o
 xctest.o : ../../Modules/kind.o
 xctest.o : ../../Modules/mp.o
+xk_et_collect.o : ../../Modules/kind.o
+xk_et_collect.o : ../../Modules/mp.o
+xk_et_collect.o : ../../Modules/mp_global.o
 xsf.o : ../../Modules/constants.o
 xsf.o : ../../Modules/kind.o

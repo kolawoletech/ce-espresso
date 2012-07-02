@@ -1,5 +1,5 @@
 !
-! Copyright (C) 2004-2007 Quantum ESPRESSO group
+! Copyright (C) 2004-2012 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
@@ -18,6 +18,7 @@ subroutine ld1_readin
   use constants,  ONLY : rytoev, c_au
   USE io_global,  ONLY : ionode, ionode_id, stdout
   USE mp,         ONLY : mp_bcast
+  USE open_close_input_file,  ONLY : open_input_file, close_input_file
   use ld1inc,     only : els, lls, betas, qq, qvan, ikk, nbeta, pseudotype, &
                          el, nn, ll, jj, oc, isw, nwf,rcut, rcutus, &
                          enls, nns, jjs, ocs, isws, nwfs, &
@@ -176,8 +177,6 @@ subroutine ld1_readin
   !
   atom  = '  '
   zed   = 0.0_dp
-!  xmin  = -7.0_dp
-!  dx    =  0.0125_dp
   xmin  = 0.0_dp
   dx    = 0.0_dp
   rmax  =100.0_dp
@@ -217,16 +216,22 @@ subroutine ld1_readin
   lgipaw_reconstruction = .false.
   use_paw_as_gipaw = .false. !EMINE
   relpert = .false.
+
+  ! check if reading from file, dump stdin to file otherwise
+  ! (when generating a pseudopotential, input data file is needed)
+
+  ios = 0
+  if (ionode) ios = open_input_file()
+  call mp_bcast(ios, ionode_id)
+  If ( ios > 0 ) call errore('ld1_readin','opening input file ',abs(ios))
   vshift(:) = 0.d0
 
   ! read the namelist input
 
-  if (ionode) then
-     CALL input_from_file()
-     read(5,input,err=100,iostat=ios) 
-  end if
+  if (ionode) read(5,input,err=100,iostat=ios) 
 100  call mp_bcast(ios, ionode_id)
   call errore('ld1_readin','reading input namelist ',abs(ios))
+
   call bcast_input()
   call mp_bcast( xmin, ionode_id )
   call mp_bcast( dx, ionode_id )
@@ -251,7 +256,7 @@ subroutine ld1_readin
      if (nint(zdum) /= nint(zed)) call errore &
           ('ld1_readin','inconsistent Z/atom specification',nint(zdum))
   end if
-! with LDA-1/2 now iswitch <=4
+  ! with LDA-1/2 now iswitch <=4
   if (iswitch < 1 .or. iswitch > 4) &
        call errore('ld1_readin','wrong iswitch',1)
   if (eminld > emaxld) &
@@ -337,10 +342,9 @@ subroutine ld1_readin
   if (xmin > -2.0_dp) call errore('ld1_readin','wrong xmin',1)
   if (dx <=0.0_dp) call errore('ld1_readin','wrong dx',1)
   !
-  ! generate the radial grid - note that if iswitch = 2 the radial grid
-  ! is not generated but read from the pseudopotential file
+  ! generate the radial grid - note that if iswitch = 2 or 4
+  ! the radial grid is not generated but read from the pseudopotential file
   !
-! also for LDA-1/2 radial grid has to be read
   if (iswitch /= 2.or.iswitch/=4) then
      call do_mesh(rmax,zed,xmin,dx,0,grid)
      rhoc=0.0_dp
@@ -350,13 +354,16 @@ subroutine ld1_readin
   if (iswitch == 1) then
      !
      !    no more data needed for AE calculations
+     !    (input unit can be safely closed)
      !
+     ios = close_input_file ( )
      frozen_core=.false.
      return
      !     
   else if (iswitch == 3) then
      !
      !    reading input for PP generation
+     !    (do not yet close the input unit: will be needed later)
      !
      zval=0.0_dp
      lloc=-1
@@ -380,6 +387,7 @@ subroutine ld1_readin
      if (ionode) read(5,inputp,err=500,iostat=ios)
 500  call mp_bcast(ios, ionode_id)
      call errore('ld1_readin','reading inputp',abs(ios))
+
      call bcast_inputp()
 
      if(which_augfun=='DEFAULT') then
@@ -427,7 +435,6 @@ subroutine ld1_readin
           do ns1=1,nwfs
              if (lls(ns) == lls(ns1) .and. jjs(ns) == jjs(ns1)) c1=c1+1 
           enddo
-!!!!
           if (c1 < 2) then
              write (stdout,'(/,5x,A)') &
                   '!!!!!!!!!!!!!!!!!!! WARNING !!!!!!!!!!!!!!!!!!!!!!!'
@@ -436,7 +443,6 @@ subroutine ld1_readin
              write (stdout,'(5x,A)') &
                   '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
           endif
-!!!!
         endif
      enddo
      if (nwfs > 1) then
@@ -461,22 +467,21 @@ subroutine ld1_readin
   ecutmax = 0.0_dp
   decut   = 5.0_dp
   rm      =30.0_dp
-
-!
-! default value for LDA-1/2
-!
+  !
+  ! default value for LDA-1/2
+  !
   rcutv = -1.0
-!
-  if (ionode) read(5,test,err=300,iostat=ios)
+
+  ! read test namelist, if present
+
+  if (ionode) read(5,test,end=300,err=300,iostat=ios)
 300  call mp_bcast(ios, ionode_id)
 
-! LDA-1/2
-  if(iswitch==4) nconf = 2
   if(iswitch==4.and.rcutv<0.0) call errore('ld1_readin','inconsistent rcutv',1)
-!
-
-! Added iswitch ==4 for LDA-1/2
   if (iswitch==2.or.iswitch==4) call errore('ld1_readin','reading test',abs(ios))
+  ! for LDA-1/2
+  if(iswitch==4) nconf = 2
+  !
   call bcast_test()
   call mp_bcast(configts, ionode_id)
   !
@@ -589,6 +594,10 @@ subroutine ld1_readin
   !    PP testing: reading the pseudopotential
   !
   if (iswitch ==2.or.iswitch==4) then
+     !
+     ! input unit can be safely closed (and temporary file deleted)
+     !
+     ios = close_input_file ( )
      lpaw=.false.
      !
      if (file_pseudo == ' ') &
@@ -639,7 +648,6 @@ subroutine ld1_readin
            ikk(ns)=grid%mesh
         enddo
      endif
-     !
   endif
   !
   if (lpaw) then

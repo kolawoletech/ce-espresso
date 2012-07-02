@@ -5,7 +5,7 @@
 ! in the root directory of the present distribution,
 ! or http://www.gnu.org/copyleft/gpl.txt .
 !
-subroutine write_upf_atomic(ounps)
+subroutine write_upf_v1(ounps)
 
   use ld1inc, only: nlcc, rel, lpaw, lgipaw_reconstruction, &
                     use_paw_as_gipaw
@@ -30,8 +30,7 @@ subroutine write_upf_atomic(ounps)
   if ( lgipaw_reconstruction.and.(.not.use_paw_as_gipaw) ) call write_pseudo_gipaw(ounps)
   !
   !
-end subroutine write_upf_atomic
-
+end subroutine write_upf_v1
   !
   !---------------------------------------------------------------------
   subroutine write_pseudo_comment (ounps)  
@@ -61,7 +60,6 @@ end subroutine write_upf_atomic
     comment=title
 
     write (ounps, '(a9)', err = 100, iostat = ios) "<PP_INFO>"  
-
     write (ounps, '(a75)', err = 100, iostat = ios) generated
     write (ounps, '(a75)', err = 100, iostat = ios) date_author
     if (trim(comment) /= ' ') then

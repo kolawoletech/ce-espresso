@@ -6,7 +6,7 @@
 ! or http://www.gnu.org/copyleft/gpl.txt .
 !
 !---------------------------------------------------------------------
-SUBROUTINE export_upf(iunps)
+SUBROUTINE export_upf(iunps, unit_loc)
   !---------------------------------------------------------------------
   !
   use constants, only : fpi
@@ -26,15 +26,16 @@ SUBROUTINE export_upf(iunps)
                      nstoaets, pseudotype, enls, rhoc, vnl, vpsloc, &
                      lgipaw_reconstruction, use_paw_as_gipaw
   use funct, only: get_dft_name
-  use iotk_module, only: iotk_newline
+  use global_version, only: version_number, svn_revision
   !
   use pseudo_types
-  use upf_module, only : write_upf, pseudo_config, deallocate_pseudo_config
+  use write_upf_v2_module, only: write_upf_v2, &
+                                 pseudo_config, deallocate_pseudo_config
   !
   implicit none
   !
   !CHARACTER(len=*),INTENT(IN) :: filename
-  INTEGER,INTENT(IN)::iunps
+  INTEGER,INTENT(IN)::iunps, unit_loc
   !
   integer :: ibeta, jbeta, kbeta, l, ind, l1, l2
   !
@@ -54,7 +55,10 @@ SUBROUTINE export_upf(iunps)
   !
   IF (iswitch < 4 ) THEN
      upf%generated='Generated using "atomic" code by A. Dal Corso &
-                  & (Quantum ESPRESSO distribution)'
+                  & v.' // TRIM (version_number)
+    IF ( TRIM (svn_revision) /= 'unknown' ) upf%generated = &
+         TRIM (upf%generated) // ' svn rev. ' // TRIM (svn_revision)
+ 
   ELSE IF (iswitch==4) THEN
      upf%generated='Generated using LDA-1/2 implemented by Leonardo&
                   & Matheus Marion Jorge'
@@ -263,7 +267,7 @@ SUBROUTINE export_upf(iunps)
   upf%has_wfc = lsave_wfc
   if (upf%has_wfc)   CALL export_upf_wfc()
   !
-  CALL write_upf(upf, at_conf, unit=iunps)
+  CALL write_upf_v2( iunps, upf, at_conf, unit_loc )
   !
   CALL deallocate_pseudo_upf( upf )
   CALL deallocate_radial_grid( internal_grid )

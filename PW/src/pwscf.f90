@@ -14,7 +14,7 @@ PROGRAM pwscf
   USE io_global,        ONLY : stdout, ionode, ionode_id
   USE parameters,       ONLY : ntypx, npk, lmaxx
   USE cell_base,        ONLY : fix_volume
-  USE control_flags,    ONLY : conv_elec, gamma_only, lscf
+  USE control_flags,    ONLY : conv_elec, gamma_only, lscf, scf_must_converge
   USE control_flags,    ONLY : conv_ions, istep, nstep, restart, lmd, lbfgs
   USE force_mod,        ONLY : lforce, lstres, sigma
   USE environment,      ONLY : environment_start
@@ -100,7 +100,7 @@ PROGRAM pwscf
      !
      CALL electrons()
      !
-     IF ( .NOT. conv_elec ) THEN
+     IF ( .NOT. conv_elec .and. scf_must_converge ) THEN
        CALL punch( 'all' )
        CALL stop_run( conv_elec )
      ENDIF

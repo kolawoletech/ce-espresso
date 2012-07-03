@@ -24,7 +24,7 @@ SUBROUTINE iosys()
   USE funct,         ONLY : dft_has_finite_size_correction, &
                             set_finite_size_volume, get_inlc 
   USE funct,         ONLY: set_exx_fraction, set_screening_parameter
-  USE control_flags, ONLY: adapt_thr, tr2_init, tr2_multi
+  USE control_flags, ONLY: adapt_thr, tr2_init, tr2_multi, scf_must_converge
   USE constants,     ONLY : autoev, eV_to_kelvin, pi, rytoev, &
                             ry_kbar, amu_ry, bohr_radius_angs, eps8
   USE mp_global,     ONLY : npool, nproc_pool
@@ -283,7 +283,7 @@ SUBROUTINE iosys()
                                tqr, diago_thr_init, diago_cg_maxiter,      &
                                diago_david_ndim, diagonalization,          &
                                diago_full_acc, startingwfc, startingpot,   &
-                               real_space
+                               real_space, scf_must_converge_ => scf_must_converge
   USE input_parameters, ONLY : adaptive_thr, conv_thr_init, conv_thr_multi
   !
   ! ... IONS namelist
@@ -901,6 +901,7 @@ SUBROUTINE iosys()
   !
   tr2   = conv_thr
   niter = electron_maxstep
+  scf_must_converge = scf_must_converge_
   adapt_thr = adaptive_thr
   tr2_init  = conv_thr_init
   tr2_multi = conv_thr_multi

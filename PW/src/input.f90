@@ -176,7 +176,8 @@ SUBROUTINE iosys()
                             ldamped, lbands, llang,           &
                             lconstrain, restart, twfcollect, &
                             llondon, do_makov_payne, &
-                            lecrpa_           => lecrpa
+                            lecrpa_           => lecrpa, &
+                            scf_must_converge_ => scf_must_converge
   !
   USE wvfct,         ONLY : nbnd_ => nbnd, &
                             ecutwfc_ => ecutwfc, &
@@ -283,7 +284,7 @@ SUBROUTINE iosys()
                                tqr, diago_thr_init, diago_cg_maxiter,      &
                                diago_david_ndim, diagonalization,          &
                                diago_full_acc, startingwfc, startingpot,   &
-                               real_space, scf_must_converge_ => scf_must_converge
+                               real_space
   USE input_parameters, ONLY : adaptive_thr, conv_thr_init, conv_thr_multi
   !
   ! ... IONS namelist
@@ -901,7 +902,7 @@ SUBROUTINE iosys()
   !
   tr2   = conv_thr
   niter = electron_maxstep
-  scf_must_converge = scf_must_converge_
+  scf_must_converge_ = scf_must_converge
   adapt_thr = adaptive_thr
   tr2_init  = conv_thr_init
   tr2_multi = conv_thr_multi

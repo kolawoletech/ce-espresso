@@ -525,6 +525,7 @@ CONTAINS
      rho_ddot = fac*rho_ddot
      !
      IF ( gamma_only ) rho_ddot = 2.D0 * rho_ddot
+#if 0
      !
      ! ... then the magnetization
      !
@@ -550,6 +551,7 @@ CONTAINS
         !
      END DO
      !
+#endif
   ELSE IF ( nspin == 4 ) THEN
      !
      DO ig = gstart, gf
@@ -562,6 +564,7 @@ CONTAINS
      rho_ddot = fac*rho_ddot
      !
      IF ( gamma_only ) rho_ddot = 2.D0 * rho_ddot
+#if 0
      !
      IF (domag) THEN
         fac = e2*fpi / (tpi**2)  ! lambda=1 a.u.
@@ -588,6 +591,7 @@ CONTAINS
         !
      END IF
      !
+#endif
   END IF
   !
   rho_ddot = rho_ddot * omega * 0.5D0
@@ -596,7 +600,9 @@ CONTAINS
   !
   IF (dft_is_meta()) rho_ddot = rho_ddot + tauk_ddot( rho1, rho2, gf )
   IF (lda_plus_u )   rho_ddot = rho_ddot + ns_ddot(rho1,rho2)
+#if 0
   IF (okpaw)         rho_ddot = rho_ddot + paw_ddot(rho1%bec, rho2%bec)
+#endif
   IF (dipfield)      rho_ddot = rho_ddot + (e2/2.0_DP)* &
                                     (rho1%el_dipole * rho2%el_dipole)*omega/fpi
 

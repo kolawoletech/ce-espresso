@@ -92,7 +92,7 @@ SUBROUTINE punch_plot (filplot, plot_num, sample_bias, z, dz, &
         ENDIF
      ENDIF
 
-  ELSEIF (plot_num == 19) THEN
+  ELSEIF (plot_num == 20) THEN
      !
      !      plot of the charge density minus the atomic rho
      !

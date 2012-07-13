@@ -197,20 +197,20 @@ LIBOBJS        = ../../flib/ptools.a ../../flib/flib.a ../../clib/clib.a ../../i
 
 TLDEPS= bindir mods libs pw
 
-all : tldeps libph.a ph.x dynmat.x matdyn.x q2r.x lambda.x fqha.x q2qstar.x
+all : tldeps libph.a ph.x dynmat.x matdyn.x q2r.x lambda.x fqha.x q2qstar.x 
 
 ph.x : phonon.o libph.a $(PWOBJS) $(LIBOBJS)
 	$(LD) $(LDFLAGS) -o ph.x phonon.o libph.a \
 		 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/ph.x . )
 
-dynmat.x : dynmat.o rigid.o libph.a $(PWOBJS)  $(MODULES) $(LIBOBJS)
-	$(LD) $(LDFLAGS) -o $@ dynmat.o rigid.o libph.a \
+dynmat.x : dynmat.o rigid.o write_eigenvectors.o libph.a $(PWOBJS)  $(MODULES) $(LIBOBJS)
+	$(LD) $(LDFLAGS) -o $@ dynmat.o write_eigenvectors.o rigid.o libph.a \
 		 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
 
-matdyn.x : matdyn.o rigid.o libph.a $(PWOBJS)  $(MODULES) $(LIBOBJS)
-	$(LD) $(LDFLAGS) -o $@ matdyn.o rigid.o libph.a \
+matdyn.x : matdyn.o rigid.o write_eigenvectors.o libph.a $(PWOBJS)  $(MODULES) $(LIBOBJS)
+	$(LD) $(LDFLAGS) -o $@ matdyn.o rigid.o write_eigenvectors.o libph.a \
 		 $(PWOBJS) $(QEMODS) $(LIBOBJS) $(LIBS)
 	- ( cd ../../bin ; ln -fs ../PHonon/PH/$@ . )
 

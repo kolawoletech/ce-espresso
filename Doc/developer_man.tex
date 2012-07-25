@@ -1,5 +1,5 @@
 \documentclass[12pt,a4paper]{article}
-\def\version{5.0}
+\def\version{5.0.1}
 \def\qe{{\sc Quantum ESPRESSO}}
 \def\qeforge{\texttt{qe-forge.org}}
 \textwidth = 17cm
@@ -159,12 +159,25 @@ subscribe to \texttt{q-e-developers@qe-forge.org} (low traffic)
 \subsection{Hints, Caveats, Do's and Dont's for developers}
 
 \begin{itemize}
-\item Before doing anything, inquire whether it is already there, or under development.
-\item Before starting writing code, inquire whether you can reuse code that is already available in the distribution. Avoid redundancy: the only bug-free software line is the one that doesn't exist.
-\item When you make some change:
+\item Before doing anything, inquire whether it is already there,
+or under development.
+\item Before starting writing code, inquire whether you can reuse
+code that is already available in the distribution. Avoid redundancy: 
+the only bug-free software line is the one that doesn't exist.
+\item When you make some changes:
 \begin{itemize}
-\item Check that are not spoiling other people's work. In particular, search the distribution for codes using the routine or module you are modifying and change its usage or its calling sequence everywhere.
-\item Do not forget that your change must work on many different combinations of hardware and software, in both serial and parallel execution.
+\item Check that are not spoiling other people's work. In particular, 
+search the distribution for codes using the routine or module you are 
+modifying and change its usage or its calling arguments everywhere.
+\item Do not forget that your changes must work on many different 
+combinations of hardware and software, in both serial and parallel execution.
+\item Do not forget that your changes must work for a wide variety of
+different system: if your code works only in some selected case, it
+must either stop or issue a warning in all other cases.
+\item Do not forget that your changes must work on systems of wildly
+different computational size: solutions that may look appropriate in
+crystal silicon may gobble a disproportionate amount of time and/or
+memory in a 1000-atom cell.
 \end{itemize}
 \item Document your changes:
 \begin{itemize}

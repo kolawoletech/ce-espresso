@@ -40,16 +40,18 @@ SUBROUTINE errore( calling_routine, message, ierr )
     ! the error flag
   INTEGER                      :: mpime, mpierr
     ! the task id  
+  CHARACTER(LEN=6) :: cerr
   !
   !
   IF ( ierr <= 0 ) RETURN
   !
   ! ... the error message is written un the "*" unit
   !
+  WRITE( cerr, FMT = '(I6)' ) ierr
   WRITE( UNIT = *, FMT = '(/,1X,78("%"))' )
-  WRITE( UNIT = *, &
-         FMT = '(5X,"from ",A," : error #",I10)' ) calling_routine, ierr
-  WRITE( UNIT = *, FMT = '(5X,A)' ) message
+  WRITE( UNIT = *, FMT = '(5X,"Error in routine ",A," (",A,"):")' ) &
+        TRIM(calling_routine), TRIM(ADJUSTL(cerr))
+  WRITE( UNIT = *, FMT = '(5X,A)' ) TRIM(message)
   WRITE( UNIT = *, FMT = '(1X,78("%"),/)' )
   !
 #if defined (__MPI) && defined (__AIX)
@@ -58,9 +60,9 @@ SUBROUTINE errore( calling_routine, message, ierr )
   ! ... which is automatically connected to stderr
   !
   WRITE( UNIT = 0, FMT = '(/,1X,78("%"))')
-  WRITE( UNIT = 0, &
-         FMT = '(5X,"from ",A," : error #",I10)' ) calling_routine, ierr
-  WRITE( UNIT = 0, FMT = '(5X,A)' ) message
+  WRITE( UNIT = 0, FMT = '(5X,"Error in routine ",A," (",A,"):")' ) &
+        TRIM(calling_routine), TRIM(ADJUSTL(cerr))
+  WRITE( UNIT = 0, FMT = '(5X,A)' ) TRIM(message)
   WRITE( UNIT = 0, FMT = '(1X,78("%"),/)' )
   !
 #endif

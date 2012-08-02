@@ -129,7 +129,7 @@ phonons of Si at Gamma
   tr2_ph=1.0d-14,
   prefix='si',
   epsil=.true.,
-  max_seconds=3,
+  max_seconds=1,
   amass(1)=28.08,
   outdir='$TMP_DIR/',
   fildyn='si.dynG',

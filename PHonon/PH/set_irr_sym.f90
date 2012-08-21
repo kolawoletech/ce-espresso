@@ -7,8 +7,7 @@
 !
 !
 !---------------------------------------------------------------------
-subroutine set_irr_sym (nat, at, bg, xq, s, rtau, irt, &
-     irgq, nsymq, minus_q, irotmq, t, tmq, u, npert, nirr, npertx )
+subroutine set_irr_sym_new ( t, tmq, npertx )
 !---------------------------------------------------------------------
 !
 !     This subroutine computes: 
@@ -17,7 +16,12 @@ subroutine set_irr_sym (nat, at, bg, xq, s, rtau, irt, &
 !
   USE kinds, ONLY : DP
   USE constants, ONLY: tpi
-
+  USE ions_base, ONLY : nat, tau
+  USE cell_base, ONLY : at, bg
+  USE symm_base, ONLY : s, irt, nsym, sname
+  USE qpoint,    ONLY : xq
+  USE modes,     ONLY : nsymq, u, irotmq, nirr, npert, rtau, minus_q
+  USE control_flags, ONLY : modenum
   USE mp, ONLY: mp_bcast
   USE mp_global, ONLY : intra_image_comm
   USE io_global, ONLY : ionode_id
@@ -25,32 +29,13 @@ subroutine set_irr_sym (nat, at, bg, xq, s, rtau, irt, &
 !
 !   first the dummy variables
 !
-
-  integer, intent(in) ::  nat, s (3, 3, 48), irt (48, nat), npert (3 * nat), &
-                          irgq (48), nsymq, irotmq, nirr, npertx
-! input: the number of atoms
-! input: the symmetry matrices
-! input: the rotated of each atom
-! input: the dimension of each represe
-! input: the small group of q
-! input: the order of the small group
-! input: the symmetry sending q -> -q+
-! input: the number of irr. representa
-
-  real(DP), intent(in) :: xq (3), rtau (3, 48, nat), at (3, 3), bg (3, 3)
-! input: the q point
-! input: the R associated to each tau
-! input: the direct lattice vectors
-! input: the reciprocal lattice vectors
-
-  complex(DP), intent(in) :: u(3*nat, 3*nat)
-! input: the pattern vectors
-
-  complex(DP), intent(out) :: t(npertx, npertx, 48, 3*nat), tmq (npertx, npertx, 3*nat)
+  integer, intent(in) ::  npertx
+! input: maximum dimension of the irreducible representations 
+!
+  complex(DP), intent(out) :: t(npertx, npertx, 48, 3*nat), &
+                              tmq (npertx, npertx, 3*nat)
 ! output: the symmetry matrices
 ! output: the matrice sending q -> -q+G
-  logical :: minus_q
-! output: if true one symmetry send q -
 !
 !   here the local variables
 !
@@ -79,13 +64,14 @@ subroutine set_irr_sym (nat, at, bg, xq, s, rtau, irt, &
   endif
   do isymq = 1, nsymtot
      if (isymq.le.nsymq) then
-        irot = irgq (isymq)
+        irot = isymq
      else
         irot = irotmq
      endif
      imode0 = 0
      do irr = 1, nirr
         do ipert = 1, npert (irr)
+           if (modenum /= 0 .AND. modenum /= irr) CYCLE
            imode = imode0 + ipert
            do na = 1, nat
               do ipol = 1, 3
@@ -128,6 +114,7 @@ subroutine set_irr_sym (nat, at, bg, xq, s, rtau, irt, &
            do na = 1, nat
               call trnvecc (wrk_ru (1, na), at, bg, 1)
            enddo
+            
 !
 !     Computes the symmetry matrices on the basis of the pattern
 !
@@ -154,7 +141,10 @@ subroutine set_irr_sym (nat, at, bg, xq, s, rtau, irt, &
 ! if this is not the case, the way the representations have been chosen has failed
 ! for some reasons (check set_irr.f90)
 !
+        
+        
         do ipert = 1, npert (irr)
+           IF (modenum /= 0 .AND. modenum /= irr) CYCLE
            do jpert = 1, npert (irr)
               wrk = cmplx(0.d0,0.d0)
               do kpert = 1, npert (irr)
@@ -178,4 +168,4 @@ subroutine set_irr_sym (nat, at, bg, xq, s, rtau, irt, &
   call mp_bcast (tmq, ionode_id, intra_image_comm)
 #endif
   return
-end subroutine set_irr_sym
+end subroutine set_irr_sym_new

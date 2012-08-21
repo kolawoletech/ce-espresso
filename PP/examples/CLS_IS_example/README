@@ -17,7 +17,7 @@ type with a different, core-exited, electronic configuration.
 
 The calculation proceeds as follows:
 
-1) make a self-consistent calculation for Pd [011] slab adding the
+1) make a self-consistent calculation for Rh [011] slab adding the
 core-exited PP in the ATOMIC_SPECIES. All the atomic positions will
 be defined by the normal PP, the addition of the exited PP in the list
 is needed for the next step. Notice that in &system the ntyp variable

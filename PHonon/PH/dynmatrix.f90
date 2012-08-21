@@ -6,7 +6,7 @@
 ! or http://www.gnu.org/copyleft/gpl.txt .
 !
 !-----------------------------------------------------------------------
-subroutine dynmatrix(iq_)
+subroutine dynmatrix_new(iq_)
   !-----------------------------------------------------------------------
   !
   ! This routine is a driver which computes the symmetrized dynamical
@@ -26,7 +26,7 @@ subroutine dynmatrix(iq_)
   USE dynmat,        ONLY : dyn, w2
   USE qpoint,        ONLY : xq
   USE noncollin_module, ONLY : nspin_mag
-  USE modes,         ONLY : u, nmodes, minus_q, irotmq, nsymq, irgq, &
+  USE modes,         ONLY : u, nmodes, minus_q, irotmq, nsymq, &
                             rtau, npert, nirr, name_rap_mode, num_rap_mode
   USE gamma_gamma,   ONLY : nasr, asr, equiv_atoms, has_equivalent, &
                             n_diff_sites
@@ -57,7 +57,7 @@ subroutine dynmatrix(iq_)
   real(DP) :: sxq (3, 48), work(3)
   ! list of vectors in the star of q
   real(DP), allocatable :: zstar(:,:,:)
-  integer :: icart, jcart
+  integer :: icart, jcart, ierr
   logical :: ldiag_loc, opnd
   !
   call start_clock('dynmatrix')
@@ -109,7 +109,7 @@ subroutine dynmatrix(iq_)
                        n_diff_sites, equiv_atoms, has_equivalent, dyn)
      IF (asr) CALL set_asr_c(nat,nasr,dyn)
   ELSE
-     CALL symdyn_munu (dyn, u, xq, s, invs, rtau, irt, irgq, at, bg, &
+     CALL symdyn_munu_new (dyn, u, xq, s, invs, rtau, irt, at, bg, &
           nsymq, nat, irotmq, minus_q)
   ENDIF
   !
@@ -138,6 +138,7 @@ subroutine dynmatrix(iq_)
            RETURN
         ENDIF
      ENDDO
+     ldiag_loc=.TRUE.
   ENDIF
   !
   !   Generates the star of q
@@ -227,9 +228,13 @@ subroutine dynmatrix(iq_)
   !
   IF (ldiag_loc) THEN
      call dyndia (xq, nmodes, nat, ntyp, ityp, amass, iudyn, dyn, w2)
-     IF (search_sym) CALL find_mode_sym (dyn, w2, at, bg, tau, nat, nsymq, sr,&
-              irt, xq, rtau, amass, ntyp, ityp, 1, lgamma, lgamma_gamma, &
-                                        nspin_mag, name_rap_mode, num_rap_mode)
+     IF (search_sym) THEN
+         CALL find_mode_sym_new (dyn, w2, tau, nat, nsymq, sr, irt, xq, &
+              rtau, amass, ntyp, ityp, 1, lgamma_gamma, .FALSE., &
+              num_rap_mode, ierr)
+         CALL print_mode_sym(w2, num_rap_mode, lgamma)
+     ENDIF
+
   END IF
 !
 ! Here we save the dynamical matrix and the effective charges dP/du on
@@ -242,4 +247,4 @@ subroutine dynmatrix(iq_)
 
   call stop_clock('dynmatrix')
   return
-end subroutine dynmatrix
+end subroutine dynmatrix_new

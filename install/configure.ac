@@ -197,6 +197,7 @@ then
         test -d /proc/cray_xt && arch=crayxt
 	# workaround for IBM BG machines
         test -d /bgsys && arch=ppc64-bg
+        test -f /bgsys/drivers/ppcfloor/bin/runjob && arch=ppc64-bgq
 fi
 echo checking architecture... $arch
 
@@ -264,7 +265,7 @@ ppc64-mn )
         try_arflags="ruv"
         ;;
 # IBM BlueGene
-ppc64-bg )
+ppc64-bg | ppc64-bgq )
 	if test "$use_openmp" -eq 0 ; then
           try_mpif90="mpixlf90"
           try_f90="bgxlf90"
@@ -273,7 +274,7 @@ ppc64-bg )
           try_f90="bgxlf90_r"
 	fi
         try_arflags="ruv"
-        try_dflags="-D__AIX -D__XLF"
+        try_dflags="-D__XLF"
         ;;
 * )
         AC_MSG_WARN($arch : unsupported architecture?)
@@ -479,11 +480,11 @@ cray*:* )
 necsx:* )
         try_cc="sxcc"
         ;;
-ppc64-bg:*xlf90_r )
+ppc64-bg*:*xlf90_r )
         try_cc="bgxlc_r"
         try_f77="bgxlf_r"
         ;;
-ppc64-bg:*xlf90 )
+ppc64-bg*:*xlf90 )
         try_cc="bgxlc"
         try_f77="bgxlf"
         ;;
@@ -716,7 +717,21 @@ ppc64-bg:*xlf* )
         try_f90flags="\$(FFLAGS) -qsuffix=cpp=f90"
         try_fflags_noopt="-q32 -O0"
         try_ldflags="-q32"
-        try_ldflags_openmp="-qsmp -qthreaded"
+        try_ldflags_openmp="-qsmp=omp -qthreaded"
+        pre_fdflags="-WF,"
+        xlf_flags=1
+        ;;
+ppc64-bgq:*xlf* )
+    if test "$use_debug" -eq 1; then
+        try_fflags="-qalias=noaryovrlp:nointptr -g -C -qdpc=e"
+    else
+        try_fflags="-qalias=noaryovrlp:nointptr -O3 -qstrict -qdpc=e -qarch=qp -qtune=qp"
+    fi
+        try_fflags_openmp="-qsmp=noauto:omp -qtm -qthreaded"
+        try_f90flags="\$(FFLAGS) -qsuffix=cpp=f90"
+        try_fflags_noopt="-O0"
+        try_ldflags=""
+        try_ldflags_openmp="-qstatic -qsmp=noauto:omp -qtm -qthreaded"
         pre_fdflags="-WF,"
         xlf_flags=1
         ;;
@@ -791,6 +806,9 @@ ppc64-mn:* )
         ;;
 ppc64-bg:* )
         try_cflags="-O3 -q32"
+        ;;
+ppc64-bgq:* )
+        try_cflags="-O3"
         ;;
 ppc64:xlc*)
         try_cflags="-O3 -q64 -qthreaded"
@@ -1500,7 +1518,7 @@ then
                 LIBS="$fft_libs"
                 AC_SEARCH_LIBS(dcft, essl, have_fft=1 fft_libs="$LIBS")
             ;;
-        ppc64-bg )
+        ppc64-bg | ppc64-bgq )
                 # check for esslbg
                 unset ac_cv_search_dcft # clear cached value
                 FFLAGS="$test_fflags"
@@ -1636,7 +1654,7 @@ then
         case "$arch" in
         aix | ppc64-bg )
                 # check for mass (in several directories)
-                try_libdirs="/opt/ibmcmp/xlmass/bg/4.4/bglib /cineca/lib /cineca/lib/mass"
+                try_libdirs="/opt/ibmcmp/xlmass/bg/7.3/bglib64 /opt/ibmcmp/xlmass/bg/4.4/bglib /cineca/lib /cineca/lib/mass"
                 try_libdirs="$libdirs $try_libdirs $ld_library_path"
 
                 for dir in none $try_libdirs
@@ -1656,6 +1674,31 @@ then
                         if test "$ac_cv_search_vexp" = "-lmassvp4" \
                                 -o "$ac_cv_search_vexp" = "-lmassv"
                         then mass_libs="$try_loption $ac_cv_search_vexp -lmass"
+                        fi
+                        if test "$ac_cv_search_vexp" != "no" ; then break ; fi
+                done
+                ;;
+        ppc64-bgq )
+                # check for mass (in several directories)
+                try_libdirs="/opt/ibmcmp/xlmass/bg/7.3/bglib64"
+                try_libdirs="$libdirs $try_libdirs $ld_library_path"
+
+                for dir in none $try_libdirs
+                do
+                        unset ac_cv_search_vexp # clear cached value
+                        if test "$dir" = "none"
+                        then
+                                try_loption=
+                        else
+                                echo $ECHO_N "in $dir: " $ECHO_C
+                                try_loption="-L$dir"
+                        fi
+                        FFLAGS="$test_fflags"
+                        LDFLAGS="$test_ldflags $try_loption"
+                        LIBS=""
+                        AC_SEARCH_LIBS(vexp, massv, , , -lmass_simd)
+                        if test "$ac_cv_search_vexp" = "-lmassv"
+                        then mass_libs="$try_loption $ac_cv_search_vexp -lmass_simd"
                         fi
                         if test "$ac_cv_search_vexp" != "no" ; then break ; fi
                 done
@@ -1693,6 +1736,10 @@ fi
 if test "$mass_libs" != ""; then 
    try_dflags="$try_dflags -D__MASS"
    if test "$arch" = "ppc64-bg"; then
+   # BlueGene wants this when mass libs are loaded, SP6 doesn't want this!
+     ldflags="$ldflags -Wl,--allow-multiple-definition"
+   fi
+   if test "$arch" = "ppc64-bgq"; then
    # BlueGene wants this when mass libs are loaded, SP6 doesn't want this!
      ldflags="$ldflags -Wl,--allow-multiple-definition"
    fi
@@ -1800,8 +1847,14 @@ fi
        LDFLAGS=""
        AC_SEARCH_LIBS(pdgemr2d, "" , have_scalapack=1
                    try_dflags="$try_dflags -D__SCALAPACK")
+    else
+        # scalapack provided in SCALAPACK_LIBS - not checked!
+        have_scalapack=1
+        try_dflags="$try_dflags -D__SCALAPACK"
     fi
 done
+
+echo setting SCALAPACK_LIBS... $scalapack_libs
 
 # preprocessing flag for openmp (experimental)
 if test "$use_openmp" -eq 1 ; then try_dflags="$try_dflags -D__OPENMP" ; fi

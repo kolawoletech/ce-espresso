@@ -197,7 +197,7 @@ MODULE pw_restart
          !
          ! ... find out the number of pools
          !
-         npool = nproc / nproc_pool
+         npool = nproc_image / nproc_pool
          !
          ! ... find out number of k points blocks
          !
@@ -1380,6 +1380,7 @@ MODULE pw_restart
             kunit = 1
             nproc_file=1
             nproc_pool_file=1
+            nproc_image_file=1
             !
          ELSE
             !
@@ -2433,7 +2434,7 @@ MODULE pw_restart
                !
             END DO
          ELSE
-            CALL errore ( 'pw_writefile ', & 
+            CALL errore ( 'read_brillouin zone', & 
                 'incorrect number of symmetries for lattice', nrot )
          END IF
          !
@@ -2874,7 +2875,7 @@ MODULE pw_restart
       USE buffers,              ONLY : save_buffer
       USE gvect,                ONLY : ngm, ngm_g, g, ig_l2g
       USE noncollin_module,     ONLY : noncolin, npol
-      USE mp_global,            ONLY : kunit, nproc, nproc_pool, me_pool, me_bgrp, nbgrp, &
+      USE mp_global,            ONLY : kunit, nproc_image, nproc_pool, me_pool, me_bgrp, nbgrp, &
                                        root_pool, intra_pool_comm, inter_pool_comm, intra_image_comm, &
                                        root_bgrp, intra_bgrp_comm, inter_bgrp_comm
       !
@@ -2917,7 +2918,7 @@ MODULE pw_restart
          !
          ! ... find out the number of pools
          !
-         npool = nproc / nproc_pool
+         npool = nproc_image / nproc_pool
          !
          ! ... find out number of k points blocks
          !
@@ -3427,7 +3428,7 @@ MODULE pw_restart
       END DO
       !
       IF ( ngg /= ngk_g ) &
-         CALL errore( 'igk_l2g_kdip', 'unexpected dimension in ngg', 1 )
+         CALL errore( 'gk_l2gmap_kdip', 'unexpected dimension in ngg', 1 )
       !
       IF ( PRESENT( igwk ) ) THEN
          !

@@ -58,7 +58,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   USE eqv,                  ONLY : dvpsi, dpsi, evq, eprec
   USE qpoint,               ONLY : xq, npwq, igkq, nksq, ikks, ikqs
   USE modes,                ONLY : npertx, npert, u, t, irotmq, tmq, &
-                                   minus_q, irgq, nsymq, rtau
+                                   minus_q, nsymq, rtau
   USE recover_mod,          ONLY : read_rec, write_rec
   ! used to write fildrho:
   USE dfile_autoname,       ONLY : dfile_name
@@ -435,7 +435,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
            IF (minus_q) CALL PAW_dumqsymmetrize(dbecsum,npe,irr, &
                              npertx,irotmq,rtau,xq,tmq)
            CALL  &
-              PAW_dusymmetrize(dbecsum,npe,irr,npertx,nsymq,irgq,rtau,xq,t)
+              PAW_dusymmetrize(dbecsum,npe,irr,npertx,nsymq,rtau,xq,t)
         END IF
      ENDIF
      !
@@ -546,8 +546,8 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
      end if
   endif
   if (convt.and.nlcc_any) call addnlcc (imode0, drhoscfh, npe)
-  if (lmetq0) deallocate (ldoss)
-  if (lmetq0) deallocate (ldos)
+  if (allocated(ldoss)) deallocate (ldoss)
+  if (allocated(ldos)) deallocate (ldos)
   deallocate (h_diag)
   deallocate (aux1)
   deallocate (dbecsum)

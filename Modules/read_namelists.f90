@@ -1396,12 +1396,8 @@ MODULE read_namelists_module
        IF( refg < 0 ) &
          CALL errore( sub_name, ' wrong table interval refg ', 1 )
        !
-#ifdef __LOWMEM
-       IF( wf_collect .EQ. .true. ) &
-         CALL errore( sub_name, ' wf_collect = .true. is not allowed with LOWMEM build ', 1 )
-       IF( prog /= 'CP' ) &
-         CALL errore( sub_name, ' LOWMEM not available in '//prog//' yet ', 1 )
-#endif
+       IF( ( prog == 'CP' ) .AND. ( TRIM(memory) == 'small' ) .AND. wf_collect ) &
+         CALL errore( sub_name, ' wf_collect = .true. is not allowed with memory = small ', 1 )
 
        allowed = .FALSE.
        DO i = 1, SIZE( memory_allowed )
@@ -1979,7 +1975,7 @@ MODULE read_namelists_module
                TRIM( calculation ) == 'cp-wf-nscf' .OR. &   !Lingzhu Kong
                TRIM( calculation ) == 'cp-wf-pbe0' .OR. &   !Lingzhu Kong
                TRIM( calculation ) == 'pbe0-nscf'  .OR. &   !Lingzhu Kong
-               TRIM( calculation ) == 'cp-wf' ) READ( 5, ions, iostat = ios )
+               TRIM( calculation ) == 'cp-wf' ) READ( unit_loc, ions, iostat = ios )
   
        END IF
        CALL mp_bcast( ios, ionode_id )
@@ -2030,7 +2026,7 @@ MODULE read_namelists_module
        !
        IF ( do_environ ) THEN
           ios = 0
-          IF( ionode ) READ( 5, environ, iostat = ios )
+          IF( ionode ) READ( unit_loc, environ, iostat = ios )
           CALL mp_bcast( ios, ionode_id )
           IF( ios /= 0 ) CALL errore( ' read_namelists ', &
                                     & ' reading namelist environ ', ABS(ios) )

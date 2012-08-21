@@ -81,6 +81,7 @@ el_ph_collect.o \
 elphon.o \
 find_equiv_sites.o \
 find_mode_sym.o \
+find_irrep.o \
 generate_dynamical_matrix_c.o \
 generate_effective_charges_c.o \
 gmressolve_all.o \
@@ -98,6 +99,7 @@ localdos.o \
 mix_pot.o \
 mode_group.o \
 newdq.o \
+obsolete.o \
 openfilq.o \
 orthogonalize.o \
 phcom.o \
@@ -133,9 +135,9 @@ set_defaults_pw.o \
 set_drhoc.o \
 set_int12_nc.o \
 set_irr.o \
-set_irr_mode.o \
 set_irr_nosym.o \
 set_irr_sym.o \
+set_small_group_of_q.o \
 setlocq.o \
 setqmod.o \
 setup_dgc.o \
@@ -166,6 +168,7 @@ tra_write_matrix.o \
 trntnsc.o \
 write_epsilon_and_zeu.o \
 write_matrix.o \
+write_modes.o \
 write_rec.o \
 zstar_eu.o \
 zstar_eu_us.o

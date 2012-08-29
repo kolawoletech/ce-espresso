@@ -30,9 +30,9 @@ SUBROUTINE makov_payne( etot )
   !
   REAL(DP), INTENT(IN) :: etot
   !
-  INTEGER  :: ia, ip
-  REAL(DP) :: x0(3), zvtot, qq, quad
-  REAL(DP) :: e_dipole(0:3), e_quadrupole
+  INTEGER  :: ia
+  REAL(DP) :: x0(3), zvtot, qq
+  REAL(DP) :: e_dipole(0:3), e_quadrupole(3)
   !
   ! ... x0 is the center of charge of the system
   !
@@ -49,21 +49,10 @@ SUBROUTINE makov_payne( etot )
   !
   x0(:) = x0(:) / zvtot
   !
-  quad = 0.D0
-  !
-  DO ia = 1, nat
-     !
-     DO ip = 1, 3
-        !
-        quad = quad + zv(ityp(ia))*( ( tau(ip,ia) - x0(ip) )*alat )**2
-        !
-     END DO
-  END DO
-  !
   CALL compute_dipole( dfftp%nnr, nspin, rho%of_r, x0, e_dipole, e_quadrupole )
   !
 #ifdef __ENVIRON
-  IF ( do_environ ) CALL environ_makov_payne( dfftp%nnr, nspin, rho%of_r, zvtot, quad, x0 )
+  IF ( do_environ ) CALL environ_makov_payne( dfftp%nnr, nspin, rho%of_r, x0 )
 #endif
   !
   CALL write_dipole( etot, x0, e_dipole, e_quadrupole, qq )
@@ -92,10 +81,10 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
   !
   REAL(DP), INTENT(IN)  :: etot
   REAL(DP), INTENT(IN)  :: x0(3)
-  REAL(DP), INTENT(IN)  :: dipole_el(0:3), quadrupole_el
+  REAL(DP), INTENT(IN)  :: dipole_el(0:3), quadrupole_el(3)
   REAL(DP), INTENT(OUT) :: qq
   !
-  REAL(DP) :: dipole_ion(3), quadrupole_ion, dipole(3), quadrupole
+  REAL(DP) :: dipole_ion(3), quadrupole_ion(3), dipole(3), quadrupole(3)
   REAL(DP) :: zvia, zvtot
   REAL(DP) :: corr1, corr2, aa, bb
   INTEGER  :: ia, ip
@@ -125,7 +114,7 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
         !
         dipole_ion(ip) = dipole_ion(ip) + &
                          zvia*( tau(ip,ia) - x0(ip) )*alat
-        quadrupole_ion = quadrupole_ion + &
+        quadrupole_ion(ip) = quadrupole_ion(ip) + &
                          zvia*( ( tau(ip,ia) - x0(ip) )*alat )**2
         !
      END DO
@@ -157,11 +146,11 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
   ! ... print the electronic, ionic and total quadrupole moments
   !
   WRITE( stdout, '(/5X,"Electrons quadrupole moment",F20.8," a.u. (Ha)")' )  &
-      -quadrupole_el
+      -SUM(quadrupole_el(:))
   WRITE( stdout, '( 5X,"     Ions quadrupole moment",F20.8," a.u. (Ha)")' ) &
-      quadrupole_ion
+      SUM(quadrupole_ion(:))
   WRITE( stdout, '( 5X,"    Total quadrupole moment",F20.8," a.u. (Ha)")' ) &
-      quadrupole
+      SUM(quadrupole(:))
   !
   IF ( ibrav < 1 .OR. ibrav > 3 ) THEN
      call errore(' write_dipole', &
@@ -174,7 +163,7 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
   !
   corr1 = - madelung(ibrav) / alat * qq**2 / 2.0D0 * e2
   !
-  aa = quadrupole
+  aa = SUM(quadrupole(:))
   bb = dipole(1)**2 + dipole(2)**2 + dipole(3)**2
   !
   corr2 = ( 2.D0 / 3.D0 * pi )*( qq*aa - bb ) / alat**3 * e2
@@ -197,8 +186,7 @@ SUBROUTINE write_dipole( etot, x0, dipole_el, quadrupole_el, qq )
       etot - corr1 - corr2 
   !
 #ifdef __ENVIRON
-  IF ( do_environ ) CALL environ_write_dipole(etot, x0, dipole, quadrupole, &
-                                              qq, corr1, corr2)
+  IF ( do_environ ) CALL environ_write_dipole(etot, qq, dipole, quadrupole, corr1, corr2)
 #endif
   !
   RETURN

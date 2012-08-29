@@ -98,7 +98,7 @@ module funct
   !              "hse"   = "sla+pw+hse+pbc"    = Heyd-Scuseria-Ernzerhof HSE 06
   !              "b3lyp" = "b3lp+vwn+b3lp+b3lp"= B3LYP
   !              "vdw-df"= "sla+pw+rpb+vdw1"   = vdW-DF
-  !              "vdw-df2"="nox+pw+rw86+vdw2"  = vdW-DF2
+  !              "vdw-df2"="sla+pw+rw86+vdw2"  = vdW-DF2
   !              "vdw-df-c09"="sla+pw+c09x+vdw1"
   !              "vdw-df2-c09"="sla+pw+c09x+vdw2"
   ! or by any nonconflicting combination of the following keywords
@@ -379,7 +379,7 @@ CONTAINS
 
    else if ('VDW-DF2' .EQ. TRIM(dftout) ) then
     ! Special case vdW-DF2
-       call set_dft_value (iexch, 0)
+       call set_dft_value (iexch, 1)
        call set_dft_value (icorr, 4)
        call set_dft_value (igcx, 13)
        call set_dft_value (igcc, 0)
@@ -585,9 +585,6 @@ CONTAINS
     ! No more defaults, the code exit if the dft is not defined
     ! ----------------------------------------------------------------
 
-    if (igcx == 13 .and. iexch > 0 ) &
-          call errore('set_dft_from_name','revPW86 already contains LDA contribution',iexch)
-   
     ! Back compatibility - TO BE REMOVED
  
     if (igcx == 14) igcx = 3 ! PBE -> PBX
@@ -955,7 +952,7 @@ CONTAINS
      shortname_ = 'OLYP'
   else if (iexch_==1.and.icorr_==4.and.igcx_==4.and.igcc_==0.and.inlc_==1) then
      shortname_ = 'VDW-DF'
-  else if (iexch_==1.and.icorr_==4.and.igcx_==12.and.igcc_==0.and.inlc_==2) then
+  else if (iexch_==1.and.icorr_==4.and.igcx_==13.and.igcc_==0.and.inlc_==2) then
      shortname_ = 'VDW-DF2'
   else if (iexch_==1.and.icorr_==4.and.igcx_==16.and.igcc_==0.and.inlc_==1) then
      shortname_ = 'VDW-DF-C09'

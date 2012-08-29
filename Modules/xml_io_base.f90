@@ -1234,7 +1234,7 @@ MODULE xml_io_base
               .NOT. PRESENT( Hubbard_J )    .OR. &
               .NOT. PRESENT( nsp )          .OR. &
               .NOT. PRESENT( Hubbard_alpha ) ) &
-            CALL errore( 'write_exchange_correlation', &
+            CALL errore( 'write_xc', &
                          ' variables for LDA+U not present', 1 )
          !
          CALL iotk_write_dat( iunpun, "NUMBER_OF_SPECIES", nsp )
@@ -1264,7 +1264,7 @@ MODULE xml_io_base
          IF ( .NOT. PRESENT( vdw_table_name ) .OR. &
               .NOT. PRESENT( pseudo_dir ) .OR. &
               .NOT. PRESENT( dirname )) &
-            CALL errore( 'write_exchange_correlation', &
+            CALL errore( 'write_xc', &
                          ' variable vdw_table_name not present', 1 )
         
          CALL iotk_write_dat( iunpun, "VDW_KERNEL_NAME", vdw_table_name )
@@ -1450,10 +1450,12 @@ MODULE xml_io_base
     END SUBROUTINE write_bz
     !
     !------------------------------------------------------------------------
-    SUBROUTINE write_para( kunit, nproc, nproc_pool, nproc_image )
+    SUBROUTINE write_para( kunit, nproc, nproc_pool, nproc_image, &
+                    ntask_groups, nproc_pot, nproc_bgrp, nproc_ortho ) 
       !------------------------------------------------------------------------
       !
-      INTEGER,  INTENT(IN) :: kunit, nproc, nproc_pool, nproc_image
+      INTEGER,  INTENT(IN) :: kunit, nproc, nproc_pool, nproc_image, &
+                              ntask_groups, nproc_pot, nproc_bgrp, nproc_ortho 
       !
       !
       CALL iotk_write_begin( iunpun, "PARALLELISM" )
@@ -1464,6 +1466,14 @@ MODULE xml_io_base
                               "NUMBER_OF_PROCESSORS_PER_POOL", nproc_pool )
       CALL iotk_write_dat( iunpun, &
                               "NUMBER_OF_PROCESSORS_PER_IMAGE", nproc_image )
+      CALL iotk_write_dat( iunpun, "NUMBER_OF_PROCESSORS_PER_TASKGROUP", &
+                                              ntask_groups )
+      CALL iotk_write_dat( iunpun, "NUMBER_OF_PROCESSORS_PER_POT", &
+                                              nproc_pot )
+      CALL iotk_write_dat( iunpun, "NUMBER_OF_PROCESSORS_PER_BAND_GROUP", &
+                                              nproc_bgrp )
+      CALL iotk_write_dat( iunpun, "NUMBER_OF_PROCESSORS_PER_DIAGONALIZATION", &
+                                              nproc_ortho )
       CALL iotk_write_end( iunpun, "PARALLELISM" )
       !
       !

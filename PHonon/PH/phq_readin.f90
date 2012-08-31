@@ -253,7 +253,7 @@ SUBROUTINE phq_readin()
       drho_star%dir = TRIM(outdir)//"/Rotated_DRHO/"
   !
   dvscf_star%open = .FALSE.
-  dvscf_star%basis = 'cartesian'
+  dvscf_star%basis = 'modes'
   dvscf_star%pat  = .FALSE.
   dvscf_star%ext = 'dvscf'
   CALL get_env( 'ESPRESSO_FILDVSCF_DIR', dvscf_star%dir)
@@ -324,7 +324,7 @@ SUBROUTINE phq_readin()
 
   IF (modenum /= 0) search_sym=.FALSE.
   
-  if(elph_mat) then
+  if(elph_simple.or.elph_mat) then
      trans=.false.
   else
      trans = trans .OR. ldisp

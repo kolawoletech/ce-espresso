@@ -5,7 +5,7 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw2bg
     intro {
 	Converts the output files produced by pw.x to the input files for BerkeleyGW.
 
-	You cannot use NLCC, USPP, PAW, or spinors in a pw.x run for BerkeleyGW.
+	You cannot use USPP, PAW, or spinors in a pw.x run for BerkeleyGW.
 
 	You cannot use "K_POINTS gamma" in a pw.x run for BerkeleyGW.
 	Use "K_POINTS { tpiba | automatic | crystal }" even for the
@@ -265,6 +265,15 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw2bg
 	    default { 0 }
 	    info {
 		maximum band index for off-diagonal Vxc matrix elements. Not used if vxc_flag = .FALSE.
+	    }
+	}
+
+	var vxc_zero_rho_core -type LOGICAL {
+	    default { .TRUE. }
+	    info {
+		set to .TRUE. to zero out NLCC or to .FALSE. to keep NLCC when computing
+		exchange-correlation potential. For details, see Hybertsen & Louie PRB 34,
+		5390 (1986), Eq. (38) and discussion afterward.
 	    }
 	}
 

@@ -35,7 +35,7 @@ SUBROUTINE electrons()
   USE ener,                 ONLY : etot, hwf_energy, eband, deband, ehart, &
                                    vtxc, etxc, etxcc, ewld, demet, epaw, &
                                    elondon
-  USE scf,                  ONLY : scf_type, scf_type_COPY, &
+  USE scf,                  ONLY : scf_type, scf_type_COPY, bcast_scf_type,&
                                    create_scf_type, destroy_scf_type, &
                                    rho, rho_core, rhog_core, &
                                    v, vltot, vrs, kedtau, vnew
@@ -61,9 +61,9 @@ SUBROUTINE electrons()
   USE funct,                ONLY : dft_is_hybrid, exx_is_active
   USE control_flags,        ONLY : adapt_thr, tr2_init, tr2_multi
   USE funct,                ONLY : dft_is_meta
-  USE mp_global,            ONLY : intra_bgrp_comm, nbgrp, mpime, &
-                                   inter_bgrp_comm, my_bgrp_id
-  USE mp,                   ONLY : mp_sum
+  USE mp_global,            ONLY : intra_bgrp_comm, inter_pool_comm, &
+                                   root_pool, my_pool_id
+  USE mp,                   ONLY : mp_sum, mp_bcast
   !
   USE london_module,        ONLY : energy_london
   !
@@ -155,7 +155,6 @@ SUBROUTINE electrons()
   WRITE( stdout, 9000 ) get_clock( 'PWSCF' )
   !
   CALL memstat( kilobytes )
-  !
   IF ( kilobytes > 0 ) WRITE( stdout, 9001 ) kilobytes/1000.0
   !
   CALL flush_unit( stdout )
@@ -194,14 +193,10 @@ SUBROUTINE electrons()
   ewld = ewald( alat, nat, nsp, ityp, zv, at, bg, tau, &
                 omega, g, gg, ngm, gcutm, gstart, gamma_only, strf )
   !
-  !
-  !
-  elondon = 0.d0
-  !
   IF ( llondon ) THEN
-  !
-  elondon = energy_london ( alat , nat , ityp , at ,&
-                                         bg , tau )
+     elondon = energy_london ( alat , nat , ityp , at ,bg , tau )
+  ELSE
+     elondon = 0.d0
   END IF
   !
   call create_scf_type ( rhoin )
@@ -343,10 +338,21 @@ SUBROUTINE electrons()
         !
         deband = delta_e()
         !
-        ! ... mix_rho mixes several quantities: rho in g-space, tauk (for meta-gga)
-        ! ... ns (for lda+u) and becsum (for paw)
+        ! ... mix_rho mixes several quantities: rho in g-space, tauk (for
+        ! ... meta-gga), ns and ns_nc (for lda+u) and becsum (for paw)
+        ! ... Results are broadcast from pool 0 to others to prevent trouble
+        ! ... on machines unable to yield the same results from the same 
+        ! ... calculation on same data, performed on different procs
+        ! ... The mixing should be done on pool 0 only as well, but inside
+        ! ... mix_rho there is a call to rho_ddot that in the PAW case 
+        ! ... contains a hidden parallelization level on the entire image
+        ! IF ( my_pool_id == root_pool ) 
+        CALL mix_rho &
+             ( rho, rhoin, mixing_beta, dr2, tr2_min, iter, nmix, conv_elec )
+        CALL bcast_scf_type ( rhoin, root_pool, inter_pool_comm )
+        CALL mp_bcast ( dr2, root_pool, inter_pool_comm )
+        CALL mp_bcast ( conv_elec, root_pool, inter_pool_comm )
         !
-        CALL mix_rho( rho, rhoin, mixing_beta, dr2, tr2_min, iter, nmix, conv_elec )
         if (.not. scf_must_converge .and. idum == niter) conv_elec = .true.
         !
         ! ... if convergence is achieved or if the self-consistency error

@@ -33,12 +33,11 @@ SUBROUTINE iosys()
   !
   USE kernel_table,  ONLY : initialize_kernel_table
   !
-  USE mp,            ONLY : mp_bcast
-  !
   USE bp,            ONLY : nppstr_    => nppstr, &
                             gdir_      => gdir, &
                             lberry_    => lberry, &
                             lelfield_  => lelfield, &
+                            lorbm_     => lorbm, &
                             efield_    => efield, &
                             nberrycyc_ => nberrycyc, &
                             efield_cart_ => efield_cart
@@ -229,7 +228,7 @@ SUBROUTINE iosys()
                                nstep, iprint, tstress, tprnfor, dt, outdir,    &
                                wfcdir, prefix, etot_conv_thr, forc_conv_thr,   &
                                pseudo_dir, disk_io, tefield, dipfield, lberry, &
-                               gdir, nppstr, wf_collect,lelfield, efield,      &
+                               gdir, nppstr, wf_collect,lelfield,lorbm,efield, &
                                nberrycyc, lkpoint_dir, efield_cart, lecrpa,    &
                                vdw_table_name, memory
 
@@ -1102,6 +1101,7 @@ SUBROUTINE iosys()
   gdir_       = gdir
   lberry_     = lberry
   lelfield_   = lelfield
+  lorbm_      = lorbm
   efield_     = efield
   nberrycyc_  = nberrycyc
   efield_cart_ = efield_cart

@@ -1633,17 +1633,16 @@ MODULE xml_io_base
     END SUBROUTINE write_rho_xml
     !
     !------------------------------------------------------------------------
-    SUBROUTINE read_rho_xml( rho_file_base, rho, &
-                             nr1, nr2, nr3, nr1x, nr2x, ipp, npp, &
-                             ionode, intra_group_comm, inter_group_comm )
+    SUBROUTINE read_rho_xml( rho_file_base, nr1, nr2, nr3, nr1x, nr2x, &
+                             ipp, npp, rho )
       !------------------------------------------------------------------------
       !
-      ! ... Reads charge density rho, one plane at a time.
-      ! ... If ipp and npp are specified, planes are collected one by one from
-      ! ... all processors, avoiding an overall collect of the charge density
-      ! ... on a single proc.
+      ! ... Reads charge density rho, one plane at a time, to avoid 
+      ! ... collecting the entire charge density on a single processor
       !
       USE io_files,  ONLY : rhounit
+      USE io_global, ONLY : ionode, ionode_id
+      USE mp_global, ONLY : intra_bgrp_comm, intra_image_comm
       USE mp,        ONLY : mp_put, mp_sum, mp_rank, mp_size
       !
       IMPLICIT NONE
@@ -1652,23 +1651,19 @@ MODULE xml_io_base
       INTEGER,           INTENT(IN)  :: nr1, nr2, nr3
       INTEGER,           INTENT(IN)  :: nr1x, nr2x
       REAL(DP),          INTENT(OUT) :: rho(:)
-      INTEGER, OPTIONAL, INTENT(IN)  :: ipp(:)
-      INTEGER, OPTIONAL, INTENT(IN)  :: npp(:)
-      LOGICAL,           INTENT(IN)  :: ionode
-      INTEGER,           INTENT(IN)  :: intra_group_comm, inter_group_comm
+      INTEGER,           INTENT(IN)  :: ipp(:)
+      INTEGER,           INTENT(IN)  :: npp(:)
       !
       INTEGER               :: ierr, i, j, k, kk, ldr, ip
       INTEGER               :: nr( 3 )
+      INTEGER               :: me_group, nproc_group
       CHARACTER(LEN=256)    :: rho_file
       REAL(DP), ALLOCATABLE :: rho_plane(:)
       INTEGER,  ALLOCATABLE :: kowner(:)
       LOGICAL               :: exst
-      INTEGER               :: ngroup, my_group_id, me_group, nproc_group, io_group_id, io_group
       !
-      me_group    = mp_rank( intra_group_comm )
-      nproc_group = mp_size( intra_group_comm )
-      my_group_id = mp_rank( inter_group_comm )
-      ngroup      = mp_size( inter_group_comm )
+      me_group     = mp_rank ( intra_bgrp_comm )
+      nproc_group  = mp_size ( intra_bgrp_comm )
       !
       rho_file = TRIM( rho_file_base ) // ".dat"
       exst = check_file_exst( TRIM(rho_file) ) 
@@ -1705,26 +1700,6 @@ MODULE xml_io_base
       ALLOCATE( rho_plane( nr1*nr2 ) )
       ALLOCATE( kowner( nr3 ) )
       !
-      ! ... find the index of the pool that will write rho
-      !
-      io_group_id = 0
-      !
-      IF ( ionode ) io_group_id = my_group_id
-      !
-      CALL mp_sum( io_group_id, intra_group_comm )
-      CALL mp_sum( io_group_id, inter_group_comm )
-      !
-      ! ... find the index of the ionode within its own pool
-      !
-      io_group = 0
-      !
-      IF ( ionode ) io_group = me_group
-      !
-      CALL mp_sum( io_group, intra_group_comm )
-      CALL mp_sum( io_group, inter_group_comm )
-      !
-      ! ... find out the owner of each "z" plane
-      !
       DO ip = 1, nproc_group
          !
          kowner((ipp(ip)+1):(ipp(ip)+npp(ip))) = ip - 1
@@ -1747,36 +1722,15 @@ MODULE xml_io_base
          !
          ! ... planes are sent to the destination processor
          !
-         IF( ngroup > 1 ) THEN
-            !
-            !  send to all proc/pools
-            !
-            IF( io_group_id == my_group_id ) THEN
-               CALL mp_bcast( rho_plane, io_group, intra_group_comm )
-            END IF
-            CALL mp_bcast( rho_plane, io_group_id, inter_group_comm )
-            !
-         ELSE
-            !
-            !  send to the destination proc
-            !
-            IF ( kowner(k) /= io_group ) &
-               CALL mp_put( rho_plane, rho_plane, me_group, io_group, kowner(k), k, intra_group_comm )
-            !
-         END IF
+         CALL mp_bcast( rho_plane, ionode_id, intra_image_comm )
          !
          IF( kowner(k) == me_group ) THEN
             !
             kk = k - ipp( me_group + 1 )
-            ! 
             DO j = 1, nr2
-               !
                DO i = 1, nr1
-                  !
                   rho(i+(j-1)*nr1x+(kk-1)*ldr) = rho_plane(i+(j-1)*nr1)
-                  !
                END DO
-               !
             END DO
             !
          END IF
@@ -1798,6 +1752,7 @@ MODULE xml_io_base
       !
     END SUBROUTINE read_rho_xml
     !
+    !------------------------------------------------------------------------
     ! ... methods to write and read wavefunctions
     !
     !------------------------------------------------------------------------
@@ -2106,5 +2061,4 @@ MODULE xml_io_base
       !
     END SUBROUTINE write_eig
          
-
 END MODULE xml_io_base

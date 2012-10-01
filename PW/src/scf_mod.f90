@@ -22,9 +22,9 @@ MODULE scf
   USE io_files,     ONLY : diropn
   USE funct,        ONLY : dft_is_meta
   USE fft_base,     ONLY : dfftp
-  USE fft_interfaces,ONLY : invfft
+  USE fft_interfaces,ONLY: invfft
   USE gvect,        ONLY : ngm
-  USE gvecs,      ONLY : ngms
+  USE gvecs,        ONLY : ngms
   USE paw_variables,ONLY : okpaw
   USE uspp_param,   ONLY : nhm
   USE extfield,     ONLY : dipfield, emaxpos, eopreg, edir
@@ -58,7 +58,7 @@ MODULE scf
      REAL(DP),    POINTER :: ns(:,:,:,:)! the LDA+U occupation matrix 
      COMPLEX(DP), POINTER :: ns_nc(:,:,:,:)!    ---      noncollinear case 
      REAL(DP),    POINTER :: bec(:,:,:) ! PAW corrections to hamiltonian
-     REAL(DP)                   :: el_dipole  ! electrons dipole
+     REAL(DP)             :: el_dipole  ! electrons dipole
   END TYPE mix_type
 #else
   TYPE scf_type
@@ -77,7 +77,7 @@ MODULE scf
      REAL(DP),    ALLOCATABLE :: ns(:,:,:,:)! the LDA+U occupation matrix 
      COMPLEX(DP), ALLOCATABLE :: ns_nc(:,:,:,:)!     ---     noncollinear case 
      REAL(DP),    ALLOCATABLE :: bec(:,:,:) ! PAW corrections to hamiltonian
-     REAL(DP)                   :: el_dipole  ! electrons dipole
+     REAL(DP)                 :: el_dipole  ! electrons dipole
   END TYPE mix_type
 #endif
 
@@ -600,6 +600,10 @@ CONTAINS
   !
   IF (dft_is_meta()) rho_ddot = rho_ddot + tauk_ddot( rho1, rho2, gf )
   IF (lda_plus_u )   rho_ddot = rho_ddot + ns_ddot(rho1,rho2)
+  ! 
+  ! Beware: paw_ddot has a hidden parallelization on all processors
+  !         it must be called on all processors or else it will hang
+  !
 #if 0
   IF (okpaw)         rho_ddot = rho_ddot + paw_ddot(rho1%bec, rho2%bec)
 #endif
@@ -798,5 +802,32 @@ END FUNCTION ns_ddot
   RETURN
   !
  END FUNCTION local_tf_ddot
+ !
+ SUBROUTINE bcast_scf_type ( rho, root, comm )
+  !----------------------------------------------------------------------------
+  ! ... Broadcast all mixed quantities from first pool to all others
+  ! ... Needed to prevent divergencies in k-point parallization
+  !
+  USE mp,            ONLY : mp_bcast
+  !
+  IMPLICIT NONE
+  !
+  type(scf_type), INTENT(INOUT) :: rho
+  INTEGER, INTENT(IN) :: root, comm
+  !
+  CALL mp_bcast ( rho%of_g, root, comm )
+  CALL mp_bcast ( rho%of_r, root, comm )
+  IF ( dft_is_meta() ) THEN
+     CALL mp_bcast ( rho%kin_g, root, comm )
+     CALL mp_bcast ( rho%kin_r, root, comm )
+  END IF
+  IF ( lda_plus_u ) THEN
+     CALL mp_bcast ( rho%ns,    root, comm )
+     CALL mp_bcast ( rho%ns_nc, root, comm )
+  END IF
+  IF ( okpaw ) &
+     CALL mp_bcast ( rho%bec,   root, comm )
+  !
+  END SUBROUTINE
  !
 END MODULE scf

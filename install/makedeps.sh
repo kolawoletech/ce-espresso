@@ -81,6 +81,12 @@ for dir in $dirs; do
         sed '/@iso_c_binding@/d' make.depend.tmp > make.depend
         sed -i '/@ifcore@/d' make.depend
 
+        if test "$DIR" = "Modules"
+        then
+            mv make.depend make.depend.tmp
+            sed '/@mpi@/d' make.depend.tmp > make.depend
+        fi
+
         if test "$DIR" = "clib"
         then
             mv make.depend make.depend.tmp

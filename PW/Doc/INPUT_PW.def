@@ -136,6 +136,8 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 	                number of processors and pools. Useful if you do not
 	                need the wavefunction or if you want to reduce the I/O
 	                or the disk occupancy.
+
+		Note that this flag has no effect on reading, only on writing.
 	    }
 	}
 	
@@ -711,7 +713,9 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 		'fixed' :       for insulators with a gap
 
 		'from_input' :  The occupation are read from input file.
-                                Requires "nbnd" to be set in input
+                                Requires "nbnd" to be set in input.
+                                Occupations should be consistent with the
+                                value of "tot_charge". 
 	    }
 	}
 
@@ -1452,8 +1456,9 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
                'atomic': starting potential from atomic charge superposition
                          ( default for scf, *relax, *md )
 
-               'file'  : start from existing "charge-density.xml" file
-                         For nscf and bands alculation this is the default
+               'file'  : start from existing "charge-density.xml" file in the
+			 directory specified by variables "prefix" and "outdir"
+                         For nscf and bands calculation this is the default
                          and the only sensible possibility.
 	    }
 	}
@@ -1476,7 +1481,8 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
                          It may also reduce memory usage in conjunction with
                          diagonalization='cg'
 
-               'file':   start from a wavefunction file
+               'file':   start from an existing wavefunction file in the 
+			 directory specified by variables "prefix" and "outdir"
 	    }
 	}
 

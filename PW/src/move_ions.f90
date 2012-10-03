@@ -114,9 +114,15 @@ SUBROUTINE move_ions()
      !
      ! ... do the minimization / dynamics step
      !
+     ! lmovecell.and.lconstrain.and.lbfgs not implemented yet
+     IF( lmovecell .AND. lconstrain .AND. lbfgs) &
+       CALL errore('bfgs', &
+		  & 'variable cell bfgs and constraints not implemented yet', 1 )
+     !
      IF ( lmovecell .AND. lconstrain ) &
-        CALL errore( 'move_ions', &
-                   & 'variable cell and constraints not implemented', 1 )
+        WRITE(stdout, '(5x,"-------------------------------------------")')
+        WRITE(stdout, '(5x,"NEW FEATURE: constraints with variable cell")')
+        WRITE(stdout, '(5x,"-------------------------------------------")')
      !
      ! ... BFGS algorithm is used to minimize ionic configuration
      !

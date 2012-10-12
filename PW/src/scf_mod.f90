@@ -7,6 +7,11 @@
 !
 !--------------------------------------------------------------------------
 !
+! What to mix:
+#undef MIX_MAGN
+#define MIX_HUBBARD
+#define MIX_PAW
+
 MODULE scf
   !  
   !  This module contains variables and auxiliary routines needed for
@@ -525,7 +530,7 @@ CONTAINS
      rho_ddot = fac*rho_ddot
      !
      IF ( gamma_only ) rho_ddot = 2.D0 * rho_ddot
-#if 0
+#ifdef MIX_MAGN
      !
      ! ... then the magnetization
      !
@@ -564,7 +569,7 @@ CONTAINS
      rho_ddot = fac*rho_ddot
      !
      IF ( gamma_only ) rho_ddot = 2.D0 * rho_ddot
-#if 0
+#ifdef MIX_MAGN
      !
      IF (domag) THEN
         fac = e2*fpi / (tpi**2)  ! lambda=1 a.u.
@@ -599,12 +604,14 @@ CONTAINS
   CALL mp_sum(  rho_ddot , intra_bgrp_comm )
   !
   IF (dft_is_meta()) rho_ddot = rho_ddot + tauk_ddot( rho1, rho2, gf )
+#ifdef MIX_HUBBARD
   IF (lda_plus_u )   rho_ddot = rho_ddot + ns_ddot(rho1,rho2)
+#endif
   ! 
   ! Beware: paw_ddot has a hidden parallelization on all processors
   !         it must be called on all processors or else it will hang
   !
-#if 0
+#ifdef MIX_PAW
   IF (okpaw)         rho_ddot = rho_ddot + paw_ddot(rho1%bec, rho2%bec)
 #endif
   IF (dipfield)      rho_ddot = rho_ddot + (e2/2.0_DP)* &

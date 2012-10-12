@@ -191,7 +191,7 @@ PROGRAM pw2bgw
   vxc_diag_nmax = 0
   vxc_offdiag_nmin = 0
   vxc_offdiag_nmax = 0
-  vxc_zero_rho_core = .TRUE.
+  vxc_zero_rho_core = .FALSE.
   input_dft = 'sla+pz'
   exx_flag = .FALSE.
   vnlg_flag = .FALSE.
@@ -2333,6 +2333,8 @@ SUBROUTINE write_vnlg (output_file_name, symm_type, wfng_kgrid, &
   CALL mp_max ( npw_g )
   npwx_g = MAXVAL ( ngk_g ( : ) )
 
+  CALL cryst_to_cart (nkstot, xk, at, -1)
+
   IF (ionode) THEN
     OPEN (unit = unit, file = TRIM (output_file_name), &
       form = 'unformatted', status = 'replace')
@@ -2364,6 +2366,8 @@ SUBROUTINE write_vnlg (output_file_name, symm_type, wfng_kgrid, &
     WRITE ( unit ) ngm_g
     WRITE ( unit ) ( ( gvec ( id, ig ), id = 1, nd ), ig = 1, ngm_g )
   ENDIF
+
+  CALL cryst_to_cart (nkstot, xk, bg, 1)
 
   ALLOCATE ( igwk ( npwx_g ) )
 
@@ -2536,7 +2540,7 @@ subroutine check_inversion(real_or_complex, ntran, mtrx, nspin, warn, real_need_
   enddo
 
   if(real_or_complex .eq. 2) then
-    if(invflag .ne. 0 .and. warn) then
+    if(invflag .ne. 0 .and. warn .and. nspin == 1) then
       if(ionode) write(6, '(a)') 'WARNING: Inversion symmetry is present. The real version would be faster.'
     endif
   else
@@ -2551,7 +2555,7 @@ subroutine check_inversion(real_or_complex, ntran, mtrx, nspin, warn, real_need_
     endif
     if(nspin .eq. 2) then
       call errore('check_inversion', &
-        'Time-reversal symmetry is absent in spin-polarized calculation. Complex version must be used.', -2)
+        'Real version may only be used for spin-unpolarized calculations.', nspin)
     endif
   endif
 

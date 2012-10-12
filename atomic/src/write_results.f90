@@ -1,5 +1,5 @@
 !
-! Copyright (C) 2004 PWSCF group
+! Copyright (C) 2004-2012 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
@@ -22,7 +22,7 @@ subroutine write_results
                         relpert, evel, edar, eso, noscf, iswitch, rho, &
                         file_charge, max_out_wfc
 
-  use funct, only :  get_iexch, get_dft_name
+  use funct, only :  get_iexch, get_dft_name, write_dft_name
   implicit none
 
   integer :: is, i, j, n, m, im(40), ios, counter, ismax

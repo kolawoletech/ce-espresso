@@ -234,7 +234,7 @@ SUBROUTINE sum_band()
        ! ... gamma version
        !
        USE becmod,        ONLY : bec_type, becp, calbec
-       USE mp_global,     ONLY : me_pool
+       USE mp_global,     ONLY : me_bgrp
        USE mp,            ONLY : mp_sum, mp_get_comm_null
        !
        IMPLICIT NONE
@@ -339,7 +339,7 @@ SUBROUTINE sum_band()
                 ! Compute the proper factor for each band
                 !
                 DO idx = 1, dffts%nogrp
-                   IF( dffts%nolist( idx ) == me_pool ) EXIT
+                   IF( dffts%nolist( idx ) == me_bgrp ) EXIT
                 END DO
                 !
                 ! Remember two bands are packed in a single array :
@@ -360,7 +360,7 @@ SUBROUTINE sum_band()
                    w2 = w1
                 END IF
                 !
-                CALL get_rho_gamma(tg_rho, dffts%tg_npp( me_pool + 1 ) * dffts%nr1x * dffts%nr2x, w1, w2, tg_psi)
+                CALL get_rho_gamma(tg_rho, dffts%tg_npp( me_bgrp + 1 ) * dffts%nr1x * dffts%nr2x, w1, w2, tg_psi)
                 !
              ELSE
                 !
@@ -450,7 +450,7 @@ SUBROUTINE sum_band()
              !
              ioff = 0
              DO idx = 1, dffts%nogrp
-                IF( me_pool == dffts%nolist( idx ) ) EXIT
+                IF( me_bgrp == dffts%nolist( idx ) ) EXIT
                 ioff = ioff + dffts%nr1x * dffts%nr2x * dffts%npp( dffts%nolist( idx ) + 1 )
              END DO
              !
@@ -565,7 +565,7 @@ SUBROUTINE sum_band()
        ! ... k-points version
        !
        USE becmod, ONLY : bec_type, becp, calbec
-       USE mp_global,     ONLY : me_pool
+       USE mp_global,     ONLY : me_bgrp
        USE mp,            ONLY : mp_sum
        !
        IMPLICIT NONE
@@ -579,8 +579,8 @@ SUBROUTINE sum_band()
        INTEGER :: ipol, js
        !
        INTEGER  :: idx, ioff, incr, v_siz, j
-       COMPLEX(DP), ALLOCATABLE :: tg_psi(:)
-       REAL(DP),    ALLOCATABLE :: tg_rho(:)
+       COMPLEX(DP), ALLOCATABLE :: tg_psi(:), tg_psi_nc(:,:)
+       REAL(DP),    ALLOCATABLE :: tg_rho(:), tg_rho_nc(:,:)
        LOGICAL  :: use_tg
 #ifdef __OPENMP
        INTEGER :: mytid, ntids, omp_get_thread_num, omp_get_num_threads, icnt
@@ -597,8 +597,8 @@ SUBROUTINE sum_band()
        IF ( nks > 1 ) REWIND( iunigk )
        !
        use_tg = dffts%have_task_groups
-       dffts%have_task_groups = ( dffts%have_task_groups ) .AND. ( nbnd >= dffts%nogrp ) &
-            .AND. ( .NOT. noncolin ) .AND. ( .NOT. dft_is_meta() )
+       dffts%have_task_groups = ( dffts%have_task_groups ) .AND. &
+                  ( nbnd >= dffts%nogrp ) .AND. ( .NOT. dft_is_meta() )
        !
        incr = 1
        !
@@ -606,8 +606,13 @@ SUBROUTINE sum_band()
           !
           v_siz = dffts%tg_nnr * dffts%nogrp
           !
-          ALLOCATE( tg_psi( v_siz ) )
-          ALLOCATE( tg_rho( v_siz ) )
+          IF (noncolin) THEN
+             ALLOCATE( tg_psi_nc( v_siz, npol ) )
+             ALLOCATE( tg_rho_nc( v_siz, nspin_mag ) )
+          ELSE
+             ALLOCATE( tg_psi( v_siz ) )
+             ALLOCATE( tg_rho( v_siz ) )
+          ENDIF
           !
           incr  = dffts%nogrp
           !
@@ -615,7 +620,13 @@ SUBROUTINE sum_band()
        !
        k_loop: DO ik = 1, nks
           !
-          IF( dffts%have_task_groups ) tg_rho = 0.0_DP
+          IF( dffts%have_task_groups ) THEN
+            IF (noncolin) THEN
+               tg_rho_nc = 0.0_DP
+            ELSE
+               tg_rho = 0.0_DP
+            ENDIF
+          ENDIF
 
           IF ( lsda ) current_spin = isk(ik)
           npw = ngk (ik)
@@ -648,27 +659,89 @@ SUBROUTINE sum_band()
              w1 = wg(ibnd,ik) / omega
              !
              IF (noncolin) THEN
-                psic_nc = (0.D0,0.D0)
-                DO ig = 1, npw
-                   psic_nc(nls(igk(ig)),1)=evc(ig     ,ibnd)
-                   psic_nc(nls(igk(ig)),2)=evc(ig+npwx,ibnd)
-                END DO
-                CALL invfft ('Wave', psic_nc(:,1), dffts)
-                CALL invfft ('Wave', psic_nc(:,2), dffts)
-                !
-                ! increment the charge density ...
-                !
-                DO ipol=1,npol
-                   CALL get_rho(rho%of_r(:,1), dffts%nnr, w1, psic_nc(:,ipol))
-                END DO
-                !
-                ! In this case, calculate also the three
-                ! components of the magnetization (stored in rho%of_r(ir,2-4))
-                !
-                IF (domag) THEN
-                   CALL get_rho_domag(rho%of_r(:,:), dffts%nnr, w1, psic_nc(:,:))
+                IF( dffts%have_task_groups ) THEN
+                   !
+                   tg_psi_nc = ( 0.D0, 0.D0 )
+                   !
+                   ioff   = 0
+                   !
+                   DO idx = 1, dffts%nogrp
+                      !
+                      ! ... dffts%nogrp ffts at the same time
+                      !
+                      IF( idx + ibnd - 1 <= nbnd ) THEN
+                         DO j = 1, npw
+                            tg_psi_nc( nls( igk( j ) ) + ioff, 1 ) = &
+                                                       evc( j, idx+ibnd-1 )
+                            tg_psi_nc( nls( igk( j ) ) + ioff, 2 ) = &
+                                                       evc( j+npwx, idx+ibnd-1 )
+                         END DO
+                      END IF
+
+                      ioff = ioff + dffts%tg_nnr
+
+                   END DO
+                   !
+                   CALL invfft ('Wave', tg_psi_nc(:,1), dffts)
+                   CALL invfft ('Wave', tg_psi_nc(:,2), dffts)
+                   !
+                   ! Now the first proc of the group holds the first band
+                   ! of the dffts%nogrp bands that we are processing at the same time,
+                   ! the second proc. holds the second and so on
+                   !
+                   ! Compute the proper factor for each band
+                   !
+                   DO idx = 1, dffts%nogrp
+                      IF( dffts%nolist( idx ) == me_bgrp ) EXIT
+                   END DO
+                   !
+                   ! Remember
+                   ! proc 0 has bands ibnd
+                   ! proc 1 has bands ibnd+1
+                   ! ....
+                   !
+                   IF( idx + ibnd - 1 <= nbnd ) THEN
+                      w1 = wg( idx + ibnd - 1, ik) / omega
+                   ELSE
+                      w1 = 0.0d0
+                   END IF
+                   !
+                   DO ipol=1,npol
+                      CALL get_rho(tg_rho_nc(:,1), dffts%tg_npp( me_bgrp + 1 ) &
+                          * dffts%nr1x * dffts%nr2x, w1, tg_psi_nc(:,ipol))
+                   ENDDO
+                   !
+                   IF (domag) CALL get_rho_domag(tg_rho_nc(:,:), &
+                          dffts%tg_npp( me_bgrp + 1 )*dffts%nr1x*dffts%nr2x, &
+                          w1, tg_psi_nc(:,:))
+                   !
                 ELSE
-                   rho%of_r(:,2:4)=0.0_DP
+!
+!     Noncollinear case without task groups
+!
+                   psic_nc = (0.D0,0.D0)
+                   DO ig = 1, npw
+                      psic_nc(nls(igk(ig)),1)=evc(ig     ,ibnd)
+                      psic_nc(nls(igk(ig)),2)=evc(ig+npwx,ibnd)
+                   END DO
+                   CALL invfft ('Wave', psic_nc(:,1), dffts)
+                   CALL invfft ('Wave', psic_nc(:,2), dffts)
+                   !
+                   ! increment the charge density ...
+                   !
+                   DO ipol=1,npol
+                      CALL get_rho(rho%of_r(:,1), dffts%nnr, w1, psic_nc(:,ipol))
+                   END DO
+                   !
+                   ! In this case, calculate also the three
+                   ! components of the magnetization (stored in rho%of_r(ir,2-4))
+                   !
+                   IF (domag) THEN
+                      CALL get_rho_domag(rho%of_r(:,:), dffts%nnr, w1, psic_nc(:,:))
+                   ELSE
+                      rho%of_r(:,2:4)=0.0_DP
+                   END IF
+                   !
                 END IF
                 !
              ELSE
@@ -710,7 +783,7 @@ SUBROUTINE sum_band()
                    ! Compute the proper factor for each band
                    !
                    DO idx = 1, dffts%nogrp
-                      IF( dffts%nolist( idx ) == me_pool ) EXIT
+                      IF( dffts%nolist( idx ) == me_bgrp ) EXIT
                    END DO
                    !
                    ! Remember
@@ -724,7 +797,7 @@ SUBROUTINE sum_band()
                       w1 = 0.0d0
                    END IF
                    !
-                   CALL get_rho(tg_rho, dffts%tg_npp( me_pool + 1 ) * dffts%nr1x * dffts%nr2x, w1, tg_psi)
+                   CALL get_rho(tg_rho, dffts%tg_npp( me_bgrp + 1 ) * dffts%nr1x * dffts%nr2x, w1, tg_psi)
                    !
                 ELSE
                    !
@@ -764,21 +837,44 @@ SUBROUTINE sum_band()
              !
              ! reduce the group charge
              !
-             CALL mp_sum( tg_rho, gid = dffts%ogrp_comm )
+             IF (noncolin) THEN
+                CALL mp_sum( tg_rho_nc, gid = dffts%ogrp_comm )
+             ELSE
+                CALL mp_sum( tg_rho, gid = dffts%ogrp_comm )
+             ENDIF
              !
              ioff = 0
              DO idx = 1, dffts%nogrp
-                IF( me_pool == dffts%nolist( idx ) ) EXIT
+                IF( me_bgrp == dffts%nolist( idx ) ) EXIT
                 ioff = ioff + dffts%nr1x * dffts%nr2x * dffts%npp( dffts%nolist( idx ) + 1 )
              END DO
              !
              ! copy the charge back to the proper processor location
              !
+             IF (noncolin) THEN
 !$omp parallel do
-             DO ir = 1, dffts%nnr
-                rho%of_r(ir,current_spin) = rho%of_r(ir,current_spin) + tg_rho(ir+ioff)
-             END DO
+                DO ir = 1, dffts%nnr
+                   rho%of_r(ir,1) = rho%of_r(ir,1) + &
+                                               tg_rho_nc(ir+ioff,1)
+                END DO
 !$omp end parallel do
+                IF (domag) THEN
+!$omp parallel do
+                   DO ipol=2,4 
+                      DO ir = 1, dffts%nnr
+                         rho%of_r(ir,ipol) = rho%of_r(ir,ipol) + &
+                                               tg_rho_nc(ir+ioff,ipol)
+                      END DO
+                   END DO
+!$omp end parallel do
+                ENDIF 
+             ELSE
+!$omp parallel do
+                DO ir = 1, dffts%nnr
+                   rho%of_r(ir,current_spin) = rho%of_r(ir,current_spin) + tg_rho(ir+ioff)
+                END DO
+!$omp end parallel do
+             END IF
              !
           END IF
           !
@@ -915,8 +1011,13 @@ SUBROUTINE sum_band()
        END DO k_loop
 
        IF( dffts%have_task_groups ) THEN
-          DEALLOCATE( tg_psi )
-          DEALLOCATE( tg_rho )
+          IF (noncolin) THEN
+             DEALLOCATE( tg_psi_nc )
+             DEALLOCATE( tg_rho_nc )
+          ELSE
+             DEALLOCATE( tg_psi )
+             DEALLOCATE( tg_rho )
+          END IF
        END IF
        dffts%have_task_groups = use_tg
 

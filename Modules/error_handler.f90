@@ -74,6 +74,11 @@ SUBROUTINE errore( calling_routine, message, ierr )
 #endif
   CALL flush_unit( stdout )
   !
+#ifdef __PTRACE
+    WRITE( UNIT = 0, FMT = '(5X,A)' ) "Printing strace..."
+    CALL ptrace()
+#endif 
+!
 #if defined (__MPI)
   !
   mpime = 0

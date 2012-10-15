@@ -38,7 +38,7 @@ SUBROUTINE q_points_wannier ( )
   !
 
   if( nq1 <= 0 .or. nq2 <= 0 .or. nq3 <= 0 ) &
-       call errore('q_points','nq1 or nq2 or nq3 <= 0',1)
+       call errore('q_points_wannier','nq1 or nq2 or nq3 <= 0',1)
 
   nqs=nq1*nq2*nq3
  

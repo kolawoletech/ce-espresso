@@ -281,6 +281,9 @@ ppc64-bg | ppc64-bgq )
           try_f90="bgxlf90"
 	else
           try_mpif90="mpixlf90_r"
+          # Executable paths are usually consistent across several 
+          # IBM BG/P BG/Q machine deployed 
+          ld="/bgsys/drivers/ppcfloor/comm/xl.ndebug/bin/mpixlf90_r"
           try_f90="bgxlf90_r"
 	fi
         try_arflags="ruv"
@@ -1646,9 +1649,17 @@ fi
 echo setting FFT_LIBS... $fft_libs
 
 # if no valid FFT library was found, use the local copy
+# (This happens also if OpenMP is enabled...)
 if test "$have_fft" -eq 0
 then
-        try_dflags="$try_dflags -D__FFTW"
+        case "$arch" in
+        ppc64-bg | ppc64-bgq )
+            try_dflags="$try_dflags -D__LINUX_ESSL"
+            ;;
+        * )
+		    try_dflags="$try_dflags -D__FFTW"
+            ;;
+        esac
 fi
 
 F77=$f90
@@ -1781,6 +1792,7 @@ then
 fi
 echo setting MPI_LIBS... $mpi_libs
 
+
 # final check on availability of parallel environment
 parallel=0
 for dummy in x # to allow simple 'break' 
@@ -1861,14 +1873,17 @@ fi
         # scalapack provided in SCALAPACK_LIBS - not checked!
         have_scalapack=1
         try_dflags="$try_dflags -D__SCALAPACK"
-    fi
+    fi   
 done
 
-if test "$with_elpa" -eq 1; then 
-        try_dflags="$try_dflags -D__ELPA"
+# ELPA iff SCALAPACK
+elpa_libs_switch="disabled"
+if test "$with_elpa" -eq 1 && test "$have_scalapack" -eq 1; then 
+    scalapack_libs="../../ELPA/libelpa.a $scalapack_libs"
+    try_dflags="$try_dflags -D__ELPA"
+    elpa_libs_switch="enabled"    
 fi
-
-
+    
 echo setting SCALAPACK_LIBS... $scalapack_libs
 
 # preprocessing flag for openmp (experimental)
@@ -1987,6 +2002,7 @@ AC_SUBST(lapack_libs_switch)
 AC_SUBST(fft_libs)
 AC_SUBST(mpi_libs)
 AC_SUBST(mass_libs)
+AC_SUBST(elpa_libs_switch)
 AC_SUBST(scalapack_libs)
 AC_SUBST(ar)
 AC_SUBST(arflags)

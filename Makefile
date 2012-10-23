@@ -95,7 +95,7 @@ all   : pwall cp ld1 upf tddfpt
 # Auxiliary targets used by main targets:
 # compile modules, libraries, directory for binaries, etc
 ###########################################################
-mods : libiotk
+mods : libiotk libelpa
 	( cd Modules ; if test "$(MAKE)" = "" ; then make $(MFLAGS) TLDEPS= all ; \
 	else $(MAKE) $(MFLAGS) TLDEPS= all ; fi )
 libs : mods
@@ -120,6 +120,9 @@ libblas : touch-dummy
 liblapack: touch-dummy
 	cd install ; $(MAKE) $(MFLAGS) -f extlibs_makefile $@
 
+libelpa: touch-dummy
+	cd install ; $(MAKE) $(MFLAGS) -f extlibs_makefile $@
+	
 libiotk: touch-dummy
 	cd install ; $(MAKE) $(MFLAGS) -f extlibs_makefile $@
 
@@ -179,7 +182,7 @@ clean :
 	for dir in \
 		CPV Modules PP PW \
 		ACFDT \
-		clib flib pwtools upftools iotk \
+		clib flib pwtools upftools \
 		dev-tools extlibs Environ \
 	; do \
 	    if test -d $$dir ; then \
@@ -189,6 +192,7 @@ clean :
 	    fi \
 	done
 	- @(cd install ; $(MAKE) $(MFLAGS) -f plugins_makefile clean)
+	- @(cd install ; $(MAKE) $(MFLAGS) -f extlibs_makefile clean)
 	- /bin/rm -rf bin/*.x tmp
 	- cd PW/tests; /bin/rm -rf CRASH *.out *.out? ; cd -
 	- cd CPV/tests; /bin/rm -rf CRASH *.out *.out? 

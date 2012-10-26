@@ -44,7 +44,8 @@ SUBROUTINE close_files(lflag)
   ! ... iunat  contains the (orthogonalized) atomic wfcs 
   ! ... iunsat contains the (orthogonalized) atomic wfcs * S
   !
-  IF ( lda_plus_u .OR. use_wannier .OR. one_atom_occupations) THEN
+  IF ( ( lda_plus_u .AND. (U_projection.NE.'pseudo') ) .OR. &
+        use_wannier .OR. one_atom_occupations ) THEN
      !
      INQUIRE( UNIT = iunat, OPENED = opnd )  
      IF ( opnd ) CLOSE( UNIT = iunat, STATUS = 'KEEP' )

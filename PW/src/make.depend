@@ -31,6 +31,11 @@ add_paw_to_deeq.o : ../../Modules/kind.o
 add_paw_to_deeq.o : ../../Modules/paw_variables.o
 add_paw_to_deeq.o : ../../Modules/uspp.o
 add_paw_to_deeq.o : pwcom.o
+add_vhub_to_deeq.o : ../../Modules/ions_base.o
+add_vhub_to_deeq.o : ../../Modules/kind.o
+add_vhub_to_deeq.o : ../../Modules/uspp.o
+add_vhub_to_deeq.o : pwcom.o
+add_vhub_to_deeq.o : scf_mod.o
 add_vuspsi.o : ../../Modules/becmod.o
 add_vuspsi.o : ../../Modules/control_flags.o
 add_vuspsi.o : ../../Modules/ions_base.o
@@ -429,8 +434,8 @@ exx.o : ../../Modules/kind.o
 exx.o : ../../Modules/mp.o
 exx.o : ../../Modules/mp_global.o
 exx.o : ../../Modules/noncol.o
-exx.o : ../../Modules/parallel_include.o
 exx.o : ../../Modules/recvec.o
+exx.o : ../../Modules/uspp.o
 exx.o : ../../Modules/wavefunctions.o
 exx.o : buffers.o
 exx.o : pwcom.o
@@ -705,6 +710,13 @@ init_ns.o : ../../Modules/noncol.o
 init_ns.o : ../../Modules/uspp.o
 init_ns.o : pwcom.o
 init_ns.o : scf_mod.o
+init_q_aeps.o : ../../Modules/atom.o
+init_q_aeps.o : ../../Modules/control_flags.o
+init_q_aeps.o : ../../Modules/io_global.o
+init_q_aeps.o : ../../Modules/ions_base.o
+init_q_aeps.o : ../../Modules/kind.o
+init_q_aeps.o : ../../Modules/uspp.o
+init_q_aeps.o : pwcom.o
 init_run.o : ../../Modules/cell_base.o
 init_run.o : ../../Modules/control_flags.o
 init_run.o : ../../Modules/fft_base.o
@@ -902,6 +914,7 @@ new_ns.o : ../../Modules/mp.o
 new_ns.o : ../../Modules/mp_global.o
 new_ns.o : ../../Modules/noncol.o
 new_ns.o : ../../Modules/recvec.o
+new_ns.o : ../../Modules/uspp.o
 new_ns.o : ../../Modules/wavefunctions.o
 new_ns.o : buffers.o
 new_ns.o : pwcom.o

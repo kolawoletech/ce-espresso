@@ -11,7 +11,7 @@ SUBROUTINE close_files(lflag)
   !
   ! ... Close all files and synchronize processes for a new scf calculation.
   !
-  USE ldaU,          ONLY : lda_plus_u
+  USE ldaU,          ONLY : lda_plus_u, U_projection
   USE control_flags, ONLY : twfcollect, io_level
   USE fixed_occ,     ONLY : one_atom_occupations
   USE io_files,      ONLY : prefix, iunwfc, iunigk, iunat, iunsat, &

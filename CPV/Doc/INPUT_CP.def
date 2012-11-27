@@ -9,6 +9,9 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
 	HARTREE ATOMIC UNITS
 
         BEWARE: TABS, DOS <CR><LF> CHARACTERS ARE POTENTIAL SOURCES OF TROUBLE 
+        Comment lines in namelists can be introduced by a "!", exactly as in
+        fortran code. Comments lines in ``cards'' can be introduced either by
+        a "!" or a "#" character in the first position of a line.
 
 	Structure of the input data:
 	===============================================================================
@@ -215,7 +218,7 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
 	    default {.false.}
 	    info {
                .true. to compute the volume and/or the surface of an isolated
-               system for finete pressure/finite surface tension calculations
+               system for finite pressure/finite surface tension calculations
                (PRL 94, 145501 (2005); JCP 124, 074103 (2006)).
 	    }
 	}

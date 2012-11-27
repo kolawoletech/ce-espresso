@@ -130,7 +130,7 @@ SUBROUTINE iosys()
                            delta_ => delta,                                     &
                            env_pressure_ => env_pressure,                       &
                            env_periodicity, slab_axis,                          &
-                           cion_ => cion,                                       &
+                           env_ioncc_concentration_ => env_ioncc_concentration, &
                            zion_ => zion,                                       &
                            rhopb_ => rhopb,                                     &
                            solvent_temperature_ => solvent_temperature
@@ -278,7 +278,8 @@ SUBROUTINE iosys()
                                mixtype, ndiis, mixrhopol, tolrhopol,    &
                                env_surface_tension, delta,              &
                                env_pressure,                            &
-                               cion, zion, rhopb, solvent_temperature 
+                               env_ioncc_concentration, zion, rhopb,    &
+                               solvent_temperature
 #endif
   !
   ! ... ELECTRONS namelist
@@ -1242,6 +1243,7 @@ SUBROUTINE iosys()
   solvationrad_( 1:ntyp ) = solvationrad( 1:ntyp )
   ALLOCATE( atomicspread_( ntyp ) )
   atomicspread_( 1:ntyp ) = atomicspread( 1:ntyp )
+  IF ( do_environ ) CALL environ_initions_allocate( nat_, ntyp )
   add_jellium_ = add_jellium
   !
   ifdtype_   = ifdtype
@@ -1254,9 +1256,8 @@ SUBROUTINE iosys()
   !
   delta_     = delta
   !
-  cion_       = cion*bohr_radius_si**3/amu_si
-  zion_       = zion
-  rhopb_      = rhopb
+  zion_      = zion
+  rhopb_     = rhopb
   solvent_temperature_ = solvent_temperature
   !
   SELECT CASE (TRIM(environ_type))
@@ -1267,12 +1268,14 @@ SUBROUTINE iosys()
     env_surface_tension_ = 0.D0
     env_pressure_ = 0.D0
     env_periodicity = 3
+    env_ioncc_concentration = 0.D0
   CASE ('water')
     ! water, experimental and SCCS tuned parameters
     env_static_permittivity_ = 78.3D0
     env_surface_tension_ = 50.D0*1.D-3*bohr_radius_si**2/rydberg_si
     env_pressure_ = -0.35D0*1.D9/rydberg_si*bohr_radius_si**3
     env_periodicity = 3
+    env_ioncc_concentration = 0.D0
   CASE ('input')
     ! take values from input, this is the default option
     env_static_permittivity_ = env_static_permittivity
@@ -1280,6 +1283,8 @@ SUBROUTINE iosys()
       env_surface_tension*1.D-3*bohr_radius_si**2/rydberg_si
     env_pressure_ = env_pressure*1.D9/rydberg_si*bohr_radius_si**3
     env_periodicity = 3
+    env_ioncc_concentration_ = env_ioncc_concentration &
+    * bohr_radius_si**3 / amu_si
   CASE DEFAULT
     call errore ('iosys','unrecognized value for environ_type',1) 
   END SELECT    
@@ -1381,6 +1386,10 @@ SUBROUTINE iosys()
       !
       call errore ('iosys','unrecognized value for assume_isolated',1)
   END SELECT
+#ifdef __ENVIRON
+  IF ( env_ioncc_concentration .GT. 0.D0 .AND. env_periodicity .NE. 2 ) &
+      call errore ('iosys','ioncc requires slab boundary conditions',1)
+#endif
   !
   ! ... read following cards
   !

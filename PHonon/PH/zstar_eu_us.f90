@@ -38,7 +38,7 @@ subroutine zstar_eu_us
   USE nlcc_ph,    ONLY : nlcc_any
   USE units_ph,   ONLY : lrdwf, iucom, lrcom, lrebar, iuebar, lrdrhous, &
                          iudrhous, iudwf, lrwfc, iuwfc
-  USE mp_global, ONLY : nproc_pool
+  USE mp_global, ONLY : nproc_pool, npool
 
   !
   implicit none
@@ -66,8 +66,8 @@ subroutine zstar_eu_us
 #endif
 
   !  auxiliary space for <psi|ds/du|psi>
-  allocate (dvscf( dfftp%nnr , nspin, 3))
-  allocate (dbecsum( nhm*(nhm+1)/2, nat, nspin, 3))
+  allocate (dvscf( dfftp%nnr , nspin_mag, 3))
+  allocate (dbecsum( nhm*(nhm+1)/2, nat, nspin_mag, 3))
   if (noncolin) allocate (dbecsum_nc( nhm, nhm, nat, nspin, 3))
   allocate (aux1(  dffts%nnr))
   allocate (pdsp(nbnd,nbnd))
@@ -118,7 +118,7 @@ subroutine zstar_eu_us
 #endif
 
   if (doublegrid) then
-     do is = 1, nspin
+     do is = 1, nspin_mag
         do ipol = 1, 3
            call cinterpolate(dvscf(1,is,ipol),dvscf(1,is,ipol), 1)
         end do
@@ -165,7 +165,7 @@ subroutine zstar_eu_us
 ! potenial
 !
   imode0 = 0
-  allocate(drhoscfh(dfftp%nnr,nspin))
+  allocate(drhoscfh(dfftp%nnr,nspin_mag))
   do irr = 1, nirr
      npe = npert(irr)
      do imode = 1, npe
@@ -267,7 +267,7 @@ subroutine zstar_eu_us
 
   fact=1.0_DP
 #ifdef __MPI
-  fact=1.0_DP/nproc_pool
+  fact=1.0_DP/nproc_pool/npool
 #endif
   IF (okpaw) THEN
      imode0 = 0

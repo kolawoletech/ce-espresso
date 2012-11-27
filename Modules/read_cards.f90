@@ -130,7 +130,8 @@ CONTAINS
 100   CALL read_line( input_line, end_of_file=tend )
       !
       IF( tend ) GOTO 120
-      IF( input_line == ' ' .or. input_line(1:1) == '#' ) GOTO 100
+      IF( input_line == ' ' .OR. input_line(1:1) == '#' .OR. &
+                                 input_line(1:1) == '!' ) GOTO 100
       !
       READ (input_line, *) card
       !
@@ -401,7 +402,7 @@ CONTAINS
          IF ( prog == 'PW' ) atomic_positions = 'alat'
       ENDIF
       !
-      reader_loop : DO ia = 1,nat,1
+      reader_loop : DO ia = 1,nat
          !
          CALL read_line( input_line, end_of_file = tend )
          IF ( tend ) CALL errore( 'read_cards', &
@@ -1042,7 +1043,9 @@ CONTAINS
       ELSEIF ( matches( "ANGSTROM", input_line ) ) THEN
          cell_units = 'angstrom'
       ELSE
-         cell_units = 'alat'
+         cell_units = 'none'
+         ! It will be set to 'bohr', 'alat' in cell_base, depending
+         ! on whether a or celldm(1) are set or not
       ENDIF
       !
       DO i = 1, 3

@@ -626,7 +626,7 @@ nb_loop: DO nb = 1,upf%nbeta
 
       !
       ! Read valence all-electron and pseudo orbitals and their labels
-      !EMINE
+      !
       IF (upf%paw_as_gipaw) THEN
          !READ PAW DATA INSTEAD OF GIPAW 
          upf%gipaw_wfs_nchannels = upf%nbeta
@@ -646,8 +646,8 @@ nb_loop: DO nb = 1,upf%nbeta
          ENDDO
          ALLOCATE ( upf%gipaw_vlocal_ae(upf%mesh) )
          ALLOCATE ( upf%gipaw_vlocal_ps(upf%mesh) )
-         upf%gipaw_vlocal_ae(:)=  upf%vloc(:)
-         upf%gipaw_vlocal_ps(:)= upf%paw%ae_vloc(:)
+         upf%gipaw_vlocal_ae(:)= upf%paw%ae_vloc(:)  
+         upf%gipaw_vlocal_ps(:)= upf%vloc(:)
          DO nb = 1,upf%gipaw_wfs_nchannels
             upf%gipaw_wfs_rcut(nb)=upf%rcut(nb)
             upf%gipaw_wfs_rcutus(nb)=upf%rcutus(nb)
@@ -705,7 +705,7 @@ nb_loop: DO nb = 1,upf%nbeta
          ALLOCATE ( upf%gipaw_vlocal_ps(upf%mesh) )
          CALL iotk_scan_begin(u, 'PP_GIPAW_VLOCAL')
          CALL iotk_scan_dat(u, 'PP_GIPAW_VLOCAL_AE',upf%gipaw_vlocal_ae(:))
-         CALL iotk_scan_dat(u, 'PP_GIPAW_VLOCAL_PS',upf%gipaw_vlocal_ae(:))
+         CALL iotk_scan_dat(u, 'PP_GIPAW_VLOCAL_PS',upf%gipaw_vlocal_ps(:))
          CALL iotk_scan_end(u, 'PP_GIPAW_VLOCAL')
 
       ENDIF

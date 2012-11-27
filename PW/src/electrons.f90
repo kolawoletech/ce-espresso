@@ -76,8 +76,9 @@ SUBROUTINE electrons()
                                    vltot_zero, environ_thr,                 &
                                    env_static_permittivity,                 & 
                                    env_surface_tension, env_pressure,       &
-                                   env_periodicity, deenviron,              &
-                                   esolvent, ecavity, epressure, eperiodic
+                                   env_periodicity, env_ioncc_concentration,&
+                                   deenviron, esolvent, ecavity, epressure, &
+                                   eperiodic, eioncc
 #endif
   USE dfunct,                 only : newd
   USE esm,                  ONLY : do_comp_esm, esm_printpot
@@ -465,8 +466,8 @@ SUBROUTINE electrons()
        !
        vltot = vltot_zero
        !
-       CALL calc_eenviron( dfftp%nnr, nspin, rhoin%of_r, vltot_zero, &
-                           deenviron, esolvent, ecavity, epressure, eperiodic )
+       CALL calc_eenviron( dfftp%nnr, nspin, rhoin%of_r, deenviron, esolvent, &
+                           ecavity, epressure, eperiodic, eioncc )
        !
        update_venviron = .NOT. conv_elec .AND. dr2 .LT. environ_thr
        !
@@ -507,7 +508,7 @@ SUBROUTINE electrons()
      IF ( ( MOD( iter, report ) == 0 ) .OR. &
           ( report /= 0 .AND. conv_elec ) ) THEN
         !
-        IF ( noncolin .AND. domag .or. i_cons==1) CALL report_mag()
+        IF ( (noncolin .AND. domag) .OR. i_cons==1 .OR. nspin==2) CALL report_mag()
         !
      END IF
      !
@@ -610,7 +611,8 @@ SUBROUTINE electrons()
      !
      ! ... adds the external environment contribution to the energy
      !
-     IF ( do_environ ) etot = etot + deenviron + esolvent + ecavity + epressure + eperiodic
+     IF ( do_environ ) etot = etot + deenviron + esolvent + ecavity + & 
+                              epressure + eperiodic + eioncc
 #endif
      !
      IF ( ( conv_elec .OR. MOD( iter, iprint ) == 0 ) .AND. .NOT. lmd ) THEN
@@ -666,7 +668,11 @@ SUBROUTINE electrons()
         IF ( env_static_permittivity .GT. 1.D0 ) WRITE( stdout, 9201 ) esolvent
         IF ( env_surface_tension .GT. 0.D0 ) WRITE( stdout, 9202 ) ecavity
         IF ( env_pressure .NE. 0.D0 ) WRITE( stdout, 9203 ) epressure
-        IF ( env_periodicity .NE. 3 ) WRITE( stdout, 9204 ) eperiodic
+        IF ( env_ioncc_concentration .GT. 0.D0 ) THEN 
+          WRITE( stdout, 9205 ) eioncc
+        ELSE IF ( env_periodicity .NE. 3 ) THEN
+          WRITE( stdout, 9204 ) eperiodic
+        ENDIF
      ENDIF
      !
 #endif
@@ -799,6 +805,7 @@ SUBROUTINE electrons()
 9202 FORMAT( '     cavitation energy         =',F17.8,' Ry' ) 
 9203 FORMAT( '     PV energy                 =',F17.8,' Ry' ) 
 9204 FORMAT( '     periodic energy correct.  =',F17.8,' Ry' )
+9205 FORMAT( '     ionic charge energy       =',F17.8,' Ry' )
 #endif
   !
   CONTAINS

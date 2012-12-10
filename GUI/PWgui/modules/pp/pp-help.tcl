@@ -421,6 +421,7 @@ help output_format -helpfmt helpdoc -helptext {
 5  format suitable for XCRYSDEN  (3D, using entire FFT grid)
 6  format as gaussian cube file  (3D)
    (can be read by many programs)
+7  format suitable for gnuplot   (2D) x, y, f(x,y)
          </pre></blockquote>
 </ul>      
       

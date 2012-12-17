@@ -28,13 +28,14 @@ SUBROUTINE electrons()
   USE fft_base,             ONLY : dfftp
   USE gvect,                ONLY : ngm, gstart, nl, nlm, g, gg, gcutm
   USE gvecs,                ONLY : doublegrid, ngms
-  USE klist,                ONLY : xk, wk, nelec, ngk, nks, nkstot, lgauss
+  USE klist,                ONLY : xk, wk, nelec, ngk, nks, nkstot, lgauss, &
+                                   two_fermi_energies
   USE lsda_mod,             ONLY : lsda, nspin, magtot, absmag, isk
   USE vlocal,               ONLY : strf
   USE wvfct,                ONLY : nbnd, et, npwx, ecutwfc
   USE ener,                 ONLY : etot, hwf_energy, eband, deband, ehart, &
                                    vtxc, etxc, etxcc, ewld, demet, epaw, &
-                                   elondon
+                                   elondon, ef_up, ef_dw
   USE scf,                  ONLY : scf_type, scf_type_COPY, bcast_scf_type,&
                                    create_scf_type, destroy_scf_type, &
                                    rho, rho_core, rhog_core, &
@@ -740,6 +741,12 @@ SUBROUTINE electrons()
      !
      !CALL forces()
      !
+     ! ... it can be very useful to track internal clocks during
+     ! ... self-consistency for benchmarking purposes
+#if defined(__PW_TRACK_ELECTRON_STEPS)
+     CALL print_clock_pw()
+#endif
+     !
   END DO
   !
   WRITE( stdout, 9101 )
@@ -838,6 +845,8 @@ SUBROUTINE electrons()
           !
           CALL mp_sum( magtot, intra_bgrp_comm )
           CALL mp_sum( absmag, intra_bgrp_comm )
+          !
+          IF (two_fermi_energies.and.lgauss) bfield(3)=0.5D0*(ef_up-ef_dw)
           !
        ELSE IF ( noncolin ) THEN
           !

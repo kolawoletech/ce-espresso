@@ -77,8 +77,8 @@ PROGRAM matdyn
   !     flfrq     output file for frequencies (default: 'matdyn.freq')
   !     flvec     output file for normalized phonon displacements 
   !               (default: 'matdyn.modes'). The normalized phonon displacements
-  !               are the eigenvectors divided by the mass and then normalized.
-  !               As such they are not orthogonal.
+  !               are the eigenvectors divided by the square root of the mass
+  !               and then normalized. As such they are not orthogonal.
   !              
   !     fleig     output file for phonon eigenvectors (default: 'matdyn.eig')
   !               The phonon eigenvectors are the eigenvectors of the dynamical
@@ -1919,7 +1919,7 @@ SUBROUTINE a2Fdos &
   REAL(DP), INTENT(in) :: freq(3*nat,nq), q(3,nq), at(3,3), bg(3,3), &
        tau(3,nat), alat, Emin, DeltaE
   !
-  INTEGER, INTENT(in) :: nsc, nat_blk, itau_blk, nrws
+  INTEGER, INTENT(in) :: nsc, nat_blk, itau_blk(nat), nrws
   REAL(DP), INTENT(in) :: rws(0:3,nrws), at_blk(3,3), bg_blk(3,3), omega_blk
   !
   REAL(DP), ALLOCATABLE    :: gamma(:,:), frcg(:,:,:,:,:,:,:)

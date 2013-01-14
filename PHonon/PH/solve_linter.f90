@@ -153,8 +153,12 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
      ! restart from Phonon calculation
      IF (okpaw) THEN
         CALL read_rec(dr2, iter0, npe, dvscfin, dvscfins, drhoscfh, dbecsum)
-        CALL setmixout(npe*dfftp%nnr*nspin_mag,(nhm*(nhm+1)*nat*nspin_mag*npe)/2, &
-                    mixin, dvscfin, dbecsum, ndim, -1 )
+        IF (convt) THEN
+           CALL PAW_dpotential(dbecsum,rho%bec,int3_paw,npe)
+        ELSE
+           CALL setmixout(npe*dfftp%nnr*nspin_mag,&
+           (nhm*(nhm+1)*nat*nspin_mag*npe)/2,mixin,dvscfin,dbecsum,ndim,-1)
+        ENDIF
      ELSE
         CALL read_rec(dr2, iter0, npe, dvscfin, dvscfins, drhoscfh)
      ENDIF
@@ -182,12 +186,9 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   if (lmetq0) then
      allocate ( ldos ( dfftp%nnr  , nspin_mag) )
      allocate ( ldoss( dffts%nnr , nspin_mag) )
-     IF (okpaw) THEN
-        allocate (becsum1 ( (nhm * (nhm + 1))/2 , nat , nspin_mag))
-        call localdos_paw ( ldos , ldoss , becsum1, dos_ef )
-     ELSE
-        call localdos ( ldos , ldoss , dos_ef )
-     ENDIF
+     allocate (becsum1 ( (nhm * (nhm + 1))/2 , nat , nspin_mag))
+     call localdos_paw ( ldos , ldoss , becsum1, dos_ef )
+     IF (.NOT.okpaw) deallocate(becsum1)
   endif
   !
   !
@@ -546,7 +547,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   deallocate (aux1)
   deallocate (dbecsum)
   IF (okpaw) THEN
-     if (lmetq0.and.allocated(becsum1)) deallocate (becsum1)
+     if (allocated(becsum1)) deallocate (becsum1)
      deallocate (mixin)
      deallocate (mixout)
   ENDIF

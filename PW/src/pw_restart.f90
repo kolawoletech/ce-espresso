@@ -1425,7 +1425,7 @@ MODULE pw_restart
             IF ( .NOT. found2) nproc_pot_file=1 ! compatibility
             CALL iotk_scan_dat( iunpun, "NUMBER_OF_PROCESSORS_PER_BAND_GROUP", &
                                nproc_bgrp_file,  FOUND=found2 )
-            IF ( .NOT. found2) nproc_bgrp_file=1 ! compatibility
+            IF ( .NOT. found2) nproc_bgrp_file=nproc_pool_file ! compatibility
             CALL iotk_scan_dat( iunpun, &
                            "NUMBER_OF_PROCESSORS_PER_DIAGONALIZATION", &
                                nproc_ortho_file, FOUND=found2 )
@@ -2305,24 +2305,23 @@ MODULE pw_restart
          IF ( lda_plus_u ) THEN
             !
             CALL iotk_scan_dat( iunpun, "NUMBER_OF_SPECIES", nsp_ )
-            !
-            CALL iotk_scan_dat( iunpun, "LDA_PLUS_U_KIND", lda_plus_u_kind )
-            !
-            CALL iotk_scan_dat( iunpun, "U_PROJECTION_TYPE", U_projection )
-            !
             CALL iotk_scan_dat( iunpun, "HUBBARD_LMAX", Hubbard_lmax )
-            !
             CALL iotk_scan_dat( iunpun, "HUBBARD_L", Hubbard_l(1:nsp_) )
-            !
             CALL iotk_scan_dat( iunpun, "HUBBARD_U", Hubbard_U(1:nsp_) )
-            !
-            CALL iotk_scan_dat( iunpun, "HUBBARD_J", Hubbard_J(1:3,1:nsp_) )
-            !
-            CALL iotk_scan_dat( iunpun, "HUBBARD_J0", Hubbard_J0(1:nsp_) )
-            !
             CALL iotk_scan_dat( iunpun, "HUBBARD_ALPHA", Hubbard_alpha(1:nsp_) )
+            CALL iotk_scan_dat( iunpun, "U_PROJECTION_TYPE", U_projection, &
+                                FOUND = found )
+            IF ( .NOT. found ) U_projection='atomic' ! compatibility
             !
-            CALL iotk_scan_dat( iunpun, "HUBBARD_BETA", Hubbard_beta(1:nsp_) )
+            CALL iotk_scan_dat( iunpun, "LDA_PLUS_U_KIND", lda_plus_u_kind, &
+                                FOUND = found )
+            IF ( .NOT. found ) THEN
+               lda_plus_u_kind = 0 ! comatiility
+            ELSE
+               CALL iotk_scan_dat( iunpun, "HUBBARD_J", Hubbard_J(1:3,1:nsp_) )
+               CALL iotk_scan_dat( iunpun, "HUBBARD_J0", Hubbard_J0(1:nsp_) )
+               CALL iotk_scan_dat( iunpun, "HUBBARD_BETA",Hubbard_beta(1:nsp_) )
+            END IF
             !
          END IF
 

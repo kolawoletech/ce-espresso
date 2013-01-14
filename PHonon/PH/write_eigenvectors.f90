@@ -1,4 +1,10 @@
 !
+! Copyright (C) 2012 Quantum ESPRESSO group
+! This file is distributed under the terms of the
+! GNU General Public License. See the file `License'
+! in the root directory of the present distribution,
+! or http://www.gnu.org/copyleft/gpl.txt .
+!
 !-----------------------------------------------------------------------
 subroutine write_eigenvectors (nat,ntyp,amass,ityp,q,w2,z,iout)
   !-----------------------------------------------------------------------
@@ -9,13 +15,14 @@ subroutine write_eigenvectors (nat,ntyp,amass,ityp,q,w2,z,iout)
   use constants, only: amu_ry, ry_to_thz, ry_to_cmm1
   implicit none
   ! input
-  integer nat, iout,ntyp
+  integer, intent(in) :: nat, iout,ntyp
   integer ityp(nat)
-  real(DP) q(3), w2(3*nat),amass(ntyp)
-  complex(DP) z(3*nat,3*nat)
+  real(DP), intent(in) :: q(3), w2(3*nat),amass(ntyp)
+  complex(DP), intent(in) :: z(3*nat,3*nat)
   ! local
   integer nat3, na, nta, ipol, i, j
   real(DP):: freq(3*nat)
+  complex(DP) :: z_(3*nat,3*nat)
   !
   nat3=3*nat
   !
@@ -29,7 +36,7 @@ subroutine write_eigenvectors (nat,ntyp,amass,ityp,q,w2,z,iout)
     do na = 1,nat
        nta = ityp(na)
        do ipol = 1,3
-          z((na-1)*3+ipol,i) = z((na-1)*3+ipol,i)* sqrt(amu_ry*amass(nta))
+          z_((na-1)*3+ipol,i) = z((na-1)*3+ipol,i)* sqrt(amu_ry*amass(nta))
        end do
     end do
  end do
@@ -40,7 +47,7 @@ subroutine write_eigenvectors (nat,ntyp,amass,ityp,q,w2,z,iout)
      if (w2(i) < 0.0) freq(i) = -freq(i)
      write (iout,9010) i, freq(i)*ry_to_thz, freq(i)*ry_to_cmm1
      do na = 1,nat
-        write (iout,9020) (z((na-1)*3+ipol,i),ipol=1,3)
+        write (iout,9020) (z_((na-1)*3+ipol,i),ipol=1,3)
      end do
      !
   end do
@@ -64,9 +71,9 @@ subroutine writemodes (nat,q,w2,z,iout)
   USE constants, ONLY : ry_to_thz, ry_to_cmm1
   implicit none
   ! input
-  integer nat, iout
-  real(DP) q(3), w2(3*nat)
-  complex(DP) z(3*nat,3*nat)
+  integer, intent(in) :: nat, iout
+  real(DP), intent(in) :: q(3), w2(3*nat)
+  complex(DP), intent(in) :: z(3*nat,3*nat)
   ! local
   integer nat3, na, ipol, i, j
   real(DP):: freq(3*nat)
@@ -113,12 +120,12 @@ subroutine writemolden (flmol, gamma, nat, atm, a0, tau, ityp, w2, z)
   USE constants, ONLY : ry_to_cmm1
   implicit none
   ! input
-  integer :: nat, ityp(nat)
-  real(DP) :: a0, tau(3,nat), w2(3*nat)
-  complex(DP) :: z(3*nat,3*nat)
-  character(len=50) :: flmol
-  character(len=3) :: atm(*)
-  logical :: gamma
+  integer, intent(in) :: nat, ityp(nat)
+  real(DP), intent(in) :: a0, tau(3,nat), w2(3*nat)
+  complex(DP), intent(in) :: z(3*nat,3*nat)
+  character(len=50), intent(in) :: flmol
+  character(len=3), intent(in) :: atm(*)
+  logical, intent(in) :: gamma
   ! local
   integer :: nat3, na, ipol, i, j, iout
   real(DP) :: freq(3*nat)

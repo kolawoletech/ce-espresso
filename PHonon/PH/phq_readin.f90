@@ -55,7 +55,7 @@ SUBROUTINE phq_readin()
                             nimage, my_image_id,    &
                             nproc_image_file, nproc_image, npool, &
                             get_ntask_groups, ntask_groups_file,  &
-                            nproc_bgrp_file
+                            nbgrp
   USE paw_variables, ONLY : okpaw
   USE ramanm,        ONLY : eth_rps, eth_ns, lraman, elop, dek
   USE freq_ph,       ONLY : fpol, fiu, nfs, nfsmax
@@ -482,11 +482,14 @@ SUBROUTINE phq_readin()
   IF (get_ntask_groups() > 1) &
      CALL errore('phq_readin','task_groups not available in phonon',1)
 
-  IF (nproc_bgrp_file /= nproc_pool_file) &
+  IF (nbgrp /= 1) &
      CALL errore('phq_readin','band parallelization not available in phonon',1)
 
   IF (elph.and.nimage>1) CALL errore('phq_readin',&
        'el-ph with image parallelization is not yet available',1)
+
+  IF (elph.AND.recover) CALL errore('phq_readin',&
+     'Recovering of electron-phonon is not yet available',1)
 
   if(elph_mat.and.fildvscf.eq.' ') call errore('phq_readin',&
        'el-ph with wannier requires fildvscf',1)

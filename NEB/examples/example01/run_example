@@ -108,7 +108,6 @@ BEGIN_ENGINE_INPUT
 /
 &SYSTEM
   ibrav                  = 0,
-  celldm(1)              = 1.D0,
   nat                    = 3,
   ntyp                   = 1,
   ecutwfc                = 20.0D0,

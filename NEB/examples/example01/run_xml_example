@@ -626,9 +626,6 @@ END_POSITIONS
                 </parameter>
 
         </field>
-        <field name="MD">
-
-        </field>
         <k_points type="gamma">
         </k_points>
 </input>

@@ -36,7 +36,7 @@ subroutine solve_e2
   USE recover_mod, ONLY : read_rec, write_rec
 
   USE check_stop, ONLY: check_stop_now
-  USE mp_global,  ONLY : inter_pool_comm, intra_pool_comm
+  USE mp_global,  ONLY : inter_pool_comm, intra_bgrp_comm
   USE mp,         ONLY : mp_sum
   implicit none
 
@@ -170,9 +170,7 @@ subroutine solve_e2
                             dbecsum (1, 1), dpsi)
            enddo   ! on perturbations
         enddo      ! on k points
-#ifdef __MPI
-     call mp_sum ( dbecsum, intra_pool_comm )
-#endif
+     call mp_sum ( dbecsum, intra_bgrp_comm )
      if (doublegrid) then
         do is = 1, nspin
            do ipol = 1, 6
@@ -188,18 +186,12 @@ subroutine solve_e2
      !   After the loop over the perturbations we have the change of the pote
      !   for all the modes, and we symmetrize this potential
      !
-#ifdef __MPI
      call mp_sum ( dvscfout, inter_pool_comm )
-#endif
      do ipol = 1, 6
         call dv_of_drho (0, dvscfout (1, 1, ipol), .false.)
      enddo
 
-#ifdef __MPI
      call psyme2(dvscfout)
-#else
-     call syme2(dvscfout)
-#endif
      !
      ! Mixing with the old potential
      !

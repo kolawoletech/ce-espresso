@@ -38,7 +38,7 @@ subroutine dynmat0_new
   complex(DP) :: wrk, dynwrk (3 * nat, 3 * nat)
   ! auxiliary space
 
-  IF ( comp_irr(0) == 0 .or. done_irr(0) == 1 ) RETURN
+  IF ( .NOT.comp_irr(0) .or. done_irr(0) ) RETURN
   IF (rec_code_read > -30 ) RETURN
 
   call start_clock ('dynmat0')
@@ -69,23 +69,16 @@ subroutine dynmat0_new
      ! rotate again in the pattern basis
      !
      call zcopy (9 * nat * nat, dyn, 1, dynwrk, 1)
-     do nu_i = 1, 3 * nat
-        do nu_j = 1, 3 * nat
-           wrk = (0.d0, 0.d0)
-           do nb_jcart = 1, 3 * nat
-              do na_icart = 1, 3 * nat
-                 wrk = wrk + CONJG(u (na_icart, nu_i) ) * &
-                             dynwrk (na_icart, nb_jcart) * &
-                             u (nb_jcart, nu_j)
-              enddo
-           enddo
-           dyn (nu_i, nu_j) = wrk
-        enddo
-     enddo
+
+     dyn=(0.d0, 0.d0)
+
+     CALL rotate_pattern_add(nat, u, dyn, dynwrk)
+
   endif
+
 !        call tra_write_matrix('dynmat0 dyn',dyn,u,nat)
   dyn_rec(:,:)=dyn(:,:)
-  done_irr(0) = 1
+  done_irr(0) = .TRUE.
   CALL ph_writefile('data_dyn',0)
 
   call stop_clock ('dynmat0')

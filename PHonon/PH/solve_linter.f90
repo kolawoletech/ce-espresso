@@ -32,7 +32,7 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   USE klist,                ONLY : lgauss, degauss, ngauss, xk, wk
   USE gvect,                ONLY : g
   USE gvecs,                ONLY : doublegrid
-  USE fft_base,             ONLY : dfftp, dffts
+  USE fft_base,             ONLY : dfftp, dffts, tg_cgather
   USE lsda_mod,             ONLY : lsda, nspin, current_spin, isk
   USE spin_orb,             ONLY : domag
   USE wvfct,                ONLY : nbnd, npw, npwx, igk,g2kin,  et
@@ -62,7 +62,8 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   USE dfile_autoname,       ONLY : dfile_name
   USE save_ph,              ONLY : tmp_dir_save
   ! used oly to write the restart file
-  USE mp_global,            ONLY : inter_pool_comm, intra_pool_comm
+  USE mp_global,            ONLY : inter_pool_comm, intra_bgrp_comm, &
+                                   get_ntask_groups
   USE mp,                   ONLY : mp_sum
   !
   implicit none
@@ -94,7 +95,8 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   ! change of rho / scf potential (output)
   ! change of scf potential (output)
   complex(DP), allocatable :: ldos (:,:), ldoss (:,:), mixin(:), mixout(:), &
-       dbecsum (:,:,:,:), dbecsum_nc(:,:,:,:,:), aux1 (:,:)
+       dbecsum (:,:,:,:), dbecsum_nc(:,:,:,:,:), aux1 (:,:), tg_dv(:,:), &
+       tg_psic(:,:), aux2(:,:)
   ! Misc work space
   ! ldos : local density of states af Ef
   ! ldoss: as above, without augmentation charges
@@ -120,6 +122,9 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
              is,         & ! counter on spin polarizations
              nrec,       & ! the record number for dvpsi and dpsi
              ios,        & ! integer variable for I/O control
+             incr,       & ! used for tg
+             v_siz,      & ! size of the potential
+             ipol,       & ! counter on polarization
              mode          ! mode index
 
   integer  :: iq_dummy
@@ -131,6 +136,11 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   IF (rec_code_read > 20 ) RETURN
 
   call start_clock ('solve_linter')
+!
+!  This routine is task group aware
+!
+  IF ( get_ntask_groups() > 1 ) dffts%have_task_groups=.TRUE.
+
   allocate (dvscfin ( dfftp%nnr , nspin_mag , npe))
   if (doublegrid) then
      allocate (dvscfins (dffts%nnr , nspin_mag , npe))
@@ -148,6 +158,16 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   IF (noncolin) allocate (dbecsum_nc (nhm,nhm, nat , nspin , npe))
   allocate (aux1 ( dffts%nnr, npol))
   allocate (h_diag ( npwx*npol, nbnd))
+  allocate (aux2(npwx*npol, nbnd))
+  incr=1
+  IF ( dffts%have_task_groups ) THEN
+     !
+     v_siz =  dffts%tg_nnr * dffts%nogrp
+     ALLOCATE( tg_dv   ( v_siz, nspin_mag ) )
+     ALLOCATE( tg_psic( v_siz, npol ) )
+     incr = dffts%nogrp
+     !
+  ENDIF
   !
   if (rec_code_read == 10.AND.ext_recover) then
      ! restart from Phonon calculation
@@ -177,7 +197,6 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   END IF
 
   IF (convt) GOTO 155
-
   !
   ! if q=0 for a metal: allocate and compute local DOS at Ef
   !
@@ -277,11 +296,38 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
               ! dvscf_q from previous iteration (mix_potential)
               !
               call start_clock ('vpsifft')
-              do ibnd = 1, nbnd_occ (ikk)
-                 call cft_wave (evc (1, ibnd), aux1, +1)
-                 call apply_dpot(dffts%nnr,aux1, dvscfins(1,1,ipert), current_spin)
-                 call cft_wave (dvpsi (1, ibnd), aux1, -1)
+              IF ( get_ntask_groups() > 1 ) dffts%have_task_groups=.TRUE.
+              IF( dffts%have_task_groups ) THEN
+                 IF (noncolin) THEN
+                    CALL tg_cgather( dffts, dvscfins(:,1,ipert), &
+                                                                tg_dv(:,1))
+                    IF (domag) THEN
+                       DO ipol=2,4
+                          CALL tg_cgather( dffts, dvscfins(:,ipol,ipert), &
+                                                             tg_dv(:,ipol))
+                       ENDDO
+                    ENDIF
+                 ELSE
+                    CALL tg_cgather( dffts, dvscfins(:,current_spin,ipert), &
+                                                             tg_dv(:,1))
+                 ENDIF
+              ENDIF
+              aux2=(0.0_DP,0.0_DP)
+              do ibnd = 1, nbnd_occ (ikk), incr
+                 IF( dffts%have_task_groups ) THEN
+                    call cft_wave_tg (evc, tg_psic, 1, v_siz, ibnd, &
+                                      nbnd_occ (ikk) )
+                    call apply_dpot(v_siz, tg_psic, tg_dv, 1)
+                    call cft_wave_tg (aux2, tg_psic, -1, v_siz, ibnd, &
+                                      nbnd_occ (ikk))
+                 ELSE
+                    call cft_wave (evc (1, ibnd), aux1, +1)
+                    call apply_dpot(dffts%nnr,aux1, dvscfins(1,1,ipert), current_spin)
+                    call cft_wave (aux2 (1, ibnd), aux1, -1)
+                 ENDIF
               enddo
+              dvpsi=dvpsi+aux2
+              dffts%have_task_groups=.FALSE.
               call stop_clock ('vpsifft')
               !
               !  In the case of US pseudopotentials there is an additional
@@ -359,17 +405,15 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
         enddo
         ! on k-points
      enddo
-#ifdef __MPI
      !
      !  The calculation of dbecsum is distributed across processors (see addusdbec)
      !  Sum over processors the contributions coming from each slice of bands
      !
      IF (noncolin) THEN
-        call mp_sum ( dbecsum_nc, intra_pool_comm )
+        call mp_sum ( dbecsum_nc, intra_bgrp_comm )
      ELSE
-        call mp_sum ( dbecsum, intra_pool_comm )
+        call mp_sum ( dbecsum, intra_bgrp_comm )
      ENDIF
-#endif
 
      if (doublegrid) then
         do is = 1, nspin_mag
@@ -388,14 +432,12 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
      !    Now we compute for all perturbations the total charge and potential
      !
      call addusddens (drhoscfh, dbecsum, imode0, npe, 0)
-#ifdef __MPI
      !
      !   Reduce the delta rho across pools
      !
      call mp_sum ( drhoscf, inter_pool_comm )
      call mp_sum ( drhoscfh, inter_pool_comm )
      IF (okpaw) call mp_sum ( dbecsum, inter_pool_comm )
-#endif
 
      !
      ! q=0 in metallic case deserve special care (e_Fermi can shift)
@@ -418,14 +460,9 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
      !   Here we symmetrize them ...
      !
      IF (.not.lgamma_gamma) THEN
-#ifdef __MPI
         call psymdvscf (npe, irr, drhoscfh)
         IF ( noncolin.and.domag ) &
            CALL psym_dmag( npe, irr, drhoscfh)
-#else
-        call symdvscf (npe, irr, drhoscfh)
-        IF ( noncolin.and.domag ) CALL sym_dmag( npe, irr, drhoscfh)
-#endif
         IF (okpaw) THEN
            IF (minus_q) CALL PAW_dumqsymmetrize(dbecsum,npe,irr, &
                              npertx,irotmq,rtau,xq,tmq)
@@ -556,6 +593,13 @@ SUBROUTINE solve_linter (irr, imode0, npe, drhoscf)
   deallocate (drhoscfh)
   if (doublegrid) deallocate (dvscfins)
   deallocate (dvscfin)
+  deallocate(aux2)
+  IF ( get_ntask_groups() > 1) dffts%have_task_groups=.TRUE.
+  IF ( dffts%have_task_groups ) THEN
+     DEALLOCATE( tg_dv )
+     DEALLOCATE( tg_psic )
+  ENDIF
+  dffts%have_task_groups=.FALSE.
 
   call stop_clock ('solve_linter')
 END SUBROUTINE solve_linter
@@ -563,13 +607,13 @@ END SUBROUTINE solve_linter
 
 SUBROUTINE setmixout(in1, in2, mix, dvscfout, dbecsum, ndim, flag )
 USE kinds, ONLY : DP
-USE mp_global, ONLY : intra_pool_comm
+USE mp_global, ONLY : intra_bgrp_comm
 USE mp, ONLY : mp_sum
 IMPLICIT NONE
 INTEGER :: in1, in2, flag, ndim, startb, lastb
 COMPLEX(DP) :: mix(in1+in2), dvscfout(in1), dbecsum(in2)
 
-CALL divide (intra_pool_comm, in2, startb, lastb)
+CALL divide (intra_bgrp_comm, in2, startb, lastb)
 ndim=lastb-startb+1
 
 IF (flag==-1) THEN
@@ -579,9 +623,7 @@ ELSE
    dvscfout(1:in1)=mix(1:in1)
    dbecsum=(0.0_DP,0.0_DP)
    dbecsum(startb:lastb)=mix(in1+1:in1+ndim)
-#ifdef __MPI
-   CALL mp_sum(dbecsum, intra_pool_comm)
-#endif
+   CALL mp_sum(dbecsum, intra_bgrp_comm)
 ENDIF
 END SUBROUTINE setmixout
 
@@ -601,7 +643,7 @@ SUBROUTINE check_all_convt(convt)
   !
   CALL mp_sum(convt_check, intra_image_comm)
   !CALL mp_sum(ios, inter_pool_comm)
-  !CALL mp_sum(ios, intra_pool_com)
+  !CALL mp_sum(ios, intra_bgrp_comm)
   !
 !  convt = ALL(convt_check==0)
   IF(ANY(convt_check==0).and..not.ALL(convt_check==0) ) THEN

@@ -1,5 +1,5 @@
 !
-! Copyright (C) 2002-2009 Quantum ESPRESSO group
+! Copyright (C) 2002-2013 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
@@ -10,8 +10,8 @@ MODULE mp_global
   !----------------------------------------------------------------------------
   !
   USE mp, ONLY : mp_comm_free, mp_size, mp_rank, mp_sum, mp_barrier, &
-       mp_bcast, mp_start, mp_end
-  USE io_global, ONLY : stdout, io_global_start, meta_ionode_id, meta_ionode
+      mp_bcast, mp_start, mp_end
+  USE io_global, ONLY : io_global_start, meta_ionode_id, meta_ionode
   USE parallel_include
   !
   IMPLICIT NONE 
@@ -19,59 +19,66 @@ MODULE mp_global
   !
   ! ... World group (all processors)
   !
+  INTEGER :: nproc = 1  ! number of processors
   INTEGER :: mpime = 0  ! processor index (starts from 0 to nproc-1)
   INTEGER :: root  = 0  ! index of the root processor
-  INTEGER :: nproc = 1  ! number of processors
   INTEGER :: world_comm = 0  ! communicator
-  INTEGER :: nproc_file = 1  ! saved on file
+  INTEGER :: nproc_file = 1  ! value of nproc read from file
   !
-  ! ... Image groups (processors within an image)
+  ! ... Image groups (processors within an image). Images are used for
+  ! ... coarse-grid parallelization of semi-independent calculations, e.g.
+  ! ... points along the reaction path (NEB) or phonon irreps 
   !
-  INTEGER :: nimage    = 1 ! number of images
+  INTEGER :: nimage = 1 ! number of images
+  INTEGER :: nproc_image=1 ! number of processors within an image
   INTEGER :: me_image  = 0 ! index of the processor within an image
   INTEGER :: root_image= 0 ! index of the root processor within an image
   INTEGER :: my_image_id=0 ! index of my image
-  INTEGER :: nproc_image=1 ! number of processors within an image
   INTEGER :: inter_image_comm = 0  ! inter image communicator
   INTEGER :: intra_image_comm = 0  ! intra image communicator  
-  INTEGER :: nproc_image_file = 1  ! value saved on file
+  INTEGER :: nproc_image_file = 1  ! value of nproc_image read from file
   !
   ! ... Pot groups (processors within a cooking-pot)
+  ! ... Used only in a specialized calculation under development 
   !
   INTEGER :: npot       = 1  ! number of pots
+  INTEGER :: nproc_pot  = 1  ! number of processors within a pot
   INTEGER :: me_pot     = 0  ! index of the processor within a pot
   INTEGER :: root_pot   = 0  ! index of the root processor within a pot
   INTEGER :: my_pot_id  = 0  ! index of my pot
-  INTEGER :: nproc_pot  = 1  ! number of processors within a pot
   INTEGER :: inter_pot_comm  = 0  ! inter pot communicator
   INTEGER :: intra_pot_comm  = 0  ! intra pot communicator
-  INTEGER :: nproc_pot_file = 1  ! value saved on file
+  INTEGER :: nproc_pot_file = 1  ! value of nproc_pot read from file
   !
   ! ... Pool groups (processors within a pool of k-points)
+  ! ... Subdivision of image group, used for k-point parallelization 
   !
   INTEGER :: npool       = 1  ! number of "k-points"-pools
+  INTEGER :: nproc_pool  = 1  ! number of processors within a pool
   INTEGER :: me_pool     = 0  ! index of the processor within a pool 
   INTEGER :: root_pool   = 0  ! index of the root processor within a pool
   INTEGER :: my_pool_id  = 0  ! index of my pool
-  INTEGER :: nproc_pool  = 1  ! number of processors within a pool
   INTEGER :: inter_pool_comm  = 0  ! inter pool communicator
   INTEGER :: intra_pool_comm  = 0  ! intra pool communicator
-  INTEGER :: nproc_pool_file  = 1  ! saved on file
+  INTEGER :: nproc_pool_file  = 1  ! value of nproc_pot read from file
   !
   ! ... Band groups (processors within a pool of bands)
+  ! ... Subdivision of pool group, used for parallelization over bands
   !
   INTEGER :: nbgrp       = 1  ! number of band groups
+  INTEGER :: nproc_bgrp  = 1  ! number of processors within a band group
   INTEGER :: me_bgrp     = 0  ! index of the processor within a band group
   INTEGER :: root_bgrp   = 0  ! index of the root processor within a band group
   INTEGER :: my_bgrp_id  = 0  ! index of my band group
-  INTEGER :: nproc_bgrp  = 1  ! number of processor within a band group
   INTEGER :: inter_bgrp_comm  = 0  ! inter band group communicator
   INTEGER :: intra_bgrp_comm  = 0  ! intra band group communicator  
-  INTEGER :: ibnd_start = 0 !starting band index
-  INTEGER :: ibnd_end = 0   !ending band index
-  INTEGER :: nproc_bgrp_file = 1  ! value saved on file
+  INTEGER :: nproc_bgrp_file = 1  ! value of nproc_bgrp read from file
+  ! TEMP: These two variables should be moved to a more appropriate place
+  INTEGER :: ibnd_start = 0 ! starting band index
+  INTEGER :: ibnd_end = 0   ! ending band index
   !
-  ! ... ortho (or linear-algebra) groups
+  ! ... ortho (or linear-algebra) groups. Used for parallelization of
+  ! ... conventional diagonalization and matrix-matrix products
   !
   INTEGER :: np_ortho(2) = 1  ! size of the processor grid used in ortho
   INTEGER :: me_ortho(2) = 0  ! coordinates of the processors
@@ -83,7 +90,7 @@ MODULE mp_global
   INTEGER :: ortho_row_comm  = 0  ! communicator for the ortho row group
   INTEGER :: ortho_col_comm  = 0  ! communicator for the ortho col group
   INTEGER :: ortho_comm_id= 0 ! id of the ortho_comm
-  INTEGER :: nproc_ortho_file = 1  ! value saved on file
+  INTEGER :: nproc_ortho_file = 1  ! value of nproc_ortho read from file
   !
 #if defined __SCALAPACK
   INTEGER :: me_blacs   =  0  ! BLACS processor index starting from 0
@@ -95,12 +102,11 @@ MODULE mp_global
   ! ... "task" groups (for band parallelization of FFT)
   !
   INTEGER :: ntask_groups = 1  ! number of proc. in an orbital "task group" 
-  INTEGER :: ntask_groups_file  = 1  ! number of task groups 
+  INTEGER :: ntask_groups_file  = 1  ! as above, read from file
   !
-  ! ... Misc parallelization info
+  ! ... Misc parallelization info (maybe obsolete?)
   ! 
   INTEGER :: kunit = 1  ! granularity of k-point distribution
-  ! ... number of processors written in the data file for checkin purposes:
   !
   PRIVATE :: init_pools, init_bands, init_ortho
   PRIVATE :: ntask_groups
@@ -110,63 +116,64 @@ CONTAINS
   !-----------------------------------------------------------------------
   SUBROUTINE mp_startup ( start_images )
     !-----------------------------------------------------------------------
-    ! ... This wrapper subroutine initializes MPI
+    ! ... This wrapper subroutine initializes all parallelization levels.
     ! ... If option with_images=.true., processes are organized into images,
-    ! ... each of which performing a quasi-indipendent calculation, uch as
-    ! ... a point in configuration space (NEB) or a phonon irrep (PHonon)
+    ! ... each performing a quasi-indipendent calculation, such as a point
+    ! ..  in configuration space (NEB) or a phonon irrep (PHonon)
     ! ... Within each image processes are further subdivided into various
     ! ... groups and parallelization levels
     !
     IMPLICIT NONE
     LOGICAL, INTENT(IN), OPTIONAL :: start_images
-    INTEGER :: world, nproc_ortho_in = 0, root = 0
+    INTEGER :: nproc_ortho_in = 0
     LOGICAL :: do_images
-    !
     !
     ! ... get the basic parameters from communications sub-system
     ! ... to handle processors
-    ! ... mpime = processor number, starting from 0
     ! ... nproc = number of processors
-    ! ... world = group index of all processors
+    ! ... mpime = processor number, starting from 0
+    ! ... world_comm = group index of all processors
     !
-    CALL mp_start( nproc, mpime, world )
+    CALL mp_start( nproc, mpime, world_comm )
     !
-    ! ... for compatibility: initialize images
+    ! ... meta_ionode is true if this processor is the root processor
+    ! ... of the world group - "ionode_world" would be a better name
+    ! ... meta_ionode_id is the index of such processor
     !
     meta_ionode = ( mpime == root )
     meta_ionode_id = root
+    !
     do_images = PRESENT(start_images) 
     IF ( do_images ) do_images = start_images
     IF ( do_images ) THEN
        !
-       ! ... get nimage from command line
+       ! ... get nimage from command line argument "-nimage N"
+       ! ... done on root proc and broadcast to all others because there is 
+       ! ... no guarantee that mpirun/mpiexec trasmit command line arguments
        !
        IF ( meta_ionode ) THEN
           !
           CALL get_arg_nimage( nimage )
-          nimage = MAX( nimage, 1 )
           nimage = MIN( nimage, nproc )
           !
        END IF
-       CALL mp_barrier(world)
+       CALL mp_barrier(world_comm)
        CALL mp_bcast( nimage, meta_ionode_id )
     ELSE
        nimage = 1
     END IF
     !
-    CALL init_images ( world )
+    CALL init_images ( world_comm )
     !
-    ! ... now initialize processors and groups variables
-    ! ... set global coordinate for this processor
-    ! ... root  = index of the root processor
+    ! ... now initialize groups of processors in each image
     !
-    CALL mp_startup_new (root_image, intra_image_comm ) 
+    CALL mp_image_startup (root_image, intra_image_comm ) 
     !
     RETURN
     !
   END SUBROUTINE mp_startup
   !-----------------------------------------------------------------------
-  SUBROUTINE mp_startup_new (root, world ) 
+  SUBROUTINE mp_image_startup (root, world ) 
     !-----------------------------------------------------------------------
     ! ... This subroutine initializes the various parallelization levels
     ! ... inside an image. On input:
@@ -187,16 +194,11 @@ CONTAINS
     INTEGER, INTENT(IN) :: world, root
     INTEGER :: nproc_ortho_in = 0 
     !
-    INTEGER :: myrank, npe
+    INTEGER :: myrank
     !
-    ! ... now initialize processors and groups variables
-    ! ... set global coordinate for this processor
-    ! ... root  = index of the root processor
+    ! ... get global coordinate for this processor
     !
     myrank = mp_rank(world)
-    npe = mp_size(world)
-    !
-    CALL mp_global_start_new( root, myrank, world, npe )
     !
     ! ... initialize input/output, set (and get) the I/O nodes
     !
@@ -207,19 +209,16 @@ CONTAINS
        ! ... How many parallel pots ?
        !
        CALL get_arg_npot( npot )
-       npot = MAX( npot, 1 )
        npot = MIN( npot, nproc )
        !
        ! ... How many band groups?
        !
        CALL get_arg_nbgrp( nbgrp )
-       nbgrp = MAX( nbgrp, 1 )
        nbgrp = MIN( nbgrp, nproc )
        !
        ! ... How many k-point pools ?
        !
        CALL get_arg_npool( npool )
-       npool = MAX( npool, 1 )
        npool = MIN( npool, nproc )
        !
        ! ... How many task groups ?
@@ -254,39 +253,7 @@ CONTAINS
     !
     RETURN
     !
-  END SUBROUTINE mp_startup_new
-  !
-  !-----------------------------------------------------------------------
-  SUBROUTINE mp_global_start_new( root_i, mpime_i, group_i, nproc_i )
-    !-----------------------------------------------------------------------
-    !
-    IMPLICIT NONE
-    !
-    INTEGER, INTENT(IN) :: root_i, mpime_i, group_i, nproc_i
-    !
-    root             = root_i
-    mpime            = mpime_i
-    world_comm       = group_i
-    nproc            = nproc_i
-    nproc_pool       = nproc_i
-    nproc_bgrp       = nproc_i
-    my_pool_id       = 0
-    my_bgrp_id       = 0
-    me_pool          = mpime
-    me_bgrp          = mpime
-    root_pool        = root
-    root_bgrp        = root
-    inter_pool_comm  = group_i
-    intra_pool_comm  = group_i
-    inter_bgrp_comm  = group_i
-    intra_bgrp_comm  = group_i
-    ortho_comm       = group_i
-    ortho_row_comm   = group_i
-    ortho_col_comm   = group_i
-    !
-    RETURN
-    !
-  END SUBROUTINE mp_global_start_new
+  END SUBROUTINE mp_image_startup
   !
   !-----------------------------------------------------------------------
   SUBROUTINE mp_global_end ( )
@@ -296,23 +263,6 @@ CONTAINS
     CALL mp_end ()
     !
   END SUBROUTINE mp_global_end
-  !
-  !-----------------------------------------------------------------------     
-  SUBROUTINE mp_global_group_start( mep, myp, nprocp, num_of_pools )
-    !-----------------------------------------------------------------------
-    !
-    IMPLICIT NONE
-    !     
-    INTEGER, INTENT(IN) :: mep, myp, nprocp, num_of_pools
-    !
-    me_pool    = mep
-    my_pool_id = myp
-    nproc_pool = nprocp
-    npool      = num_of_pools
-    !
-    RETURN
-    !
-  END SUBROUTINE mp_global_group_start
   !
   !----------------------------------------------------------------------------
   SUBROUTINE init_images ( parent_comm )
@@ -810,12 +760,8 @@ CONTAINS
   END SUBROUTINE distribute_over_bgrp
   !
   SUBROUTINE init_index_over_band(comm,nbnd)
+    !
     IMPLICIT NONE
-#if defined (__MPI)
-    !
-    include 'mpif.h'
-    !
-#endif
     INTEGER, INTENT(IN) :: comm, nbnd
 
     INTEGER :: npe, myrank, ierror, rest, k
@@ -823,8 +769,6 @@ CONTAINS
     myrank = mp_rank(comm)
     npe = mp_size(comm)
 
-!    call mpi_comm_rank(comm, mp_rank, ierror)
-!    call mpi_comm_size(comm, mp_size, ierror)
     rest = mod(nbnd, npe)
     k = int(nbnd/npe)
 
@@ -840,7 +784,6 @@ CONTAINS
      ibnd_start = 1
      ibnd_end = nbnd
     endif
-
 
   END SUBROUTINE init_index_over_band
   !

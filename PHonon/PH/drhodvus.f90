@@ -35,7 +35,7 @@ subroutine drhodvus (irr, imode0, dvscfin, npe)
   USE phus,      ONLY : becsumort, int3_paw
   USE units_ph,  ONLY : iudrhous, lrdrhous
 
-  USE mp_global, ONLY : inter_pool_comm, intra_pool_comm
+  USE mp_global, ONLY : inter_pool_comm, intra_bgrp_comm
   USE mp,        ONLY : mp_sum
   implicit none
 
@@ -82,13 +82,11 @@ subroutine drhodvus (irr, imode0, dvscfin, npe)
      mode0 = mode0 + npert (irr1)
   enddo
   deallocate (drhous)
-#ifdef __MPI
   !
   ! collect contributions from all pools (sum over k-points)
   !
   call mp_sum ( dyn1, inter_pool_comm )
-  call mp_sum ( dyn1, intra_pool_comm )
-#endif
+  call mp_sum ( dyn1, intra_bgrp_comm )
 !
 !  PAW contribution: this part of the dynamical matrix is present only
 !  with PAW. PAW and US dynamical matrices differ only at this point.

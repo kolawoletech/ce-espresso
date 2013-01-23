@@ -28,10 +28,9 @@ subroutine dvpsi_e2
   USE units_ph,        ONLY : lrdrho, iudrho, lrdwf, iudwf, lrwfc, iuwfc
   USE control_ph,      ONLY : nbnd_occ
   USE ramanm,          ONLY : lrba2, iuba2, lrchf, iuchf, a1j, a2j
-#ifdef __MPI
-  USE mp_global, ONLY: my_pool_id, inter_pool_comm, intra_pool_comm
+  USE mp_global, ONLY: my_pool_id, inter_pool_comm, intra_bgrp_comm
   USE mp,        ONLY: mp_sum
-#endif
+
   implicit none
 
   integer :: ik, ipa, ipb, ir, ibnd, jbnd, nrec
@@ -106,9 +105,7 @@ subroutine dvpsi_e2
                 (0.d0,0.d0), ps(1,1,ipa,ipb), nbnd )
         enddo
      enddo
-#ifdef __MPI
-     call mp_sum ( ps, intra_pool_comm )
-#endif
+     call mp_sum ( ps, intra_bgrp_comm )
 
      do ibnd = 1, nbnd_occ (ik)
         call cft_wave (evc (1, ibnd), aux3s (1,1), +1)
@@ -186,13 +183,11 @@ subroutine dvpsi_e2
                    aux3 (ir, a1j (ipa)) * aux3 (ir, a2j (ipa))
      enddo
   enddo
-#ifdef __MPI
+
  100  continue
   call mp_sum ( aux6, inter_pool_comm )
   call psyme2 (aux6)
-#else
-  call syme2 (aux6)
-#endif
+
   deallocate (d2muxc)
   deallocate (aux3)
 

@@ -23,7 +23,7 @@ subroutine d2ionq (nat, ntyp, ityp, zv, tau, alat, omega, q, at, &
   USE io_global,  ONLY : stdout
   USE kinds, only : DP
   USE constants, ONLY: e2, tpi, fpi
-  USE mp_global, ONLY: intra_pool_comm
+  USE mp_global, ONLY: intra_bgrp_comm
   USE mp,        ONLY: mp_sum
 
   implicit none
@@ -224,26 +224,15 @@ subroutine d2ionq (nat, ntyp, ityp, zv, tau, alat, omega, q, at, &
      enddo
 
   enddo
-#ifdef __MPI
 100 continue
-  call mp_sum ( dy3, intra_pool_comm )
-#endif
+  call mp_sum ( dy3, intra_bgrp_comm )
   !
   !   The dynamical matrix was computed in cartesian axis and now we put
   !   it on the basis of the modes
   !
-  do nu_i = 1, nmodes
-     do nu_j = 1, nmodes
-        work = (0.d0, 0.d0)
-        do nb_jcart = 1, 3 * nat
-           do na_icart = 1, 3 * nat
-              work = work + CONJG(u (na_icart, nu_i) ) * &
-                   dy3 (na_icart, nb_jcart) * u (nb_jcart, nu_j)
-           enddo
-        enddo
-        dyn (nu_i, nu_j) = dyn (nu_i, nu_j) - work
-     enddo
-  enddo
+  dy3 = -dy3
+  !
+  CALL rotate_pattern_add(nat, u, dyn, dy3)
   !
   call stop_clock ('d2ionq')
   return

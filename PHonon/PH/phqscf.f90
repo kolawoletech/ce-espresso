@@ -32,7 +32,7 @@ SUBROUTINE phqscf
   USE noncollin_module, ONLY : noncolin, nspin_mag
   USE recover_mod, ONLY : write_rec
 
-  USE mp_global,  ONLY : inter_pool_comm, intra_pool_comm
+  USE mp_global,  ONLY : inter_pool_comm, intra_bgrp_comm
   USE mp,         ONLY : mp_sum
 
   IMPLICIT NONE
@@ -58,7 +58,7 @@ SUBROUTINE phqscf
   !    of the wavefunctions
   !
   DO irr = 1, nirr
-     IF ( (comp_irr (irr) == 1) .AND. (done_irr (irr) == 0) ) THEN
+     IF ( (comp_irr (irr)) .AND. (.NOT.done_irr (irr)) ) THEN
         npe=npert(irr)
         ALLOCATE (drhoscfs( dfftp%nnr , nspin_mag, npe))
         imode0 = 0
@@ -95,15 +95,15 @@ SUBROUTINE phqscf
            IF (zue) CALL add_zstar_ue (imode0, npe )
            IF (zue.AND. okvan) CALL add_zstar_ue_us(imode0, npe )
            IF (zue) THEN
-#ifdef __MPI
-              call mp_sum ( zstarue0_rec, intra_pool_comm )
+
+              call mp_sum ( zstarue0_rec, intra_bgrp_comm )
               call mp_sum ( zstarue0_rec, inter_pool_comm )
-#endif
+
               zstarue0(:,:)=zstarue0(:,:)+zstarue0_rec(:,:)
            END IF
            !
            WRITE( stdout, '(/,5x,"Convergence has been achieved ")')
-           done_irr (irr) = 1
+           done_irr (irr) = .TRUE.
         ELSE
            WRITE( stdout, '(/,5x,"No convergence has been achieved ")')
            CALL stop_smoothly_ph (.FALSE.)

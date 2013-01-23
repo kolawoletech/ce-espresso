@@ -26,7 +26,7 @@ subroutine dielec()
   USE eqv, ONLY : dpsi, dvpsi
   USE qpoint, ONLY : nksq
   USE control_ph, ONLY : nbnd_occ, done_epsil
-  USE mp_global,        ONLY : inter_pool_comm, intra_pool_comm
+  USE mp_global,        ONLY : inter_pool_comm, intra_bgrp_comm
   USE mp,               ONLY : mp_sum
 
   implicit none
@@ -60,10 +60,8 @@ subroutine dielec()
         enddo
      enddo
   enddo
-#ifdef __MPI
-  call mp_sum ( epsilon, intra_pool_comm )
+  call mp_sum ( epsilon, intra_bgrp_comm )
   call mp_sum ( epsilon, inter_pool_comm )
-#endif
   !
   !      symmetrize
   !

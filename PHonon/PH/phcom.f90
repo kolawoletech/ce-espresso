@@ -254,12 +254,13 @@ MODULE partial
   SAVE
   !
   INTEGER, ALLOCATABLE :: &
-       comp_irr(:),    &! (3*nat) : 1 if this irr.rep. has to be computed
-       done_irr(:),    &! (3*nat) : 1 if this irr.rep. has been done
        atomo(:)         ! (nat) : list of the atoms that moves
   INTEGER :: nat_todo,    & ! number of atoms to compute
              nat_todo_input ! nat_todo given in input
-  LOGICAL :: all_comp       ! if .TRUE. all representation have been computed
+  LOGICAL, ALLOCATABLE :: &
+       comp_irr(:),    &! (3*nat) : .true. if this irr.rep. has to be computed
+       done_irr(:)      ! (3*nat) : .true. if this irr.rep. has been done
+  LOGICAL :: all_comp   ! if .TRUE. all representation have been computed
   !
 END MODULE partial
 !
@@ -352,6 +353,11 @@ MODULE freq_ph
   INTEGER :: nfs                   ! # of frequencies
   !
   REAL (KIND=DP) :: fiu(nfsmax)    ! values  of frequency
+
+  LOGICAL, ALLOCATABLE :: comp_iu(:) ! values  of frequency to calculate in this ru
+  !
+  LOGICAL, ALLOCATABLE :: done_iu(:)    ! values of frequency already calculated
+
   !
 END MODULE freq_ph
 !
@@ -414,19 +420,19 @@ MODULE disp
   !
   SAVE
   !
-  INTEGER, PARAMETER :: nqmax = 1000
-  !
   INTEGER :: nq1, nq2, nq3  ! number of q-points in each direction
   INTEGER :: nqs            ! number of q points to be calculated
   REAL(DP), ALLOCATABLE :: x_q(:,:) ! coordinates of the q points
   INTEGER, ALLOCATABLE :: &
-       done_iq(:),      &! if 1 this q point has been already calculated
-       comp_iq(:),      &! if 1 this q point has to be calculated
        rep_iq(:),       &! number of irreducible representation per q point
-       done_rep_iq(:,:),&! which representation have been already done in each q
        nsymq_iq(:),     &! dimension of the small group of q
-       comp_irr_iq(:,:),&! for each q, comp_irr. Used for image parallelization
        npert_iq(:,:)     ! for each q, the number of perturbation of each irr
+
+  LOGICAL, ALLOCATABLE :: &
+       done_iq(:),      &! if .true. this q point has been already calculated
+       done_rep_iq(:,:),&! which representation have been already done in each q
+       comp_iq(:),      &! if .true. this q point has to be calculated
+       comp_irr_iq(:,:)  ! for each q, comp_irr. Used for image parallelization
   !
 END MODULE disp
 !

@@ -28,8 +28,10 @@ SUBROUTINE elphon()
   USE modes,  ONLY : npert, nirr, u
   USE uspp_param, ONLY : nhm
   USE control_ph, ONLY : trans
-  USE units_ph, ONLY : iudyn, lrdrho, iudvscf
+  USE units_ph, ONLY : iudyn, lrdrho, iudvscf, iuint3paw, lint3paw
   USE dfile_star,    ONLY : dvscf_star
+  USE mp_global, ONLY : intra_bgrp_comm, me_bgrp, root_bgrp
+  USE mp,        ONLY : mp_bcast
   USE io_global, ONLY: stdout
   !
   IMPLICIT NONE
@@ -39,13 +41,7 @@ SUBROUTINE elphon()
   ! counter on the modes
   ! the change of Vscf due to perturbations
   COMPLEX(DP), POINTER :: dvscfin(:,:,:), dvscfins (:,:,:)
-!
-!  This routine has to be called only if all representations are available
-!  
-  DO irr=1,nirr
-     IF (.NOT.done_elph(irr)) RETURN
-  ENDDO
-
+   
   CALL start_clock ('elphon')
 
   if(dvscf_star%basis.eq.'cartesian') then
@@ -70,7 +66,11 @@ SUBROUTINE elphon()
      DO ipert = 1, npe
         CALL davcio_drho ( dvscfin(1,1,ipert),  lrdrho, iudvscf, &
                            imode0 + ipert,  -1 )
+        IF (okpaw .AND. me_bgrp==0) &
+             CALL davcio( int3_paw(:,:,ipert,:,:), lint3paw, &
+                                          iuint3paw, imode0 + ipert, - 1 )
      END DO
+     IF (okpaw) CALL mp_bcast(int3_paw, root_bgrp, intra_bgrp_comm)
      IF (doublegrid) THEN
         ALLOCATE (dvscfins (dffts%nnr, nspin_mag , npert(irr)) )
         DO is = 1, nspin_mag
@@ -204,7 +204,7 @@ SUBROUTINE elphel (irr, npe, imode0, dvscfins)
   !      Original routine written by Francesco Mauri
   !
   USE kinds, ONLY : DP
-  USE fft_base, ONLY : dffts
+  USE fft_base, ONLY : dffts, tg_cgather
   USE wavefunctions_module,  ONLY: evc
   USE io_files, ONLY: iunigk
   USE klist, ONLY: xk
@@ -220,7 +220,8 @@ SUBROUTINE elphel (irr, npe, imode0, dvscfins)
   USE qpoint,   ONLY : igkq, npwq, nksq, ikks, ikqs, nksqtot
   USE control_ph, ONLY : trans, lgamma, current_iq
   USE ph_restart, ONLY : ph_writefile
-  USE mp_global, ONLY: intra_bgrp_comm, npool
+  USE spin_orb,   ONLY : domag
+  USE mp_global,  ONLY: intra_bgrp_comm, npool, get_ntask_groups
   USE mp,        ONLY: mp_sum
 
   IMPLICIT NONE
@@ -229,19 +230,29 @@ SUBROUTINE elphel (irr, npe, imode0, dvscfins)
   COMPLEX(DP), INTENT(IN) :: dvscfins (dffts%nnr, nspin_mag, npe)
   ! LOCAL variables
   INTEGER :: nrec, ik, ikk, ikq, ipert, mode, ibnd, jbnd, ir, ig, &
-       ios, ierr
-  COMPLEX(DP) , ALLOCATABLE :: aux1 (:,:), elphmat (:,:,:)
+       ipol, ios, ierr
+  COMPLEX(DP) , ALLOCATABLE :: aux1 (:,:), elphmat (:,:,:), tg_dv(:,:), &
+       tg_psic(:,:), aux2(:,:)
+  INTEGER :: v_siz, incr
   COMPLEX(DP), EXTERNAL :: zdotc
-  LOGICAL :: htg
   !
   IF (.NOT. comp_elph(irr) .OR. done_elph(irr)) RETURN
-  htg = dffts%have_task_groups
-  dffts%have_task_groups=.FALSE.
+  IF ( get_ntask_groups() > 1 ) dffts%have_task_groups=.TRUE.
 
   ALLOCATE (aux1    (dffts%nnr, npol))
   ALLOCATE (elphmat ( nbnd , nbnd , npe))
   ALLOCATE( el_ph_mat_rec (nbnd,nbnd,nksq,npe) )
   el_ph_mat_rec=(0.0_DP,0.0_DP)
+  ALLOCATE (aux2(npwx*npol, nbnd))
+  incr=1
+  IF ( dffts%have_task_groups ) THEN
+     !
+     v_siz =  dffts%tg_nnr * dffts%nogrp
+     ALLOCATE( tg_dv   ( v_siz, nspin_mag ) )
+     ALLOCATE( tg_psic( v_siz, npol ) )
+     incr = dffts%nogrp
+     !
+  ENDIF
   !
   !  Start the loops over the k-points
   !
@@ -294,13 +305,37 @@ SUBROUTINE elphel (irr, npe, imode0, dvscfins)
         !
         ! calculate dvscf_q*psi_k
         !
-        DO ibnd = 1, nbnd
-           CALL cft_wave (evc(1, ibnd), aux1, +1)
-           CALL apply_dpot(dffts%nnr, aux1, dvscfins(1,1,ipert), current_spin)
-           CALL cft_wave (dvpsi(1, ibnd), aux1, -1)
-        END DO
-        CALL adddvscf (ipert, ik)
+        IF ( get_ntask_groups() > 1 ) dffts%have_task_groups=.TRUE.
+        IF ( dffts%have_task_groups ) THEN
+           IF (noncolin) THEN
+              CALL tg_cgather( dffts, dvscfins(:,1,ipert), tg_dv(:,1))
+              IF (domag) THEN
+                 DO ipol=2,4
+                    CALL tg_cgather( dffts, dvscfins(:,ipol,ipert), &
+                                                          tg_dv(:,ipol))
+                 ENDDO
+              ENDIF
+           ELSE
+              CALL tg_cgather( dffts, dvscfins(:,current_spin,ipert), &
+                                                            tg_dv(:,1))
+           ENDIF
+        ENDIF
+        aux2=(0.0_DP,0.0_DP)
+        DO ibnd = 1, nbnd, incr
+           IF ( dffts%have_task_groups ) THEN
+              CALL cft_wave_tg (evc, tg_psic, 1, v_siz, ibnd, nbnd )
+              CALL apply_dpot(v_siz, tg_psic, tg_dv, 1)
+              CALL cft_wave_tg (aux2, tg_psic, -1, v_siz, ibnd, nbnd)
+           ELSE
+              CALL cft_wave (evc(1, ibnd), aux1, +1)
+              CALL apply_dpot(dffts%nnr, aux1, dvscfins(1,1,ipert), current_spin)
+              CALL cft_wave (aux2(1, ibnd), aux1, -1)
+           ENDIF
+        ENDDO
+        dvpsi=dvpsi+aux2
+        dffts%have_task_groups=.FALSE.
 
+        CALL adddvscf (ipert, ik)
         !
         ! calculate elphmat(j,i)=<psi_{k+q,j}|dvscf_q*psi_{k,i}> for this pertur
         !
@@ -340,9 +375,15 @@ SUBROUTINE elphel (irr, npe, imode0, dvscfins)
   IF (npool > 1) DEALLOCATE(el_ph_mat_rec_col)
   DEALLOCATE(el_ph_mat_rec)
   !
-  dffts%have_task_groups=htg
   DEALLOCATE (elphmat)
   DEALLOCATE (aux1)
+  DEALLOCATE (aux2)
+  IF ( get_ntask_groups() > 1) dffts%have_task_groups=.TRUE.
+  IF ( dffts%have_task_groups ) THEN
+     DEALLOCATE( tg_dv )
+     DEALLOCATE( tg_psic )
+  ENDIF
+  dffts%have_task_groups=.FALSE.
   !
   RETURN
 END SUBROUTINE elphel
@@ -812,80 +853,67 @@ SUBROUTINE elphsum_simple
   !-----------------------------------------------------------------------
   USE kinds, ONLY : DP
   USE constants, ONLY : pi, ry_to_cmm1, rytoev
-  USE ions_base, ONLY : nat, ityp, tau,amass,tau, ntyp => nsp, atm
-  USE cell_base, ONLY : at, bg, ibrav, celldm 
-  USE fft_base,  ONLY: dfftp
-  USE symm_base, ONLY : s, sr, irt, nsym, invs, time_reversal
+  USE ions_base, ONLY : nat
+  USE cell_base, ONLY : at, bg
+  USE symm_base, ONLY : s, irt, nsym, invs
   USE klist, ONLY : xk, nelec, nks, wk
   USE wvfct, ONLY : nbnd, et
   USE el_phon, ONLY : el_ph_mat, el_ph_nsigma, el_ph_ngauss, el_ph_sigma
-  USE mp_global, ONLY : me_pool, root_pool, inter_pool_comm, npool
-  USE io_global, ONLY : stdout
-  USE klist, only : degauss,ngauss
-  USE control_flags, ONLY : modenum, noinv
-  USE units_ph,       ONLY :iudyn
-  USE io_files,  ONLY : prefix
-  USE qpoint, ONLY : xq, nksq
+  USE mp_global, ONLY : inter_pool_comm, npool, intra_image_comm
+  USE qpoint, ONLY : xq, nksq, ikks, ikqs
   USE dynmat, ONLY : dyn, w2
-  USE modes, ONLY : u,rtau, nsymq,irotmq, minus_q
-  USE control_ph, only : lgamma
-  USE lsda_mod, only : isk,nspin, current_spin,lsda
-  USE mp,        ONLY: mp_sum
+  USE modes, ONLY : u, rtau, nsymq, irotmq, minus_q
+  USE control_ph, only : current_iq
+  USE lsda_mod, only : isk
+  USE io_global, ONLY : stdout, ionode, ionode_id
+  USE mp,        ONLY: mp_sum, mp_bcast
   !
   IMPLICIT NONE
   REAL(DP), PARAMETER :: eps = 20_dp/ry_to_cmm1 ! eps = 20 cm^-1, in Ry
   !
   INTEGER :: ik, ikk, ikq, isig, ibnd, jbnd, ipert, jpert, nu, mu, &
-       vu, ngauss1, nsig, iuelph, ios, iuelphmat,icnt,i,j,rrho,nt,k
-  INTEGER :: na,nb,icar,jcar,iu_sym,nmodes
-  INTEGER :: iu_Delta_dyn,iu_analdyn,iu_nonanaldyn
-  INTEGER :: io_file_unit
-  !   for star_q
-  INTEGER :: nsymloc, sloc(3,3,48), invsloc(48), irtloc(48,nat), &
-             nqloc, isqloc(48), imqloc
-  REAL(DP) :: rtauloc(3,48,nat), sxqloc(3,48)
-  !   end of star_q definitions
-  REAL(DP) :: weight, w0g1, w0g2, w0gauss, wgauss,degauss1, dosef, &
-       ef1, phase_space, lambda, gamma, wg1, w0g,wgp,deltae
+       vu, ngauss1, nsig, iuelph, ios
+  INTEGER :: nmodes
+  REAL(DP) :: weight, w0g1, w0g2, w0gauss, wgauss, degauss1, dosef, &
+       ef1, phase_space, lambda, gamma
   REAL(DP), EXTERNAL :: dos_ef, efermig
-  REAL(DP) xk_dummy(3)
-  COMPLEX(DP), allocatable :: phi(:,:,:,:),phi_nonanal(:,:,:,:)
-  COMPLEX(DP), allocatable :: dyn_mat_r(:,:),zz(:,:)
-  CHARACTER(len=20) :: char_deg
-  CHARACTER(len=1) :: char_ng
   character(len=80) :: filelph
   CHARACTER(len=256) ::  file_elphmat
   !
   COMPLEX(DP) :: el_ph_sum (3*nat,3*nat), dyn_corr(3*nat,3*nat)
 
   INTEGER, EXTERNAL :: find_free_unit
+  CHARACTER(LEN=6) :: int_to_char
 
   nmodes=3*nat
 
-  write(filelph,'(A5,f9.6,A1,f9.6,A1,f9.6)') 'elph.',xq(1),'.',xq(2),'.',xq(3)
+  filelph='elph.'//TRIM(int_to_char(current_iq))
 
   ! parallel case: only first node writes
-  IF ( me_pool /= root_pool ) THEN
-     iuelph = 0
-  ELSE
+  IF ( ionode ) THEN
      !
      iuelph = find_free_unit()
-     OPEN (unit = iuelph, file = filelph, status = 'unknown', err = &
+     OPEN (unit = iuelph, file = TRIM(filelph), status = 'unknown', err = &
           100, iostat = ios)
-100  CALL errore ('elphon', 'opening file '//filelph, ABS (ios) )
      REWIND (iuelph)
+  ELSE
+     iuelph = 0
      !
   END IF
+100 CONTINUE
+  CALL mp_bcast(ios,ionode_id,intra_image_comm)
+  CALL errore ('elphsum_simple', 'opening file '//filelph, ABS (ios) )
 
-  WRITE (iuelph, '(3f15.8,2i8)') xq, nsig, 3 * nat
-  WRITE (iuelph, '(6e14.6)') (w2 (nu) , nu = 1, nmodes)
+  IF (ionode) THEN
+     WRITE (iuelph, '(3f15.8,2i8)') xq, nsig, 3 * nat
+     WRITE (iuelph, '(6e14.6)') (w2 (nu) , nu = 1, nmodes)
+  ENDIF
   
 
   ngauss1=0
   DO isig = 1, el_ph_nsigma
      !     degauss1 = 0.01 * isig
      degauss1 = el_ph_sigma * isig
-     write(stdout,*) degauss1
      el_ph_sum(:,:) = (0.d0, 0.d0)
      phase_space = 0.d0
      !
@@ -909,18 +937,11 @@ SUBROUTINE elphsum_simple
         !
         ! see subroutine elphel for the logic of indices
         !
-        IF (lgamma) THEN
-           ikk = ik
-           ikq = ik
-        ELSE
-           ikk = 2 * ik - 1
-           ikq = ikk + 1
-        ENDIF
+        ikk = ikks(ik)
+        ikq = ikqs(ik)
         DO ibnd = 1, nbnd
            w0g1 = w0gauss ( (ef1 - et (ibnd, ikk) ) / degauss1, ngauss1) &
                 / degauss1
-           xk_dummy(:)=xk(:,ikk)
-           call cryst_to_cart(1,xk_dummy,at,-1)
            DO jbnd = 1, nbnd
               w0g2 = w0gauss ( (ef1 - et (jbnd, ikq) ) / degauss1, ngauss1) &
                    / degauss1
@@ -958,25 +979,24 @@ SUBROUTINE elphsum_simple
      CALL symdyn_munu_new (el_ph_sum, u, xq, s, invs, rtau, irt,  at, &
           bg, nsymq, nat, irotmq, minus_q)
      !
-     WRITE (6, 9000) degauss1, ngauss1
-     WRITE (6, 9005) dosef, ef1 * rytoev
-     WRITE (6, 9006) phase_space
-     IF (iuelph.NE.0) THEN
+     WRITE (stdout, *)
+     WRITE (stdout, 9000) degauss1, ngauss1
+     WRITE (stdout, 9005) dosef, ef1 * rytoev
+     WRITE (stdout, 9006) phase_space
+     IF (ionode) THEN
         WRITE (iuelph, 9000) degauss1, ngauss1
         WRITE (iuelph, 9005) dosef, ef1 * rytoev
      ENDIF
      
      DO nu = 1, nmodes
-        gamma = 0.0
+        gamma = 0.d0
         DO mu = 1, 3 * nat
            DO vu = 1, 3 * nat
               gamma = gamma + DBLE (CONJG (dyn (mu, nu) ) * el_ph_sum (mu, vu)&
                    * dyn (vu, nu) )
            ENDDO
         ENDDO
-        write(819+mu,*) gamma
         gamma = pi * gamma / 2.d0
-        write(6,*) 'gamma*pi/2=',gamma
         !
         ! the factor 2 comes from the factor sqrt(hbar/2/M/omega) that appears
         ! in the definition of the electron-phonon matrix element g
@@ -996,11 +1016,11 @@ SUBROUTINE elphsum_simple
            ! lambda(nu)= gamma(nu)/(pi N(Ef) \omega_{q,nu}^2)
            lambda = gamma / pi / w2 (nu) / dosef
         ELSE
-           lambda = 0.0
+           lambda = 0.d0
         ENDIF
         ! 3.289828x10^6 is the conversion factor from Ry to GHz
-        WRITE (6, 9010) nu, lambda, gamma * 3.289828d6
-        IF (iuelph.NE.0) WRITE (iuelph, 9010) nu, lambda, gamma * &
+        WRITE (stdout, 9010) nu, lambda, gamma * 3.289828d6
+        IF (ionode) WRITE (iuelph, 9010) nu, lambda, gamma * &
              3.289828d6
      ENDDO
   ENDDO
@@ -1013,7 +1033,7 @@ SUBROUTINE elphsum_simple
 9010 FORMAT(5x,'lambda(',i5,')=',f8.4,'   gamma=',f8.2,' GHz')
   !
   !
-  IF (iuelph.NE.0) CLOSE (unit = iuelph)
+  IF (ionode) CLOSE (unit = iuelph)
   RETURN
   
 

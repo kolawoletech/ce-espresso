@@ -22,12 +22,23 @@ SUBROUTINE lr_alloc_init()
   USE eqv,                  ONLY : dmuxc
   USE wavefunctions_module, ONLY : evc
   USE kinds,                ONLY : dp
+  USE control_ph,           ONLY : nbnd_occ
   !
   IMPLICIT NONE
   !
   IF (lr_verbosity > 5) THEN
    WRITE(stdout,'("<lr_alloc_init>")')
   ENDIF
+  !
+  IF (nbnd>nbnd_occ(1)) THEN
+     WRITE(stdout,'(/,5X,"Warning: There are virtual states in the input file,&
+          & trying to disregard in response calculation")')
+     nbnd_total=nbnd
+     nbnd=nbnd_occ(1)
+  ELSE
+     nbnd_total=nbnd
+  ENDIF
+  !
   IF (lr_verbosity > 7) THEN
    WRITE(stdout,'("NPWX=",I15)') npwx
    WRITE(stdout,'("NBND=",I15)') nbnd
@@ -68,8 +79,13 @@ SUBROUTINE lr_alloc_init()
      ALLOCATE(revc0(dffts%nnr,nbnd,nks))
   ENDIF
   !
-  ALLOCATE(rho_1(dfftp%nnr,nspin_mag))
-  rho_1(:,:)=0.0d0
+  IF(gamma_only) THEN
+     ALLOCATE(rho_1(dfftp%nnr,nspin_mag))
+     rho_1(:,:)=0.0d0
+  ELSE
+     ALLOCATE(rho_1c(dfftp%nnr,nspin_mag))
+     rho_1c(:,:)=(0.0d0,0.0d0)
+  ENDIF
   !allocate(rho_tot(dfftp%nnr))
   IF (charge_response == 1 ) THEN
    !allocate(rho_1_tot(dfftp%nnr,nspin_mag)) !Due to broadening this is now done in lr_charg_resp

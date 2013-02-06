@@ -281,7 +281,6 @@ MODULE pw_restart
       !
       CALL mp_sum( ngk_g, inter_pool_comm)
       CALL mp_sum( ngk_g, intra_pool_comm)
-      !
       ngk_g = ngk_g / nbgrp
       !
       ! ... compute the maximum G vector index among all G+k an processors
@@ -2316,7 +2315,7 @@ MODULE pw_restart
             CALL iotk_scan_dat( iunpun, "LDA_PLUS_U_KIND", lda_plus_u_kind, &
                                 FOUND = found )
             IF ( .NOT. found ) THEN
-               lda_plus_u_kind = 0 ! comatiility
+               lda_plus_u_kind = 0 ! compatibility
             ELSE
                CALL iotk_scan_dat( iunpun, "HUBBARD_J", Hubbard_J(1:3,1:nsp_) )
                CALL iotk_scan_dat( iunpun, "HUBBARD_J0", Hubbard_J0(1:nsp_) )
@@ -3030,6 +3029,7 @@ MODULE pw_restart
       !
       CALL mp_sum( ngk_g, inter_pool_comm )
       CALL mp_sum( ngk_g, intra_pool_comm )
+      !
       ngk_g = ngk_g / nbgrp
       !
       ! ... compute the Maximum G vector index among all G+k an processors

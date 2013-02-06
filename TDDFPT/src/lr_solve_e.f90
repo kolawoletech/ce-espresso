@@ -32,13 +32,14 @@ SUBROUTINE lr_solve_e
   USE realus,               ONLY : igk_k,npw_k
   USE lsda_mod,             ONLY : lsda, isk, current_spin
   USE uspp,                 ONLY : vkb
-  USE wvfct,                ONLY : igk, nbnd, npwx, npw, et
+  USE wvfct,                ONLY : igk, nbnd, npwx, npw, et, current_k
   USE control_flags,        ONLY : gamma_only
   USE wavefunctions_module, ONLY : evc
-  USE mp_global,            ONLY : inter_pool_comm, intra_pool_comm
+  USE mp_global,            ONLY : inter_pool_comm, intra_bgrp_comm
   USE mp,                   ONLY : mp_max,mp_min
   USE realus,               ONLY : real_space, real_space_debug!, dvpsir_e
   USE control_ph,           ONLY : alpha_pv
+
   !
   IMPLICIT NONE
   !
@@ -48,9 +49,6 @@ SUBROUTINE lr_solve_e
   ! counter on polarizations
   INTEGER :: ibnd, ik, is, ip
   !
-  !OBM!! this has been moved to lr_init_nfo
-  !! variables for calculating lr_alpha_pv
-  !real(kind=dp) :: emin, emax
   !
   CHARACTER(len=6), EXTERNAL :: int_to_char
   LOGICAL :: exst
@@ -58,70 +56,21 @@ SUBROUTINE lr_solve_e
   CHARACTER(len=256) :: tmp_dir_saved
   !
   IF (lr_verbosity > 5) WRITE(stdout,'("<lr_solve_e>")')
-  !if ( lsda ) call errore ( 'lr_solve_e' , ' LSDA not implemented' , 1)
   !
   CALL start_clock ('lr_solve_e')
 
-  !OBM!!! This has been moved to lr_init_nfo
-!  !!
-!  !!   Calculate spread in eigenvalues, corresponds to alpha_pv in PHONON
-!  !!
-!  !if (degauss /= 0) then
-!     !
-!     call errore(' lr_solve_e ','degauss not equal to 0 ',1)
-!     !
-!  else
-!     !
-!     emin=minval(et(:,:))
-!     !
-!#ifdef __MPI
-!     !   Find the minimum across pools
-!     !call poolextreme(emin,-1)
-!     call mp_min(emin, inter_pool_comm)
-!#endif
-!     !
-!     emax=maxval(et(:,:))
-!     !
-!#ifdef __MPI
-!     !   Find the maximum across pools
-!     !call poolextreme(emax,+1)
-!     call mp_max(emax, inter_pool_comm)
-!#endif
-  !   !
-  !   lr_alpha_pv=2.0d0*(emax-emin)
-  !   !   Avoid zero value for alpha_pv
-  !   lr_alpha_pv = max(lr_alpha_pv,1.0d-2)
-  !   !
-  !endif
-  !!
   IF( lr_verbosity > 1 ) &
        WRITE(stdout,'(5X,"lr_solve_e: alpha_pv=",1X,e12.5)') alpha_pv
-  !
-  !
-  !if ( real_space_debug > 8 .and. gamma_only) then
-  !print *, "Experimental, non-vkb electric field operator"
-  !     evc(:,:)=evc0(:,:,1)
-  !     if ( n_ipol==3 ) then
-  !        !
-  !         do ip=1,3
-  !           !
-  !           call dvpsir_e(ik,ip,d0psi(:,:,1,ip),lr_alpha_pv)
-  !           !
-  !        end do
-  !        !
-  !     else if ( n_ipol==1 ) then
-  !       !
-  !       call dvpsir_e(ik,ipol,d0psi(:,:,1,1),lr_alpha_pv)
-  !       !
-  !     end if
-  !else
-  !  print *, "Vkb electric field operator"
+
     DO ik=1,nks
-        !
-        IF ( lsda ) current_spin = isk(ik)
        !
-      evc(:,:)=evc0(:,:,ik)
-      !
+       current_k=ik
+       !
+       IF ( lsda ) current_spin = isk(ik)
+       !
+       evc(:,:)=evc0(:,:,ik)
+       !
+       !
        npw=npw_k(ik)
        igk(:)=igk_k(:,ik)
        !

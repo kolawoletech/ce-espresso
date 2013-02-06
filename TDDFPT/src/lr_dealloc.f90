@@ -1,4 +1,12 @@
-!-----------------------------------------------------------------------
+!
+! Copyright (C) 2004-2013 Quantum ESPRESSO group
+! This file is distributed under the terms of the
+! GNU General Public License. See the file `License'
+! in the root directory of the present distribution,
+! or http://www.gnu.org/copyleft/gpl.txt .
+!
+!--------------------------------------------------------------------
+
 SUBROUTINE lr_dealloc()
   !---------------------------------------------------------------------
   ! ... deallocates all the Lanczos variables
@@ -11,8 +19,10 @@ SUBROUTINE lr_dealloc()
   USE control_flags,  ONLY : gamma_only
   USE realus,         ONLY : igk_k,npw_k
   USE io_global,      ONLY : stdout
-  USE charg_resp,     ONLY : w_T_beta_store, w_T_gamma_store, w_T, w_T_zeta_store,chi
+  USE charg_resp,     ONLY : w_T_beta_store, w_T_gamma_store, w_T,&
+                           & w_T_zeta_store, chi, rho_1_tot, rho_1_tot_im
   USE eqv,            ONLY : dmuxc
+  USE lr_exx_kernel,     ONLY : lr_exx_dealloc
 
   IMPLICIT NONE
   !
@@ -65,6 +75,7 @@ SUBROUTINE lr_dealloc()
   IF (allocated(w_T)) DEALLOCATE(w_T)
   IF (allocated(rho_1_tot)) DEALLOCATE(rho_1_tot)
   IF (allocated(rho_1_tot_im)) DEALLOCATE(rho_1_tot_im)
+  IF (lr_exx) CALL lr_exx_dealloc
   !
   IF (gamma_only) THEN
      CALL lr_dealloc_gamma()

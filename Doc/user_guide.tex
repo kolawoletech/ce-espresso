@@ -605,9 +605,9 @@ LU code, plus the full storage Cholesky code. Follow the instructions in the
 ATLAS distributions to produce a full LAPACK replacement.
     
 Sergei Lisenkov reported success and good performances with optimized
-BLAS by Kazushige Goto. They can be freely downloaded,
-but not redistributed. See the "GotoBLAS2" item at\\
-\texttt{http://www.tacc.utexas.edu/tacc-projects/}.
+BLAS by Kazushige Goto. The library is now available under an 
+open-source license: see the GotoBLAS2 page at \\
+\texttt{http://www.tacc.utexas.edu/tacc-software/gotoblas2/}.
 
 \paragraph{FFT}
 \qe\ has an internal copy of an old FFTW version, and it 
@@ -872,13 +872,47 @@ your machine doesn't like the script that produces file \texttt{version.f90}
 with the correct version and revision. Quick solution: copy 
 \texttt{Modules/version.f90.in} to \texttt{Modules/version.f90}.
 \item
-If you get mysterious errors in the provided tests and examples:
+If you get mysterious errors ("Segmentation faults" and the like) 
+in the provided tests and examples:
 your compiler, or your mathematical libraries, or MPI libraries,
-or a combination thereof, is very likely buggy. Although the 
+or a combination thereof, is very likely buggy, or there is some
+form of incompatibility (see below). Although the 
 presence of subtle bugs in \qe\ that are not revealed during 
 the testing phase can never be ruled out, it is very unlikely
 that this happens on the provided tests and examples. 
 \end{itemize}
+
+{\em Note:} "There is a known incompatibility problem between the calling 
+convention for Fortran functions that return complex values: there is the
+convention used by 
+g77/f2c, where in practice the compiler converts such functions to subroutines 
+with a further parameter for the return value; gfortran instead produces a 
+normal function returning a complex value (and maybe also ifort?).
+If your system libraries were compiled using g77 (which may happen for
+system-provided libraries in not-too-recent Linux distributions),
+and you instead use gfortran (or possibly ifort) to compile \qe, your code
+may crash or produce random results. This typically happens 
+during calls to \texttt{zdotc}, which is one the most commonly used
+complex-returning functions of BLAS+LAPACK.
+
+For further details see for instance this link:\\
+\texttt{http://www.macresearch.org/lapackblas-fortran-106\#comment-17071}\\
+or read the man page of gfortran under the flag \texttt{-ff2c}.
+
+If your code crashes during a call to \texttt{zdotc},
+one solution is to try to recompile \qe\ using the internal BLAS and LAPACK
+routines (using the \texttt{--with-internal-blas} and 
+\texttt{--with-internal-lapack} parameters of the configure script)
+to see if the problem disappears.
+
+Otherwise, there is another trick that can be possibly tried if you use gfortran
+and you can confirm that your problem is the one described above:
+add the \texttt{-ff2c} flag to all compilations with 
+gfortran (even if this is not necessarily the best thing to do: the best
+is to use libraries compiled with the same 
+compiler, or at least libraries that are verified to work with your compiler
+(for instance, if you use ifort, you may prefer to link to 
+the appropriate intel MKL libraries)" (info by Giovanni Pizzi, Jan. 2013).
 
 \subsubsection{Cray XE and XT machines}
 

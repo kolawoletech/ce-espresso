@@ -511,7 +511,7 @@ SUBROUTINE phq_readin()
 !
   IF (get_ntask_groups() > 1) dffts%have_task_groups=.FALSE.
 
-  IF (nproc_bgrp_file /= nproc_bgrp) &
+  IF (nproc_bgrp_file /= nproc_bgrp .AND. .NOT. twfcollect ) &
      CALL errore('phq_readin','pw.x run with different band parallelization',1)
   
   if(elph_mat.and.fildvscf.eq.' ') call errore('phq_readin',&
@@ -593,8 +593,8 @@ SUBROUTINE phq_readin()
   !
   IF (elph.AND..NOT.lgauss) CALL errore ('phq_readin', 'Electron-&
        &phonon only for metals', 1)
-!  IF (elph.AND.fildvscf.EQ.' ') CALL errore ('phq_readin', 'El-ph needs &
-!       &a DeltaVscf file', 1)
+  IF (elph.AND.fildvscf.EQ.' ') CALL errore ('phq_readin', 'El-ph needs &
+       &a DeltaVscf file', 1)
   !   There might be other variables in the input file which describe
   !   partial computation of the dynamical matrix. Read them here
   !

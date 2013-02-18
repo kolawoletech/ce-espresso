@@ -18,7 +18,7 @@ SUBROUTINE openfil_cond()
   USE klist,            ONLY : nks
   USE io_files,         ONLY : prefix, iunpun, iunat, iunsat, iunwfc, iunigk, &
                                nwordwfc, nwordatwfc, iunefield, &
-                               tmp_dir, wfc_dir, iunefieldm, iunefieldp
+                               iunefieldm, iunefieldp
   USE noncollin_module, ONLY : npol
   USE mp_global,        ONLY : kunit
   USE buffers,          ONLY : open_buffer
@@ -27,37 +27,21 @@ SUBROUTINE openfil_cond()
   IMPLICIT NONE
   !
   LOGICAL            :: exst
-  CHARACTER(LEN=256) :: tmp_dir_save
-  !
-  ! ... tmp_dir may be replaced by wfc_dir  for large files
-  !
-  tmp_dir_save = tmp_dir
-  !
-  IF ( wfc_dir /= 'undefined' ) THEN
-     !
-     WRITE( stdout, '(5X,"writing wfc files to a dedicated directory")' )
-     !
-     tmp_dir = wfc_dir
-     !
-  END IF
   !
   ! ... nwordwfc is the record length (IN COMPLEX WORDS)
   ! ... for the direct-access file containing wavefunctions
   !
   nwordwfc = nbnd*npwx*npol
-
   !
-  ! ... iunwfc=10: read/write wfc from/to file
-  ! ... iunwfc=-1: copy wfc to/from RAM
+  ! ... iunwfc= 10: read/write wfc from/to file
+  ! ... iunwfc=-10: copy wfc to/from RAM
   !
   IF ( io_level > 0 ) THEN
      iunwfc = 10
   ELSE
-     iunwfc = -1
+     iunwfc =-10
   END IF
   CALL open_buffer( iunwfc, 'wfc', nwordwfc, nks, exst )
-  !
-  tmp_dir = tmp_dir_save
   !
   RETURN
   !
@@ -80,7 +64,7 @@ SUBROUTINE closefil_cond()
   IF ( io_level > 0 ) THEN
      iunwfc = 10
   ELSE
-     iunwfc = -1
+     iunwfc =-10
   END IF
   CALL close_buffer( iunwfc, 'keep' )
   !

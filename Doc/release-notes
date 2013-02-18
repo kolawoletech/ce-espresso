@@ -3,10 +3,15 @@ New in svn version:
    * dynmat.x can calculate phonon contribution to dielectric tensor
    * CELL_PARAMETERS written on output using the same format as in input
    * turboTDDFT now supports hybrid functionals (only with norm-conserving
-     psudopotentials.)
+     pseudopotentials.)
 
 Fixed in svn version:
 
+   * some quantities calculated in real space (including the charge itself
+     when tqr=.true.) were not always accurately computed in parallel
+     execution if the number of planes wasn't the same for all processors
+   * Bogus symmetry error in NEB due to missing re-initialization
+     of fractional translations
    * PW, PP, PHonon: files for DFT+U produced by previous versions
      could no longer be read
    * PHonon: restart with convt=.true. was not working with PAW

@@ -407,8 +407,13 @@ SUBROUTINE chdens (filplot,plot_num)
 
   ELSEIF (iflag == 2) THEN
 
-     CALL plot_2d (nx, ny, m1, m2, x0, e1, e2, ngm, g, rhog, alat, &
-          at, nat, tau, atm, ityp, output_format, ounit)
+     if (trim(interpolation) == 'fourier') then
+       CALL plot_2d (nx, ny, m1, m2, x0, e1, e2, ngm, g, rhog, alat, &
+            at, nat, tau, atm, ityp, output_format, ounit)
+     else
+       CALL plot_2d_bspline (nx, ny, m1, m2, x0, e1, e2, rhor, alat, &
+            at, nat, tau, atm, ityp, output_format, ounit)
+     endif
      IF (output_format == 2.and.ionode) THEN
         WRITE (ounit, '(i4)') nat
         WRITE (ounit, '(3f8.4,i3)') ( (tau(ipol,na), ipol=1,3), 1, na=1,nat)
@@ -620,172 +625,6 @@ SUBROUTINE plot_1d (nx, m1, x0, e, ngm, g, rhog, alat, iflag, ounit)
   RETURN
 
 END SUBROUTINE plot_1d
-
-
-!-----------------------------------------------------------------------
-SUBROUTINE extend_grid(nx, ny, nz, rhor, kx, ky, kz, rhoout)
-  !---------------------------------------------------------------------
-  !
-  ! Extend the grid
-  !
-  USE kinds,     ONLY : DP
-  USE io_global, ONLY : stdout, ionode
-  USE fft_base,  ONLY : dfftp
-  !---------------------------------------------------------------------
-  implicit none
-  integer, intent(in) :: nx, ny, nz   ! grid size
-  integer, intent(in) :: kx, ky, kz   ! B-spline order
-  real(dp), intent(in) :: rhor(dfftp%nr1x,dfftp%nr2x,dfftp%nr3x)
-  real(dp), intent(out) :: rhoout(-kx+1:nx+kx,-ky+1:ny+ky,-kx+1:nz+kz)
-  !---------------------------------------------------------------------
-  integer :: i, j, k, ii, jj, kk
-
-  do i = -kx+1, nx+kx
-     ii = i
-     if (i <= 0) ii = i+nx
-     if (i > nx) ii = i-nx
-     do j = -ky+1, ny+ky
-        jj = j
-        if (j <= 0) jj = j+ny
-        if (j > ny) jj = j-ny
-        do k = -kz+1, nz+kz
-           kk = k
-           if (k <= 0) kk = k+nz
-           if (k > nz) kk = k-nz
-           rhoout(i,j,k) = rhor(ii, jj, kk)
-        enddo
-     enddo
-  enddo
-
-END SUBROUTINE extend_grid
-
-
-!-----------------------------------------------------------------------
-SUBROUTINE prepare_bspline(nx, ny, nz, rho, kx, ky, kz, xv, yv, zv, xknot, yknot, zknot, bcoef)
-  !---------------------------------------------------------------------
-  !
-  ! Preapare B-spline interpolation: call dbsnak, then dbs3in
-  !
-  USE kinds,     ONLY : DP
-  USE io_global, ONLY : stdout, ionode
-  USE bspline  
-  !---------------------------------------------------------------------
-  implicit none
-  integer, intent(in) :: nx, ny, nz   ! grid size
-  integer, intent(in) :: kx, ky, kz   ! B-spline order
-  real(dp), intent(in) :: rho(nx,ny,nz)
-  real(dp), intent(out) :: xv(nx), yv(ny), zv(nz)
-  real(dp), intent(out) :: xknot(nx+kx), yknot(ny+ky), zknot(nz+kz)
-  real(dp), intent(out) :: bcoef(nx*ny*nz)
-  !---------------------------------------------------------------------
-  integer :: i, ierr
- 
-  ! setup uniform grid along x
-  do i = 1, nx
-     xv(i) = dble(i-kx-1)/dble(nx-2*kx)
-  enddo
-  call dbsnak(nx, xv, kx, xknot, ierr)
-  if (ierr /= 0) call errore('prepare_bspline', 'error in dbsnak/x', ierr)
-
-  ! setup uniform grid along y
-  do i = 1, ny
-     yv(i) = dble(i-ky-1)/dble(ny-2*ky)  
-  enddo
-  call dbsnak(ny, yv, ky, yknot, ierr)
-  if (ierr /= 0) call errore('prepare_bspline', 'error in dbsnak/y', ierr)
-
-  ! setup uniform grid along z
-  do i = 1, nz
-     zv(i) = dble(i-kz-1)/dble(nz-2*kz)
-  enddo
-  call dbsnak(nz, zv, kz, zknot, ierr)
-  if (ierr /= 0) call errore('prepare_bspline', 'error in dbsnak/z', ierr)
-
-  ! setup B-spline coefficients
-  call dbs3in(nx,xv,ny,yv,nz,zv,rho,nx,ny,kx,ky,kz,xknot,yknot,zknot,bcoef,ierr)
-  if (ierr /= 0) call errore('prepare_bspline', 'error in dbs3in', ierr)
-
-END SUBROUTINE prepare_bspline  
-
-
-!-----------------------------------------------------------------------
-SUBROUTINE plot_1d_bspline (nptx, m1, x0, e, rhor, alat, iflag, ounit)
-  !---------------------------------------------------------------------
-  !
-  ! Use B-spline interpolation instead of Fourier
-  !
-  USE kinds,     ONLY : DP
-  USE io_global, ONLY : stdout, ionode
-  USE fft_base,  ONLY : dfftp
-  USE cell_base, ONLY : bg
-  USE bspline  
-  !---------------------------------------------------------------------
-  implicit none
-  integer, intent(in) :: nptx, iflag, ounit
-  real(dp), intent(in) :: e(3), x0(3), m1, alat
-  real(dp), intent(in) :: rhor(dfftp%nr1x,dfftp%nr2x,dfftp%nr3x)
-  !---------------------------------------------------------------------
-  real(dp), allocatable :: xv(:), yv(:), zv(:)
-  real(dp), allocatable :: xknot(:), yknot(:), zknot(:)
-  real(dp), allocatable :: bcoef(:)
-  real(dp), allocatable :: rg(:,:), rhoout(:,:,:), carica(:)
-  real(dp) :: deltax
-  integer, parameter :: kx = 5, ky = 5, kz = 5   ! order of B-spline
-  integer :: nx, ny, nz, i, ierr
-
-  if (iflag == 0) &
-    call errore('plot_1d_bsplint', 'spherical average incompatible with B-splines', 1)
-
-  write(stdout,'(5X,"Interpolation by B-splines")') 
-
-  ! extend grid in all directions
-  nx = dfftp%nr1
-  ny = dfftp%nr2
-  nz = dfftp%nr3
-  allocate(rhoout(-kx+1:nx+kx,-ky+1:ny+ky,-kx+1:nz+kz))
-  call extend_grid(nx, ny, nz, rhor, kx, ky, kz, rhoout)
-  nx = nx + 2*kx
-  ny = ny + 2*ky
-  nz = nz + 2*kz
-
-  ! prepare B-spline interpolation
-  allocate (xv(nx), yv(ny), zv(nz) )
-  allocate (xknot(nx+kx), yknot(ny+ky), zknot(nz+kz) )
-  allocate (bcoef(nx*ny*nz))
-  call prepare_bspline(nx, ny, nz, rhoout, kx, ky, kz, xv, yv, zv, &
-                       xknot, yknot, zknot, bcoef)
-
-  ! grid in cartesian coordinates, in units of alat
-  allocate( rg(3,nptx), carica(nptx) )
-  deltax = dble(m1) / dble(nptx - 1) 
-  do i = 1, nptx
-     rg(1,i) = x0(1) + (i-1) * deltax*e(1)
-     rg(2,i) = x0(2) + (i-1) * deltax*e(2)
-     rg(3,i) = x0(3) + (i-1) * deltax*e(3)
-     print*, i, rg(1,i)
-  enddo
-
-  ! grid in crystal coordinates
-  ! TODO: refold positions
-  call cryst_to_cart(nptx, rg, bg, -1)
-
-  ! interpolate
-  do i = 1, nptx
-     carica(i) = dbs3vl(rg(1,i),rg(2,i),rg(3,i),kx,ky,kz,xknot,yknot,zknot,nx,ny,nz,bcoef,ierr)
-     if (ierr /= 0) call errore('plot_1d_bspline', 'error in dbs3vl', ierr)
-  enddo
-
-  ! we print the charge on output
-  write(stdout, '(5x,"Min, Max charge: ",2f12.6)') maxval(carica), minval(carica)
-  if (ionode) then
-     do i = 1, nptx
-        write (ounit, '(2f20.10)') deltax*dble(i-1), carica(i)
-     enddo
-  endif
-
-END SUBROUTINE plot_1d_bspline
-
-
 !
 !-----------------------------------------------------------------------
 SUBROUTINE plot_2d (nx, ny, m1, m2, x0, e1, e2, ngm, g, rhog, alat, &

@@ -48,10 +48,11 @@ subroutine write_results
   if (zed.ne.0.0) write(stdout,1250) zed
 1250 format(/5x,'atomic number is',f6.2)
   write(stdout,2300) dft_name(1:len_trim(dft_name)),lsd,isic,latt,beta,tr2
+  CALL write_dft_name () 
 2300 format(5x,'dft =',a,'   lsd =',i1,' sic =',i1,' latt =',i1, &
        '  beta=',f4.2,' tr2=',1pe7.1)
   write(stdout,1270) grid%mesh,grid%r(grid%mesh),grid%xmin,grid%dx
-1270 format(5x,'mesh =',i4,' r(mesh) =',f10.5,' xmin =',f6.2,' dx =',f8.5)
+1270 format(5x,'mesh =',i4,' r(mesh) =',f10.5,' a.u. xmin =',f6.2,' dx =',f8.5)
   if (rel==0 .and. .not.relpert) then
      write(stdout,'(5x "1 Ry = ",f12.8, " eV" )') rytoev_fact
   else

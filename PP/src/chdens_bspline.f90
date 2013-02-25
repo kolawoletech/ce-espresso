@@ -97,7 +97,6 @@ SUBROUTINE bspline_interpolation (nptx, rg, rhor, rhoint)
 
   ! interpolate
   do i = 1, nptx
-     !!rg(:,i) = rg(:,i) - nint(rg(:,i)) + 0.5d0
      rg(:,i) = modulo(rg(:,i), 1.d0)
      rhoint(i) = dbs3vl(rg(1,i),rg(2,i),rg(3,i),kx,ky,kz,xknot,yknot,zknot,nx,ny,nz,bcoef,ierr)
      if (ierr /= 0) then

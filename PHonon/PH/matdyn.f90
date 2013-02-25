@@ -2085,6 +2085,15 @@ SUBROUTINE a2Fdos &
            write( 6,'(3x,i5)') n
            write(20,'(9F8.4)')  (gamma(i,n)*RY_TO_THZ,i=1,3*nat)
            write( 6,'(6F12.9)') (gamma(i,n),i=1,3*nat)
+!
+!   write also in a format that can be read by plotband
+!
+           WRITE(200+isig, '(10x,3f10.6)')  q(1,n), q(2,n), q(3,n)
+!
+!     output in GHz
+!
+           WRITE(200+isig, '(6f10.4)') (gamma(nu,n)*RY_TO_THZ*1000.0_DP, &
+                                        nu=1,3*nat)
         end do
      endif
      !

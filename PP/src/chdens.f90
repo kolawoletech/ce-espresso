@@ -348,6 +348,9 @@ SUBROUTINE chdens (filplot,plot_num)
        ( at(2,1) == 0.d0  .and.  at(3,1) == 0.d0) .and. &
        ( at(1,2) == 0.d0  .and.  at(3,2) == 0.d0) .and. &
        ( at(1,3) == 0.d0  .and.  at(2,3) == 0.d0)
+
+  fast3d = fast3d .and. (trim(interpolation) == 'fourier')
+ 
   !
   !    Initialise FFT for rho(r) => rho(G) conversion if needed
   !
@@ -471,9 +474,16 @@ SUBROUTINE chdens (filplot,plot_num)
               IF (nx<=0 .or. ny <=0 .or. nz <=0) &
                   CALL errore("chdens","nx,ny,nz, required",1)
 
-              CALL plot_3d (celldm (1), at, nat, tau, atm, ityp, ngm, g, rhog,&
-                   nx, ny, nz, m1, m2, m3, x0, e1, e2, e3, output_format, &
-                   ounit, rhotot)
+              if (trim(interpolation) == 'fourier') then 
+                 CALL plot_3d (celldm (1), at, nat, tau, atm, ityp, ngm, g, rhog,&
+                      nx, ny, nz, m1, m2, m3, x0, e1, e2, e3, output_format, &
+                      ounit, rhotot)
+              else
+                 CALL plot_3d_bspline(celldm(1), at, nat, tau, atm, ityp, rhor,&
+                      nx, ny, nz, m1, m2, m3, x0, e1, e2, e3, output_format, &
+                      ounit, rhotot)
+              endif
+
            ENDIF
            !
         ENDIF

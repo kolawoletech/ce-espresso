@@ -81,3 +81,45 @@ SUBROUTINE write_cubefile ( alat, at, bg, nat, tau, atm, ityp, rho, &
   RETURN
 END SUBROUTINE write_cubefile
 
+
+! -------------------------------------------------------------------
+! this routine instead writes a re-gridded cubefile (i.e. by B-spline
+! interpolation)
+! -------------------------------------------------------------------
+SUBROUTINE write_cubefile_new (alat, nat, tau, atm, ityp, x0, &
+               m1, m2, m3, e1, e2, e3, nx, ny, nz, carica, ounit)
+
+  USE kinds,  ONLY : dp
+  implicit none
+  real(dp), intent(in) :: alat, tau(3,nat)
+  integer, intent(in) :: nat, ityp(nat), ounit, nx, ny, nz
+  character(len=3) :: atm(*)
+  real(dp), intent(in) :: m1, m2, m3, x0(3), e1(3), e2(3), e3(3), carica(nx,ny,nz)
+
+  integer          :: i, j, k, nt, at_num
+  integer, external:: atomic_number
+  real(dp)    :: at_chrg, tpos(3), inpos(3)
+
+  write(ounit,*) 'cubfile created from pwscf calculation'
+  write(ounit,*) 'total scf density'
+  write(ounit,'(i5,3f12.6)') nat, x0(:)
+  write(ounit,'(i5,3f12.6)') nx, alat*m1*e1(:)/dble(nx)
+  write(ounit,'(i5,3f12.6)') ny, alat*m2*e2(:)/dble(ny)
+  write(ounit,'(i5,3f12.6)') nz, alat*m3*e3(:)/dble(nz)
+
+  do i=1,nat
+     nt = ityp(i)
+     at_num = atomic_number(trim(atm(nt)))
+     at_chrg = dble(at_num)
+     write(ounit,'(i5,5f12.6)') at_num, at_chrg, alat*tau(:,i)
+  enddo
+
+  do i=1,nx
+     do j=1,ny
+        write(ounit,'(6e13.5)') (carica(i,j,k),k=1,nz)
+     enddo
+  enddo
+  return
+
+END SUBROUTINE write_cubefile_new
+

@@ -23,7 +23,7 @@ SUBROUTINE bspline_interpolation (nptx, rg, rhor, rhoint)
   !---------------------------------------------------------------------
   implicit none
   integer, intent(in) :: nptx
-  real(dp), intent(in) :: rg(3,nptx) ! in alat units
+  real(dp), intent(inout) :: rg(3,nptx) ! in alat units
   real(dp), intent(in) :: rhor(dfftp%nr1x,dfftp%nr2x,dfftp%nr3x)
   real(dp), intent(out) :: rhoint(nptx)
   !---------------------------------------------------------------------
@@ -67,7 +67,7 @@ SUBROUTINE bspline_interpolation (nptx, rg, rhor, rhoint)
   allocate (xknot(nx+kx), yknot(ny+ky), zknot(nz+kz) )
   allocate (bcoef(nx*ny*nz))
  
- ! setup uniform grid along x
+  ! setup uniform grid along x
   do i = 1, nx
      xv(i) = dble(i-kx-1)/dble(nx-2*kx)
   enddo
@@ -93,17 +93,21 @@ SUBROUTINE bspline_interpolation (nptx, rg, rhor, rhoint)
   if (ierr /= 0) call errore('bspline_interpolation', 'error in dbs3in', ierr)
 
   ! transform grid points in crystal coordinates
-  ! TODO: refold positions
   call cryst_to_cart(nptx, rg, bg, -1)
 
   ! interpolate
   do i = 1, nptx
+     !!rg(:,i) = rg(:,i) - nint(rg(:,i)) + 0.5d0
+     rg(:,i) = modulo(rg(:,i), 1.d0)
      rhoint(i) = dbs3vl(rg(1,i),rg(2,i),rg(3,i),kx,ky,kz,xknot,yknot,zknot,nx,ny,nz,bcoef,ierr)
-     if (ierr /= 0) call errore('bspline_interpolation', 'error in dbs3vl', ierr)
+     if (ierr /= 0) then
+        write(stdout,'(5X,''BSPLINE ERROR MESSAGE:'',A)') get_error_message()
+        call errore('bspline_interpolation', 'error in dbs3vl', ierr)
+     endif
   enddo
 
   ! we print the charge on output
-  write(stdout, '(5x,"Min, Max charge: ",2f12.6)') maxval(rhoint), minval(rhoint)
+  write(stdout, '(5x,"Min, Max charge: ",2f12.6)') minval(rhoint), maxval(rhoint)
 
 END SUBROUTINE bspline_interpolation
 

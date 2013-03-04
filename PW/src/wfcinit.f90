@@ -1,5 +1,5 @@
 ! 
-! Copyright (C) 2001-2007 Quantum ESPRESSO group
+! Copyright (C) 2001-2013 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
@@ -12,6 +12,7 @@ SUBROUTINE wfcinit()
   !
   ! ... This routine computes an estimate of the starting wavefunctions
   ! ... from superposition of atomic wavefunctions and/or random wavefunctions.
+  ! ... It also open needed files or memory buffers
   !
   USE io_global,            ONLY : stdout
   USE basis,                ONLY : natomwfc, starting_wfc
@@ -19,34 +20,59 @@ SUBROUTINE wfcinit()
   USE klist,                ONLY : xk, nks, ngk
   USE control_flags,        ONLY : io_level, lscf
   USE fixed_occ,            ONLY : one_atom_occupations
-  USE ldaU,                 ONLY : swfcatom, lda_plus_u, U_projection
+  USE ldaU,                 ONLY : lda_plus_u, swfcatom, U_projection
   USE lsda_mod,             ONLY : lsda, current_spin, isk
-  USE io_files,             ONLY : nwordwfc, nwordatwfc, iunwfc, iunigk, iunsat
-  USE buffers,              ONLY : get_buffer, save_buffer
+  USE io_files,             ONLY : nwordwfc, nwordatwfc, iunsat, iunwfc, iunigk
+  USE buffers,              ONLY : open_buffer, get_buffer, save_buffer
   USE uspp,                 ONLY : nkb, vkb
   USE wavefunctions_module, ONLY : evc
   USE wvfct,                ONLY : nbnd, npw, current_k, igk
-  USE wannier_new,              ONLY : use_wannier
+  USE wannier_new,          ONLY : use_wannier
+  USE pw_restart,           ONLY : pw_readfile
   !
   IMPLICIT NONE
   !
-  INTEGER :: ik
+  INTEGER :: ik, ierr
+  LOGICAL :: exst
   !
   !
   CALL start_clock( 'wfcinit' )
   !
-  ! ... Needed for LDA+U
+  ! ... Orthogonalized atomic functions needed for LDA+U and other cases
   !
-  IF ( use_wannier .OR. one_atom_occupations ) CALL orthoatwfc()
-  IF ( lda_plus_u ) THEN
-     IF ( U_projection == 'pseudo' ) THEN
-         WRITE( stdout,*) 'Beta functions used for LDA+U Projector'
-     ELSE
-         CALL orthoatwfc()
-     ENDIF
-  ENDIF
+  IF ( use_wannier .OR. one_atom_occupations .or. lda_plus_u ) &
+     CALL orthoatwfc()
   !
-  ! ... state what is going to happen
+  ! ... open files/buffer for wavefunctions (nwordwfc set in openfil)
+  ! ... iunwfc= 10: read/write wfc from/to file
+  ! ... iunwfc=-10: copy wfc to/from RAM
+  !
+  IF ( io_level > 0 ) THEN
+     iunwfc = 10
+  ELSE
+     iunwfc =-10
+  END IF
+  CALL open_buffer( iunwfc, 'wfc', nwordwfc, nks, exst )
+  !
+  ! ... now the various possible wavefunction initializations
+  ! ... first a check: is "tmp_dir"/"prefix".wfc found on disk?
+  !
+  IF ( TRIM(starting_wfc) == 'file' .AND. .NOT. exst)  THEN
+     !
+     ! ... "tmp_dir"/"prefix".wfc not found on disk: try to read
+     ! ... wavefunctions in "collected" format from "prefix".save/, 
+     ! ... rewrite them (in pw_readfile) using the internal format
+     !
+     ierr = 1
+     CALL pw_readfile( 'wave', ierr )
+     IF ( ierr > 0 ) THEN
+        WRITE( stdout, '(5X,"Cannot read wfc : file not found")' )
+        starting_wfc = 'atomic'
+     END IF
+     !
+  END IF
+  !
+  ! ... first of all, state what will happen
   !
   IF ( TRIM(starting_wfc) == 'file' ) THEN
      !
@@ -55,14 +81,10 @@ SUBROUTINE wfcinit()
   ELSE IF ( starting_wfc == 'atomic' ) THEN
      !
      IF ( natomwfc >= nbnd ) THEN
-        !
         WRITE( stdout, '(5X,"Starting wfc are ",I4," atomic wfcs")' ) natomwfc
-        !
      ELSE
-        !
         WRITE( stdout, '(5X,"Starting wfc are ",I4," atomic + ", &
              &           I4," random wfc")' ) natomwfc, nbnd-natomwfc
-        !
      END IF
      !
   ELSE IF ( TRIM(starting_wfc) == 'atomic+random' ) THEN
@@ -76,31 +98,29 @@ SUBROUTINE wfcinit()
      !
   END IF
   !
+  IF ( TRIM(starting_wfc) == 'file' ) THEN
+     !
+     ! ... wavefunctions are read from file in routine c_bands, but
+     ! ... not if there is a single k-point, unless high I/O is required
+     ! ... In such a case, store wavefunctions in memory
+     !
+     IF ( nks == 1 .AND. (io_level < 2) ) &
+        CALL get_buffer ( evc, nwordwfc, iunwfc, 1 )
+     CALL stop_clock( 'wfcinit' )
+     RETURN
+     !
+  END IF
+  !
   ! ... for non-scf calculations, the starting wavefunctions are not 
-  ! ... calculated here but immediately before diagonalization
+  ! ... calculated here but before diagonalization (to reduce I/O)
   !
   IF ( .NOT. lscf .AND. .NOT. lelfield ) THEN
      !
      CALL stop_clock( 'wfcinit' )
-     !
      RETURN
      !
   END IF
   !
-  IF ( TRIM(starting_wfc) == 'file' ) THEN
-     !
-     ! ... wavefunctions are to be read from file: store wavefunction into
-     ! ... memory if c_bands will not do it (for a single k-point);
-     ! ... return and do nothing otherwise (c_bands will read wavefunctions)
-     !
-     IF ( nks == 1 .AND. (io_level < 2) ) &
-        CALL get_buffer ( evc, nwordwfc, iunwfc, 1 )
-     !
-     CALL stop_clock( 'wfcinit' )
-     !
-     RETURN
-     !
-  END IF
   !
   IF ( nks > 1 ) REWIND( iunigk )
   !
@@ -121,10 +141,10 @@ SUBROUTINE wfcinit()
      !
      IF ( nkb > 0 ) CALL init_us_2( npw, igk, xk(1,ik), vkb )
      !
-     ! ... LDA+U: read atomic wavefunctions for U term in Hamiltonian
+     ! ... Needed for LDA+U
      !
      IF ( lda_plus_u .AND. (U_projection .NE. 'pseudo') ) &
-         CALL davcio( swfcatom, nwordatwfc, iunsat, ik, - 1 )
+        CALL davcio( swfcatom, nwordatwfc, iunsat, ik, -1 )
      !
      ! ... calculate starting wavefunctions
      !
@@ -138,7 +158,6 @@ SUBROUTINE wfcinit()
   END DO
   !
   CALL stop_clock( 'wfcinit' )
-  !
   RETURN
   !
 END SUBROUTINE wfcinit

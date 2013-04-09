@@ -1,5 +1,5 @@
 !
-! Copyright (C) 2001-2007 Quantum ESPRESSO group
+! Copyright (C) 2001-2013 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
@@ -24,7 +24,7 @@ MODULE scf
   USE lsda_mod,     ONLY : nspin
   USE ldaU,         ONLY : lda_plus_u, Hubbard_lmax
   USE ions_base,    ONLY : nat
-  USE io_files,     ONLY : diropn
+  USE buffers,      ONLY : open_buffer, close_buffer, get_buffer, save_buffer
   USE funct,        ONLY : dft_is_meta
   USE fft_base,     ONLY : dfftp
   USE fft_interfaces,ONLY: invfft
@@ -105,7 +105,9 @@ MODULE scf
                        rlen_dip=0, &
                        start_rho=0, start_kin=0, start_ldaU=0, start_bec=0, &
                        start_dipole=0
-  REAL(DP), PRIVATE, ALLOCATABLE:: io_buffer(:)
+  ! DFT+U, colinear and noncolinear cases
+  LOGICAL, PRIVATE :: lda_plus_u_co, lda_plus_u_nc
+  COMPLEX(DP), PRIVATE, ALLOCATABLE:: io_buffer(:)
 CONTAINS
 
  SUBROUTINE create_scf_type ( rho, do_not_allocate_becsum )
@@ -126,10 +128,10 @@ CONTAINS
       allocate ( rho%kin_g(1,1) )
    endif
 
-   if (lda_plus_u) then
-     allocate (rho%ns(2*Hubbard_lmax+1,2*Hubbard_lmax+1,nspin,nat))
-     allocate (rho%ns_nc(2*Hubbard_lmax+1,2*Hubbard_lmax+1,nspin,nat))
-   endif 
+   lda_plus_u_co = lda_plus_u .and. .not. (nspin == 4 )
+   lda_plus_u_nc = lda_plus_u .and.       (nspin == 4 )
+   if (lda_plus_u_co) allocate (rho%ns(2*Hubbard_lmax+1,2*Hubbard_lmax+1,nspin,nat))
+   if (lda_plus_u_nc) allocate (rho%ns_nc(2*Hubbard_lmax+1,2*Hubbard_lmax+1,nspin,nat))
 
    if (okpaw) then ! See the top of the file for clarification
       if(present(do_not_allocate_becsum)) then
@@ -174,21 +176,26 @@ CONTAINS
 #ifdef __STD_F95
    nullify (rho%kin_g, rho%ns, rho%ns_nc, rho%bec)
 #endif
-   if (dft_is_meta()) allocate (rho%kin_g( ngms, nspin ) )
-   if (lda_plus_u) then
-    allocate (rho%ns(2*Hubbard_lmax+1,2*Hubbard_lmax+1,nspin,nat))
-    allocate (rho%ns_nc(2*Hubbard_lmax+1,2*Hubbard_lmax+1,nspin,nat))
-   endif
-   if (okpaw)         allocate (rho%bec(nhm*(nhm+1)/2,nat,nspin))
-
    rho%of_g = 0._dp
-   if (dft_is_meta()) rho%kin_g = 0._dp
-   if (lda_plus_u) then
-     rho%ns       = 0._dp
-     rho%ns_nc    = 0._dp
+   if (dft_is_meta()) then
+      allocate (rho%kin_g( ngms, nspin ) )
+      rho%kin_g = 0._dp
+   end if
+   lda_plus_u_co = lda_plus_u .and. .not. (nspin == 4 )
+   lda_plus_u_nc = lda_plus_u .and.       (nspin == 4 )
+   if (lda_plus_u_nc) then
+      allocate (rho%ns_nc(2*Hubbard_lmax+1,2*Hubbard_lmax+1,nspin,nat))
+      rho%ns_nc    = 0._dp
    endif
-   if (okpaw)         rho%bec   = 0._dp
-   if (dipfield)      rho%el_dipole =  0._dp
+   if (lda_plus_u_co) then
+      allocate (rho%ns(2*Hubbard_lmax+1,2*Hubbard_lmax+1,nspin,nat))
+      rho%ns       = 0._dp
+   endif
+   if (okpaw) then
+      allocate (rho%bec(nhm*(nhm+1)/2,nat,nspin))
+      rho%bec   = 0._dp
+   end if
+   rho%el_dipole =  0._dp
    
  return
  END SUBROUTINE create_mix_type
@@ -221,10 +228,8 @@ CONTAINS
    rho_m%of_g(1:ngms,:) = rho_s%of_g(1:ngms,:)
    
    if (dft_is_meta()) rho_m%kin_g(1:ngms,:) = rho_s%kin_g(1:ngms,:)
-   if (lda_plus_u) then
-     rho_m%ns     = rho_s%ns
-     rho_m%ns_nc  = rho_s%ns_nc
-   endif
+   if (lda_plus_u_nc) rho_m%ns_nc  = rho_s%ns_nc
+   if (lda_plus_u_co) rho_m%ns     = rho_s%ns
    if (okpaw)         rho_m%bec = rho_s%bec
    
    if (dipfield) then
@@ -267,10 +272,8 @@ CONTAINS
       END DO
    end if
 
-   if (lda_plus_u) then
-     rho_s%ns(:,:,:,:)    = rho_m%ns(:,:,:,:)
-     rho_s%ns_nc(:,:,:,:) = rho_m%ns_nc(:,:,:,:)
-   endif 
+   if (lda_plus_u_nc) rho_s%ns_nc(:,:,:,:) = rho_m%ns_nc(:,:,:,:)
+   if (lda_plus_u_co) rho_s%ns(:,:,:,:)    = rho_m%ns(:,:,:,:)
    if (okpaw)      rho_s%bec(:,:,:)  = rho_m%bec(:,:,:)
        
    return
@@ -290,10 +293,8 @@ CONTAINS
      Y%kin_r = X%kin_r
      Y%kin_g = X%kin_g
   end if
-  if (lda_plus_u) then
-    Y%ns    = X%ns
-    Y%ns_nc = X%ns_nc
-  endif
+  if (lda_plus_u_nc) Y%ns_nc = X%ns_nc
+  if (lda_plus_u_co) Y%ns    = X%ns
   if (okpaw)      Y%bec = X%bec
   !
   RETURN
@@ -311,10 +312,8 @@ CONTAINS
   TYPE(mix_type), INTENT(INOUT) :: Y
   Y%of_g  = Y%of_g  + A * X%of_g
   if (dft_is_meta()) Y%kin_g = Y%kin_g + A * X%kin_g
-  if (lda_plus_u) then
-    Y%ns    = Y%ns    + A * X%ns
-    Y%ns_nc = Y%ns_nc + A * X%ns_nc
-  endif
+  if (lda_plus_u_nc) Y%ns_nc = Y%ns_nc + A * X%ns_nc
+  if (lda_plus_u_co) Y%ns = Y%ns + A * X%ns
   if (okpaw)     Y%bec = Y%bec + A * X%bec
   if (dipfield)  Y%el_dipole =  Y%el_dipole + A * X%el_dipole
   !
@@ -331,10 +330,8 @@ CONTAINS
   TYPE(mix_type), INTENT(INOUT) :: Y
   Y%of_g  = X%of_g
   if (dft_is_meta()) Y%kin_g = X%kin_g
-  if (lda_plus_u) then
-    Y%ns     = X%ns
-    Y%ns_nc  = X%ns_nc
-  endif
+  if (lda_plus_u_nc) Y%ns_nc  = X%ns_nc
+  if (lda_plus_u_co) Y%ns  = X%ns
   if (okpaw)      Y%bec = X%bec
   if (dipfield)   Y%el_dipole =  X%el_dipole
   !
@@ -352,10 +349,8 @@ CONTAINS
   TYPE(mix_type), INTENT(INOUT) :: X
   X%of_g(:,:)  = A * X%of_g(:,:)
   if (dft_is_meta()) X%kin_g = A * X%kin_g
-  if (lda_plus_u) then
-    X%ns    = A * X%ns
-    X%ns_nc = A * X%ns_nc
-  endif
+  if (lda_plus_u_nc) X%ns_nc = A * X%ns_nc
+  if (lda_plus_u_co) X%ns    = A * X%ns
   if (okpaw)      X%bec= A * X%bec
   if (dipfield)   X%el_dipole =  A * X%el_dipole
   !
@@ -403,45 +398,52 @@ CONTAINS
          rhoin%kin_r(:,:)= 0.d0
       endif
    endif
-   if (lda_plus_u) then
-     rhoin%ns(:,:,:,:)    = 0.d0
-     rhoin%ns_nc(:,:,:,:) = 0.d0
-   endif
+   if (lda_plus_u_nc) rhoin%ns_nc(:,:,:,:) = 0.d0
+   if (lda_plus_u_co) rhoin%ns(:,:,:,:)    = 0.d0
+
    return
  end subroutine high_frequency_mixing 
 
 
- subroutine diropn_mix_file( iunit, extension, exst )
+ subroutine open_mix_file( iunit, extension, exst )
+   USE control_flags,        ONLY : io_level
    implicit none
    character(len=*), intent(in) :: extension
    integer, intent(in) :: iunit
    logical :: exst
-   ! define lengths of different record chunks
+   ! define lengths (in real numbers) of different record chunks
    rlen_rho = 2 * ngms * nspin
    if (dft_is_meta() ) rlen_kin =  2 * ngms * nspin
-   if (lda_plus_u)     rlen_ldaU = (2*Hubbard_lmax+1)**2 *nspin*nat
-   if (okpaw)          rlen_bec =  (nhm*(nhm+1)/2) * nat * nspin
+   if (lda_plus_u_co)  rlen_ldaU = (2*Hubbard_lmax+1)**2 *nspin*nat
+   if (lda_plus_u_nc)  rlen_ldaU = 2 * (2*Hubbard_lmax+1)**2 *nspin*nat
+   if (okpaw)          rlen_bec = (nhm*(nhm+1)/2) * nat * nspin
    if (dipfield)       rlen_dip = 1
-   ! define total record length
-   record_length = rlen_rho + rlen_kin + rlen_ldaU + rlen_bec + rlen_dip
-   ! and the starting point of different chunks
+   ! define the starting point of the different chunks. Beware: each starting point
+   ! is the index of a COMPLEX array. When real arrays with odd dimension are copied
+   ! to/from the complex array io_buffer, the last complex number will be half-filled
+   ! but must still be counted as one!
    start_rho = 1
-   start_kin = start_rho + rlen_rho
-   start_ldaU = start_kin + rlen_kin
-   start_bec = start_ldaU + rlen_ldaU
-   start_dipole = start_bec + rlen_bec
+   start_kin = start_rho + rlen_rho / 2
+   start_ldaU = start_kin + rlen_kin / 2
+   start_bec = start_ldaU + ( rlen_ldaU + 1 ) / 2 
+   start_dipole = start_bec + ( rlen_bec + 1 ) / 2
+   ! define total record length, in complex numbers
+   record_length = start_dipole + rlen_dip - 1
    ! open file and allocate io_buffer
-   call diropn ( iunit, extension, record_length, exst)
-   allocate (io_buffer(record_length+1))
+   call open_buffer ( iunit, extension, record_length, io_level, exst)
+   allocate (io_buffer(record_length))
+   ! setting to zero -prevents trouble with "holes" due to odd dimensions of real arrays
+   io_buffer (:) = (0.0_dp, 0.0_dp)
    !
  return
- end subroutine diropn_mix_file
+ end subroutine open_mix_file
  !
- subroutine close_mix_file( iunit )
+ subroutine close_mix_file( iunit, stat )
    implicit none
    integer, intent(in) :: iunit
+   character(len=*), intent(in) :: stat
    deallocate (io_buffer)
-   close(iunit,status='keep')
+   call close_buffer ( iunit, trim(stat) ) 
    return
  end subroutine close_mix_file
 
@@ -449,26 +451,23 @@ CONTAINS
    implicit none
    type (mix_type) :: rho
    integer, intent(in) :: iunit, record, iflag
-   if (iflag > 0) then
-      
+
+   if (iflag > 0) then      
       call DCOPY(rlen_rho,rho%of_g,1,io_buffer(start_rho),1)
-      if (dft_is_meta()) call DCOPY(rlen_kin, rho%kin_g,1,io_buffer(start_kin),1)
-      if (lda_plus_u)    call DCOPY(rlen_ldaU,rho%ns,   1,io_buffer(start_ldaU),1)
-      if (lda_plus_u)    call DCOPY(rlen_ldaU,rho%ns_nc, 1,io_buffer(start_ldaU),1)
-      if (okpaw)         call DCOPY(rlen_bec, rho%bec,  1,io_buffer(start_bec),1)
-      if (dipfield)      call DCOPY(1, rho%el_dipole,  1,io_buffer(start_dipole),1)
-      
-   end if
-   CALL davcio( io_buffer, record_length, iunit, record, iflag )
-   if (iflag < 0) then
-
+      if (dft_is_meta())  call DCOPY(rlen_kin, rho%kin_g,1,io_buffer(start_kin),1)
+      if (lda_plus_u_nc)  call DCOPY(rlen_ldaU,rho%ns_nc, 1,io_buffer(start_ldaU),1)
+      if (lda_plus_u_co)  call DCOPY(rlen_ldaU,rho%ns,   1,io_buffer(start_ldaU),1)
+      if (okpaw)          call DCOPY(rlen_bec, rho%bec,  1,io_buffer(start_bec),1)
+      if (dipfield)       io_buffer(start_dipole) = CMPLX ( rho%el_dipole, 0.0_dp )
+      CALL save_buffer( io_buffer, record_length, iunit, record )   
+   else if (iflag < 0 ) then 
+      CALL get_buffer( io_buffer, record_length, iunit, record )
       call DCOPY(rlen_rho,io_buffer(start_rho),1,rho%of_g,1)
-      if (dft_is_meta()) call DCOPY(start_kin,io_buffer(start_kin), 1,rho%kin_g,1)
-      if (lda_plus_u)    call DCOPY(rlen_ldaU,io_buffer(start_ldaU),1,rho%ns,1)
-      if (lda_plus_u)    call DCOPY(rlen_ldaU,io_buffer(start_ldaU),1,rho%ns_nc,1)
+      if (dft_is_meta()) call DCOPY(rlen_kin,io_buffer(start_kin), 1,rho%kin_g,1)
+      if (lda_plus_u_co) call DCOPY(rlen_ldaU,io_buffer(start_ldaU),1,rho%ns,1)
+      if (lda_plus_u_nc) call DCOPY(rlen_ldaU,io_buffer(start_ldaU),1,rho%ns_nc,1)
       if (okpaw)         call DCOPY(rlen_bec, io_buffer(start_bec), 1,rho%bec,1)
-      if (dipfield)      call DCOPY(1, io_buffer(start_dipole), 1, rho%el_dipole, 1)
-
+      if (dipfield)      rho%el_dipole = REAL ( io_buffer(start_dipole) )
    end if
  end subroutine davcio_mix_type
  !
@@ -610,7 +609,7 @@ CONTAINS
   ! 
   ! Beware: paw_ddot has a hidden parallelization on all processors
   !         it must be called on all processors or else it will hang
-  !
+  ! Beware: commented out because it yields too often negative values
 #ifdef MIX_PAW
   IF (okpaw)         rho_ddot = rho_ddot + paw_ddot(rho1%bec, rho2%bec)
 #endif
@@ -828,12 +827,9 @@ END FUNCTION ns_ddot
      CALL mp_bcast ( rho%kin_g, root, comm )
      CALL mp_bcast ( rho%kin_r, root, comm )
   END IF
-  IF ( lda_plus_u ) THEN
-     CALL mp_bcast ( rho%ns,    root, comm )
-     CALL mp_bcast ( rho%ns_nc, root, comm )
-  END IF
-  IF ( okpaw ) &
-     CALL mp_bcast ( rho%bec,   root, comm )
+  IF ( lda_plus_u_co) CALL mp_bcast ( rho%ns,    root, comm )
+  IF ( lda_plus_u_nc) CALL mp_bcast ( rho%ns_nc, root, comm )
+  IF ( okpaw )        CALL mp_bcast ( rho%bec,   root, comm )
   !
   END SUBROUTINE
  !

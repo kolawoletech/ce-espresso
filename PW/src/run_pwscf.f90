@@ -12,7 +12,7 @@ SUBROUTINE run_pwscf ( conv )
   ! ... Run an instance of the Plane Wave Self-Consistent Field code 
   ! ... MPI initialization and input data reading is performed in the 
   ! ... calling code - returns in "conv" whether successfully completed
-  ! ... Will be eventualy merged with NEB
+  ! ... Will be eventually merged with NEB
   !
   USE io_global,        ONLY : stdout, ionode, ionode_id
   USE parameters,       ONLY : ntypx, npk, lmaxx
@@ -32,6 +32,7 @@ SUBROUTINE run_pwscf ( conv )
   LOGICAL, INTENT(OUT) :: conv
   !
   !
+  CONV = .false.
   IF ( ionode ) WRITE( unit = stdout, FMT = 9010 ) ntypx, npk, lmaxx
   !
   IF (ionode) CALL plugin_arguments()
@@ -62,22 +63,26 @@ SUBROUTINE run_pwscf ( conv )
   !
   CALL init_run()
   !
-  IF ( check_stop_now() ) THEN
-     CALL punch( 'all' )
-     conv = .TRUE.
-     RETURN
-  ENDIF
+  ! ... dry run: code will stop here if called with exit file present
+  ! ... useful for a quick and automated way to check input data
+  !
+  IF ( check_stop_now() ) RETURN
   !
   main_loop: DO
      !
-     ! ... electronic self-consistency
+     ! ... electronic self-consistency or band structure calculation
      !
-     CALL electrons()
+     IF ( .NOT. lscf) THEN
+        CALL non_scf ()
+     ELSE
+        CALL electrons()
+     END IF
      !
-     IF ( .NOT. conv_elec ) THEN
-       CALL punch( 'all' )
-       conv = .FALSE.
-       RETURN
+     ! ... code stopped by user or not converged
+     !
+     IF ( check_stop_now() .OR. .NOT. conv_elec ) THEN
+        CALL punch( 'config' )
+        RETURN
      ENDIF
      !
      ! ... ionic section starts here
@@ -87,7 +92,7 @@ SUBROUTINE run_pwscf ( conv )
      !
      ! ... recover from a previous run, if appropriate
      !
-     IF ( restart .AND. lscf ) CALL restart_in_ions()
+     !IF ( restart .AND. lscf ) CALL restart_in_ions()
      !
      ! ... file in CASINO format written here if required
      !
@@ -116,7 +121,7 @@ SUBROUTINE run_pwscf ( conv )
         IF ( istep < nstep .AND. .NOT. conv_ions ) THEN
            !
            CALL punch( 'config' )
-           CALL save_in_ions()
+           !CALL save_in_ions()
            !
         END IF
         !

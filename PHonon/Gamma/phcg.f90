@@ -505,7 +505,7 @@ SUBROUTINE newscf
   CALL openfil
   !
   CALL hinit1
-  CALL electrons
+  CALL non_scf ( )
   !
   CLOSE(unit=iunwfc, status='keep')
   CLOSE(unit=iunigk, status='delete')

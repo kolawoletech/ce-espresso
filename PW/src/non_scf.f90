@@ -1,5 +1,5 @@
 !
-! Copyright (C) 2001-2011 Quantum ESPRESSO group
+! Copyright (C) 2001-2013 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
@@ -7,14 +7,15 @@
 !  
 !
 !-----------------------------------------------------------------------
-  SUBROUTINE non_scf (ik_)
+  SUBROUTINE non_scf ( )
   !-----------------------------------------------------------------------
   !
   ! ... diagonalization of the KS hamiltonian in the non-scf case
   !
   USE kinds,                ONLY : DP
   USE bp,                   ONLY : lelfield, lberry, lorbm
-  USE control_flags,        ONLY : io_level
+  USE check_stop,           ONLY : stopped_by_user
+  USE control_flags,        ONLY : io_level, conv_elec
   USE ener,                 ONLY : ef
   USE io_global,            ONLY : stdout, ionode
   USE io_files,             ONLY : iunwfc, nwordwfc, iunefield
@@ -26,29 +27,33 @@
   !
   IMPLICIT NONE
   !
-  INTEGER, INTENT (in) :: ik_
-  !
   ! ... local variables
   !
-  INTEGER :: iter = 1, i, ik
-  REAL(DP) :: dr2 = 0.d0
+  INTEGER :: iter, i
   REAL(DP), EXTERNAL :: get_clock
   !
   !
   CALL start_clock( 'electrons' )
+  iter = 1
   !
   WRITE( stdout, 9002 )
-  !
   CALL flush_unit( stdout )
   !
   IF ( lelfield) THEN
      !
-     CALL c_bands_efield ( iter, ik_, dr2 )
+     CALL c_bands_efield ( iter )
      !
   ELSE
      !
-     CALL c_bands_nscf ( ik_ )
+     CALL c_bands_nscf ( )
      !
+  END IF
+  !
+  ! ... check if calculation was stopped in c_bands
+  !
+  IF ( stopped_by_user ) THEN
+     conv_elec=.FALSE.
+     RETURN
   END IF
   !
   ! ... xk, wk, isk, et, wg are distributed across pools;
@@ -73,8 +78,9 @@
   !
   WRITE( stdout, 9102 )
   !
-  ! ... write band eigenvalues
+  ! ... write band eigenvalues (conv_elec is used in print_ks_energies)
   !
+  conv_elec = .true.
   CALL print_ks_energies ( ) 
   !
   ! ... save converged wfc if they have not been written previously
@@ -97,3 +103,4 @@
 9102 FORMAT(/'     End of band structure calculation' )
   !
 END SUBROUTINE non_scf
+

@@ -1,3 +1,8 @@
+New in svn version
+
+   * Added the subdirectory FD in PHonon. Calculation of phonon dispersions using
+     the finite displacements supercell approach.
+
 Incompatible changes in svn version:
 
    * Routine "electrons" doesn't deal any longer with non-scf cases;
@@ -16,6 +21,8 @@ New in svn version:
 
 Fixed in svn version:
 
+   * D3: bug when the crystal has symmetry but the small group of the 
+     q-point has no symmetry.
    * Bogus "file not found" error in pp.x when extracting quantities not
      requiring wave functions if these were "collected" - v.5.0.2 only
    * some quantities calculated in real space (including the charge itself

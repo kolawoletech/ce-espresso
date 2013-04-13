@@ -157,9 +157,7 @@ read_file.o \
 regterg.o \
 remove_atomic_rho.o \
 report_mag.o \
-restart_from_file.o \
 restart_in_electrons.o \
-restart_in_ions.o \
 rho2zeta.o \
 rotate_wfc.o \
 rotate_wfc_k.o \
@@ -170,7 +168,6 @@ s_1psi.o \
 s_psi.o \
 save_in_cbands.o \
 save_in_electrons.o \
-save_in_ions.o \
 scale_h.o \
 scf_mod.o \
 set_kplusq.o \

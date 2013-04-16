@@ -91,7 +91,7 @@ subroutine ld1_writeout
         if(upf_v1_format) then
             call write_upf_v1(iunps)
         else
-            call export_upf(iunps, unit_loc)
+            call export_upf(iunps, qestdin)
         endif
         !
         if(lpaw) call deallocate_pseudo_paw( pawsetup )

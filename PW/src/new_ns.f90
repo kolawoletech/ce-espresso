@@ -16,8 +16,8 @@ SUBROUTINE new_ns(ns)
   ! f_{kv} <\fi^{at}_{I,m1}|\psi_{k,v,s}><\psi_{k,v,s}|\fi^{at}_{I,m2}>
 
   !  It seems that the order of {m1, m2} in the definition should be opposite. 
-  !  Hovewer, since ns is symmetric (and real for collinear case, due to time reversal) 
-  !  it does not matter.  
+  !  Hovewer, since ns is symmetric (and real for collinear case, due to time
+  !  reversal) it does not matter.  
   !  (A.Smogunov) 
 
 
@@ -25,10 +25,10 @@ SUBROUTINE new_ns(ns)
   USE io_global,            ONLY : stdout
   USE kinds,                ONLY : DP
   USE ions_base,            ONLY : nat, ityp
-  USE basis,                ONLY : natomwfc
   USE klist,                ONLY : nks, ngk
-  USE ldaU,                 ONLY : Hubbard_lmax, Hubbard_l, oatwfc, q_ae, &
-                                   U_projection, Hubbard_U, Hubbard_alpha, swfcatom
+  USE ldaU,                 ONLY : Hubbard_lmax, Hubbard_l, q_ae, wfcU, &
+                                   U_projection, is_hubbard, nwfcU, offsetU, &
+                                   oatwfc, swfcatom, copy_U_wfc
   USE symm_base,            ONLY : d1, d2, d3
   USE lsda_mod,             ONLY : lsda, current_spin, nspin, isk
   USE symm_base,            ONLY : nsym, irt
@@ -46,19 +46,18 @@ SUBROUTINE new_ns(ns)
   !
   REAL(DP), INTENT(OUT) :: ns(2*Hubbard_lmax+1,2*Hubbard_lmax+1,nspin,nat)
   !
-  TYPE (bec_type) :: proj     ! proj(natomwfc,nbnd)
+  TYPE (bec_type) :: proj     ! proj(nwfcU,nbnd)
   INTEGER :: ik, ibnd, is, i, na, nb, nt, isym, m1, m2, m0, m00, ldim
   ! counter on k points
   !    "    "  bands
   !    "    "  spins
-  ! in the natomwfc ordering
   REAL(DP) , ALLOCATABLE :: nr (:,:,:,:)
   REAL(DP) :: psum
 
   CALL start_clock('new_ns')
   ldim = 2 * Hubbard_lmax + 1
   ALLOCATE( nr(ldim,ldim,nspin,nat) )  
-  CALL allocate_bec_type ( natomwfc, nbnd, proj ) 
+  CALL allocate_bec_type ( nwfcU, nbnd, proj ) 
   !
   ! D_Sl for l=1, l=2 and l=3 are already initialized, for l=0 D_S0 is 1
   !
@@ -87,7 +86,10 @@ SUBROUTINE new_ns(ns)
         !
      ELSE
         CALL get_buffer (swfcatom, nwordatwfc, iunsat, ik)
-        CALL calbec ( npw, swfcatom, evc, proj )
+!!!
+        call copy_U_wfc ()
+!!!
+        CALL calbec ( npw, wfcU, evc, proj )
      END IF
      !
      ! compute the occupation numbers (the quantities n(m1,m2)) of the
@@ -95,20 +97,20 @@ SUBROUTINE new_ns(ns)
      !
      DO na = 1, nat  
         nt = ityp (na)  
-        IF (Hubbard_U(nt).NE.0.d0 .OR. Hubbard_alpha(nt).NE.0.d0) THEN  
+        IF ( is_hubbard(nt) ) THEN  
            DO m1 = 1, 2 * Hubbard_l(nt) + 1  
               DO m2 = m1, 2 * Hubbard_l(nt) + 1
                  IF ( gamma_only ) THEN
                     DO ibnd = 1, nbnd  
                        nr(m1,m2,current_spin,na) = nr(m1,m2,current_spin,na) + &
-                            proj%r(oatwfc(na)+m2,ibnd) * &
-                            proj%r(oatwfc(na)+m1,ibnd) * wg(ibnd,ik) 
+                            proj%r(offsetU(na)+m2,ibnd) * &
+                            proj%r(offsetU(na)+m1,ibnd) * wg(ibnd,ik) 
                     ENDDO
                  ELSE
                     DO ibnd = 1, nbnd  
                        nr(m1,m2,current_spin,na) = nr(m1,m2,current_spin,na) + &
-                            DBLE( proj%k(oatwfc(na)+m2,ibnd) * &
-                            CONJG(proj%k(oatwfc(na)+m1,ibnd)) ) * wg(ibnd,ik) 
+                            DBLE( proj%k(offsetU(na)+m2,ibnd) * &
+                            CONJG(proj%k(offsetU(na)+m1,ibnd)) ) * wg(ibnd,ik) 
                     ENDDO
                  END IF
               ENDDO
@@ -140,7 +142,7 @@ SUBROUTINE new_ns(ns)
   ! symmetrize the quantities nr -> ns
   DO na = 1, nat  
      nt = ityp (na)  
-     IF (Hubbard_U(nt).NE.0.d0 .OR. Hubbard_alpha(nt).NE.0.d0) THEN  
+     IF ( is_hubbard(nt) ) THEN  
         DO is = 1, nspin  
            DO m1 = 1, 2 * Hubbard_l(nt) + 1  
               DO m2 = 1, 2 * Hubbard_l(nt) + 1  
@@ -180,7 +182,7 @@ SUBROUTINE new_ns(ns)
   ! Now we make the matrix ns(m1,m2) strictly hermitean
   DO na = 1, nat  
      nt = ityp (na)  
-     IF (Hubbard_U(nt).NE.0.d0 .OR. Hubbard_alpha(nt).NE.0.d0) THEN  
+     IF ( is_hubbard(nt) ) THEN  
         DO is = 1, nspin  
            DO m1 = 1, 2 * Hubbard_l(nt) + 1  
               DO m2 = m1, 2 * Hubbard_l(nt) + 1  
@@ -220,7 +222,7 @@ SUBROUTINE new_ns(ns)
     USE uspp_param,           ONLY : nhm, nh
     !
     IMPLICIT NONE
-    REAL(DP), INTENT(IN) :: q(natomwfc,nhm,nat)
+    REAL(DP), INTENT(IN) :: q(nwfcU,nhm,nat)
     TYPE(bec_type), INTENT(INOUT) :: p
     !
     INTEGER :: ib, iw, nt, na, ijkb0, ikb, ih
@@ -247,14 +249,14 @@ SUBROUTINE new_ns(ns)
           !
           IF ( ityp(na) == nt ) THEN
              !
-             IF ( Hubbard_U(nt).NE.0.D0 .OR. Hubbard_alpha(nt).NE.0.D0 ) THEN
+             IF ( is_hubbard(nt) ) THEN
                 !
                 DO ib = 1, nbnd
                    !
                    DO ih = 1, nh(nt)
                       !
                       ikb = ijkb0 + ih
-                      DO iw = 1, natomwfc
+                      DO iw = 1, nwfcU
                          !
                          IF ( gamma_only ) THEN
                             p%r(iw,ib) = p%r(iw,ib) + q(iw,ih,na)*becp%r(ikb,ib)
@@ -283,7 +285,6 @@ SUBROUTINE new_ns(ns)
     RETURN
   END SUBROUTINE compute_pproj
   !
-
 END SUBROUTINE new_ns 
 
 
@@ -292,14 +293,13 @@ SUBROUTINE new_ns_nc(ns)
   !
   ! Noncollinear version (A. Smogunov). 
   !
-
   USE io_global,            ONLY : stdout
   USE kinds,                ONLY : DP
   USE ions_base,            ONLY : nat, ityp
-  USE basis,                ONLY : natomwfc
   USE klist,                ONLY : nks, ngk
-  USE ldaU,                 ONLY : Hubbard_lmax, Hubbard_l, oatwfc, &
-                                   Hubbard_U, Hubbard_alpha, swfcatom, d_spin_ldau
+  USE ldaU,                 ONLY : Hubbard_lmax, Hubbard_l, wfcU, &
+                                   d_spin_ldau, is_hubbard, nwfcU, offsetU, &
+                                   oatwfc, swfcatom, copy_U_wfc
   USE symm_base,            ONLY : d1, d2, d3
   USE lsda_mod,             ONLY : lsda, current_spin, nspin, isk
   USE noncollin_module, ONLY : noncolin, npol
@@ -332,7 +332,7 @@ SUBROUTINE new_ns_nc(ns)
   ldim = 2 * Hubbard_lmax + 1
 
   ALLOCATE( nr(ldim,ldim,npol,npol,nat), nr1(ldim,ldim,npol,npol,nat) )  
-  ALLOCATE( proj(natomwfc,nbnd) )
+  ALLOCATE( proj(nwfcU,nbnd) )
 
   nr  (:,:,:,:,:) = 0.d0
   nr1 (:,:,:,:,:) = 0.d0
@@ -350,12 +350,15 @@ SUBROUTINE new_ns_nc(ns)
         CALL get_buffer  (evc, nwordwfc, iunwfc, ik)
      END IF
      CALL get_buffer (swfcatom, nwordatwfc, iunsat, ik)
+!!!
+     call copy_U_wfc ()
+!!!
      !
-     ! make the projection
+     ! make the projection - FIXME: use ZGEMM or calbec instead
      !
      DO ibnd = 1, nbnd
-       DO i = 1, natomwfc
-         proj(i, ibnd) = zdotc (npwx*npol, swfcatom (1, i), 1, evc (1, ibnd), 1)
+       DO i = 1, nwfcU
+         proj(i, ibnd) = zdotc (npwx*npol, wfcU (1, i), 1, evc (1, ibnd), 1)
        ENDDO
      ENDDO
 #ifdef __MPI
@@ -366,7 +369,7 @@ SUBROUTINE new_ns_nc(ns)
      !
      do na = 1, nat  
         nt = ityp (na)  
-        if (Hubbard_U(nt).ne.0.d0) then  
+        if ( is_hubbard(nt) ) then  
           ldim = 2 * Hubbard_l(nt) + 1
 
           do m1 = 1, 2 * Hubbard_l(nt) + 1
@@ -376,8 +379,8 @@ SUBROUTINE new_ns_nc(ns)
 
                   do ibnd = 1, nbnd
                     nr(m1,m2,is1,is2,na) = nr(m1,m2,is1,is2,na) + &
-                            wg(ibnd,ik) * CONJG( proj(oatwfc(na)+m1+ldim*(is1-1),ibnd) ) * &
-                                           proj(oatwfc(na)+m2+ldim*(is2-1),ibnd)
+                            wg(ibnd,ik) * CONJG( proj(offsetU(na)+m1+ldim*(is1-1),ibnd) ) * &
+                                           proj(offsetU(na)+m2+ldim*(is2-1),ibnd)
                   enddo
 
                 enddo
@@ -397,7 +400,7 @@ SUBROUTINE new_ns_nc(ns)
 !
   do na = 1, nat  
     nt = ityp (na)  
-    if (Hubbard_U(nt).ne.0.d0) then  
+    if ( is_hubbard(nt) ) then  
 
       do m1 = 1, 2 * Hubbard_l(nt) + 1  
         do m2 = 1, 2 * Hubbard_l(nt) + 1  
@@ -486,7 +489,7 @@ loopisym:     do isym = 1, nsym
 !
   DO na = 1, nat
      nt = ityp (na)
-     IF (Hubbard_U(nt).NE.0.d0) THEN
+     IF ( is_hubbard(nt) ) THEN
         DO is1 = 1, npol
          do is2 = 1, npol
            i = npol*(is1-1) + is2
@@ -505,7 +508,7 @@ loopisym:     do isym = 1, nsym
 !
   DO na = 1, nat  
      nt = ityp (na)  
-     IF (Hubbard_U(nt).NE.0.d0 .OR. Hubbard_alpha(nt).NE.0.d0) THEN  
+     IF ( is_hubbard(nt) ) THEN  
         DO is1 = 1, npol  
          do is2 = 1, npol
            i = npol*(is1-1) + is2
@@ -528,14 +531,10 @@ loopisym:     do isym = 1, nsym
      ENDIF 
   ENDDO
 !--
-
-
   DEALLOCATE ( nr, nr1 )
   CALL stop_clock('new_ns')
 
   RETURN
 
 END SUBROUTINE new_ns_nc
-
-
 

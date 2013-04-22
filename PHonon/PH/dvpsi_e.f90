@@ -129,7 +129,7 @@ subroutine dvpsi_e (ik, ipol)
      ! for effective charges
      !
      nrec = (ipol - 1) * nksq + ik
-     call davcio (dvpsi, lrcom, iucom, nrec, 1)
+     call save_buffer(dvpsi, lrcom, iucom, nrec)
      !
      allocate (spsi ( npwx*npol, nbnd))
      CALL calbec (npw, vkb, dvpsi, becp )
@@ -142,7 +142,7 @@ subroutine dvpsi_e (ik, ipol)
   IF (nkb > 0) call deallocate_bec_type (becp2)
 
   nrec = (ipol - 1)*nksq + ik
-  call davcio(dvpsi, lrebar, iuebar, nrec, 1)
+  call save_buffer(dvpsi, lrebar, iuebar, nrec)
   this_pcxpsi_is_on_file(ik,ipol) = .true.
   call stop_clock ('dvpsi_e')
   return

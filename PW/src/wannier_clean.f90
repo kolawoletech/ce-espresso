@@ -17,7 +17,8 @@ subroutine wannier_clean()
   USE wannier_new, only: wan_in, wan_pot, wannier_energy, wannier_occ, pp, coef
   USE io_files
   USE buffers
-  USE ldaU,       ONLY : swfcatom, lda_plus_u
+  USE basis,      ONLY : swfcatom
+  USE ldaU,       ONLY : lda_plus_u
   USE fixed_occ, ONLY : one_atom_occupations
   
   IMPLICIT NONE
@@ -34,8 +35,6 @@ subroutine wannier_clean()
   CALL close_buffer( iunwf, 'keep' )
   
   IF ( .NOT. ( lda_plus_u .OR. one_atom_occupations ) ) THEN
-     INQUIRE( UNIT = iunat, OPENED = opnd )  
-     IF ( opnd ) CALL close_buffer( iunat, 'delete' )
      INQUIRE( UNIT = iunsat, OPENED = opnd )  
      IF ( opnd ) CALL close_buffer( iunsat, 'delete' )
   END IF

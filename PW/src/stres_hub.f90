@@ -128,14 +128,15 @@ SUBROUTINE dndepsilon ( dns,ldim,ipol,jpol )
    USE control_flags,        ONLY : gamma_only   
    USE klist,                ONLY : nks, xk, ngk
    USE ldaU,                 ONLY : wfcU, nwfcU, offsetU, Hubbard_l, &
-                                    is_hubbard, oatwfc, swfcatom, copy_U_wfc
+                                    is_hubbard, oatwfc, copy_U_wfc
+   USE basis,                ONLY : swfcatom
    USE lsda_mod,             ONLY : lsda, nspin, current_spin, isk
    USE wvfct,                ONLY : nbnd, npwx, npw, igk, wg
    USE uspp,                 ONLY : nkb, vkb
    USE becmod,               ONLY : bec_type, becp, calbec, &
                                     allocate_bec_type, deallocate_bec_type
    USE io_files,             ONLY : iunigk, nwordwfc, iunwfc, &
-                                    iunat, iunhub, nwordwfcU, nwordatwfc
+                                    iunhub, nwordwfcU, nwordatwfc
    USE buffers,              ONLY : get_buffer
    USE mp_global,            ONLY : inter_pool_comm
    USE mp,                   ONLY : mp_sum
@@ -185,11 +186,10 @@ SUBROUTINE dndepsilon ( dns,ldim,ipol,jpol )
       CALL init_us_2 (npw,igk,xk(1,ik),vkb)
       CALL calbec( npw, vkb, evc, becp )
       CALL s_psi  (npwx, npw, nbnd, evc, spsi )
-! read atomic wfc - swfcatom is used as work space
-      CALL get_buffer (swfcatom, nwordatwfc, iunat, ik)
-!!!
-      call copy_U_wfc ( )
-!!!  
+! re-calculate atomic wfc - swfcatom is used as work space
+! (must be modified in order to account for nocolinear case)
+      CALL atomic_wfc (ik, swfcatom)
+      call copy_U_wfc (swfcatom)
       IF ( gamma_only ) THEN
          CALL dprojdepsilon_gamma (wfcU, spsi, ipol, jpol, dproj%r)
       ELSE

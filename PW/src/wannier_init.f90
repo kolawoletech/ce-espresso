@@ -18,12 +18,12 @@ SUBROUTINE wannier_init(hwwa)
   USE input_parameters, only: constrain_pot, wan_data
   USE lsda_mod, only: nspin
   USE ions_base, only : nat
-  USE basis, only : natomwfc
+  USE basis, only : natomwfc, swfcatom
   USE constants, only: rytoev
   USE klist, only: nks
   USE io_files
   USE buffers
-  USE ldaU,       ONLY : swfcatom, U_projection
+  USE ldaU,       ONLY : U_projection
   USE noncollin_module, ONLY : npol
 
   IMPLICIT NONE 
@@ -74,8 +74,6 @@ SUBROUTINE wannier_init(hwwa)
   U_projection = 'ortho-atomic'
   
   nwordatwfc = npwx*natomwfc*npol
-  INQUIRE( UNIT = iunat, OPENED = opnd )
-  IF(.NOT. opnd) CALL open_buffer( iunat, 'atwfc', nwordatwfc,io_level,exst )
   INQUIRE( UNIT = iunsat, OPENED = opnd )
   IF(.NOT. opnd) CALL open_buffer( iunsat,'satwfc',nwordatwfc,io_level,exst )
 

@@ -47,15 +47,18 @@ subroutine wannier_proj(ik, wan_func)
   current_spin = 1
   IF (lsda) current_spin  = isk(ik)
   
-  !Read current wavefunctions
+  ! Read current wavefunctions
+  !
   evc = ZERO
-  call get_buffer ( evc, nwordwfc, iunwfc, ik )  
+  ! See comment in PP/src/openfil.f90 why davcio and not get_buffer
+  ! call get_buffer ( evc, nwordwfc, iunwfc, ik )  
+  call davcio ( evc, nwordwfc, iunwfc, ik, -1 )  
   ! Reads ortho-atomic wfc
   ! You should prepare data using orthoatwfc.f90
   swfcatom = ZERO
   CALL get_buffer (swfcatom, nwordatwfc, iunsat, ik)
   
-  ! generates trial wavefunctions as a summ of ingridients
+  ! generates trial wavefunctions as a sum of ingredients
   trialwf = ZERO
   do iwan=1, nwan
      do j=1,wan_in(iwan,current_spin)%ning
@@ -67,7 +70,7 @@ subroutine wannier_proj(ik, wan_func)
      end do
   end do
   
-  ! copmputes <\Psi|\hat S|\phi> for all \Psi and \phi
+  ! computes <\Psi|\hat S|\phi> for all \Psi and \phi
   ! later one should select only few columns 
   pp = ZERO
   DO ibnd = 1, nbnd

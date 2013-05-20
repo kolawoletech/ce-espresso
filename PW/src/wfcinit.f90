@@ -51,7 +51,7 @@ SUBROUTINE wfcinit()
   ! ... now the various possible wavefunction initializations
   ! ... first a check: is "tmp_dir"/"prefix".wfc found on disk?
   !
-  IF ( TRIM(starting_wfc) == 'file' .AND. .NOT. exst)  THEN
+  IF ( TRIM(starting_wfc) == 'file' .AND. .NOT. exst) THEN
      !
      ! ... "tmp_dir"/"prefix".wfc not found on disk: try to read
      ! ... wavefunctions in "collected" format from "prefix".save/, 

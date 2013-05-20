@@ -145,7 +145,7 @@ CONTAINS
          &    "395502 (2009);", &
          &/9X," URL http://www.quantum-espresso.org"", ", &
          &/5X,"in publications or presentations arising from this work. More details at",&
-         &/5x,"http://www.quantum-espresso.org/quote.php")' )
+         &/5x,"http://www.quantum-espresso.org/quote")' )
 
     RETURN
   END SUBROUTINE opening_message
@@ -202,8 +202,8 @@ CONTAINS
     IF ( nproc_bgrp > 1 ) WRITE( stdout, &
          '(5X,"R & G space division:  proc/nbgrp/npool/nimage = ",I7)' ) nproc_bgrp
     IF ( get_ntask_groups() > 1 ) WRITE( stdout, &
-         '(5X,"wavefunctions fft division:  fft/group = ",I7)' ) &
-         get_ntask_groups()
+         '(5X,"wavefunctions fft division:  fft and procs/group = ",2I7)' ) &
+         get_ntask_groups(), nproc_bgrp / get_ntask_groups()
     !
   END SUBROUTINE parallel_info
 

@@ -621,6 +621,10 @@ work_function.o : ../../Modules/mp.o
 work_function.o : ../../Modules/recvec.o
 work_function.o : ../../PW/src/pwcom.o
 work_function.o : ../../PW/src/scf_mod.o
+write_io_header.o : ../../Modules/ions_base.o
+write_io_header.o : ../../Modules/kind.o
+write_io_header.o : ../../Modules/noncol.o
+write_io_header.o : ../../PW/src/pwcom.o
 write_p_avg.o : ../../Modules/becmod.o
 write_p_avg.o : ../../Modules/cell_base.o
 write_p_avg.o : ../../Modules/constants.o
@@ -636,6 +640,13 @@ write_p_avg.o : ../../Modules/uspp.o
 write_p_avg.o : ../../Modules/wavefunctions.o
 write_p_avg.o : ../../PW/src/ldaU.o
 write_p_avg.o : ../../PW/src/pwcom.o
+write_proj.o : ../../Modules/cell_base.o
+write_proj.o : ../../Modules/io_files.o
+write_proj.o : ../../Modules/kind.o
+write_proj.o : ../../Modules/noncol.o
+write_proj.o : ../../PW/src/atomic_wfc_mod.o
+write_proj.o : ../../PW/src/pwcom.o
+write_proj.o : ../../iotk/src/iotk_module.o
 xctest.o : ../../Modules/funct.o
 xctest.o : ../../Modules/kind.o
 xctest.o : ../../Modules/mp.o

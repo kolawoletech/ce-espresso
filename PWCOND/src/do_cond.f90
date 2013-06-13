@@ -542,6 +542,7 @@ CALL mp_bcast( last_k, ionode_id )
          ! To add T(k) to the total T
          !
          tran_tot(ien) = tran_tot(ien) + wkpt(ik)*tk
+         if (tk_plot.gt.0) tran_k(ik) = tk
          if (lorb) CALL transmit(ik, ien, tk, .false.)
 
          !
@@ -560,9 +561,6 @@ CALL mp_bcast( last_k, ionode_id )
          ENDIF
          !!!
 
-         if (tk_plot.gt.0) tran_k(ik) = tk
-         tran_tot(ien) = tran_tot(ien) + wkpt(ik)*tk
-
       ENDIF
 
       if (loop_ek) CALL free_mem
@@ -571,6 +569,8 @@ CALL mp_bcast( last_k, ionode_id )
 
     if (ikind.ne.0.and.tk_plot.gt.0.and.ionode) &
              CALL summary_tran_k(ien,nk1ts,nk2ts,k1ts,k2ts)
+
+    if (.not.loop_ek) CALL free_mem
 
   ENDDO
 

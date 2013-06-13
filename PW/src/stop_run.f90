@@ -6,12 +6,14 @@
 ! or http://www.gnu.org/copyleft/gpl.txt .
 !
 !----------------------------------------------------------------------------
-SUBROUTINE stop_run( lflag )
+SUBROUTINE stop_run( exit_status )
   !----------------------------------------------------------------------------
   !
   ! ... Close all files and synchronize processes before stopping.
-  ! ... Called at the end of the run with flag = .TRUE. (removes 'restart')
-  ! ... or during execution with flag = .FALSE. (does not remove 'restart')
+  ! ... If exit_status = 0, successfull execution, remove temporary files
+  ! ... If exit_status =-1, code stopped by user request, or
+  !        exit_status = 1, convergence not achieved :
+  ! ... do not remove temporary files needed for restart. 
   !
   USE io_global,          ONLY : ionode
   USE mp_global,          ONLY : mp_global_end
@@ -20,10 +22,11 @@ SUBROUTINE stop_run( lflag )
   !
   IMPLICIT NONE
   !
-  LOGICAL, INTENT(IN) :: lflag
-  LOGICAL             :: exst, opnd
+  INTEGER, INTENT(IN) :: exit_status
+  LOGICAL             :: exst, opnd, lflag
   !
-  IF (lflag ) THEN
+  lflag = ( exit_status == 0 ) 
+  IF ( lflag ) THEN
      ! 
      ! ... remove files needed only to restart
      !
@@ -49,14 +52,27 @@ SUBROUTINE stop_run( lflag )
   !
   CALL clean_pw( .TRUE. )
   !
-  IF ( lflag ) THEN
-     !
+  IF ( exit_status == -1 ) THEN
+     ! -1 is not an acceptable value for stop in fortran;
+     ! convert it to 255
+     STOP 255
+  ELSE IF ( exit_status == 0 ) THEN
      STOP
-     !
-  ELSE
-     !
+  ELSE IF ( exit_status == 1 ) THEN
      STOP 1
-     !
+  ELSE IF ( exit_status == 2 ) THEN
+     STOP 2
+  ELSE IF ( exit_status == 3 ) THEN
+     STOP 3
+  ELSE IF ( exit_status == 4 ) THEN
+     STOP 4
+  ELSE IF ( exit_status == 255 ) THEN
+     STOP 255
+  ELSE IF ( exit_status == 254 ) THEN
+     STOP 254
+  ELSE
+     ! unimplemented value
+     STOP 128
   END IF
   !
 END SUBROUTINE stop_run
@@ -72,7 +88,7 @@ SUBROUTINE closefile()
   !
   WRITE( stdout,'(5X,"Signal Received, stopping ... ")')
   !
-  CALL stop_run( .FALSE. )
+  CALL stop_run( 255 )
   !
   RETURN
   !

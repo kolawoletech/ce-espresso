@@ -35,8 +35,8 @@ PROGRAM lr_calculate_spectrum
   INTEGER :: verbosity
   real(kind=dp) :: start,end,increment
   real(kind=dp) :: omegmax,delta_omeg
-  CHARACTER(len=60) :: extrapolation
-  CHARACTER(len=256) :: outdir, filename
+  CHARACTER(len=60) :: extrapolation,td
+  CHARACTER(len=256) :: outdir, filename,eign_file
   INTEGER :: units
   !
   !General use variables & counters
@@ -82,7 +82,8 @@ PROGRAM lr_calculate_spectrum
   !
   NAMELIST / lr_input / itermax, itermax0, itermax_actual, extrapolation,&
                       & end, increment, start, ipol, outdir, prefix,&
-                      & epsil, sym_op, verbosity, units,omeg,omegmax,delta_omeg
+                      & epsil, sym_op, verbosity, units,omeg,omegmax,&
+                      & delta_omeg, td,eign_file
 
 
   !
@@ -108,6 +109,7 @@ PROGRAM lr_calculate_spectrum
   omeg=-1
   delta_omeg=-1
   omegmax=-1
+  td='lanczos'
   !
   !Other initialisation
   !
@@ -137,31 +139,38 @@ ENDIF
   CALL mp_bcast ( ios, ionode_id)
   CALL errore ('lr_readin', 'reading lr_input namelist', abs (ios) )
 
+  if(trim(td)=="davidson" .or. trim(td)=='david') then
+    if(ionode) call spectrum_david()
+    goto  555
+  endif
+
   IF (ionode) THEN
-  IF (itermax0 < 151 .and. trim(extrapolation)/="no") THEN
-     WRITE(*,*) "Itermax0 is less than 150, no extrapolation scheme can be used!"
-     extrapolation="no"
-  ENDIF
+  
+    IF (itermax0 < 151 .and. trim(extrapolation)/="no") THEN
+       WRITE(*,*) "Itermax0 is less than 150, no extrapolation scheme can be used!"
+       extrapolation="no"
+    ENDIF
 
-  outdir = trimcheck(outdir)
-  tmp_dir = outdir
-  IF (ipol < 4) THEN
-    n_ipol=1
-  ELSE
-    n_ipol=3
-    ipol = 1
-  ENDIF
+    outdir = trimcheck(outdir)
+    tmp_dir = outdir
+    IF (ipol < 4) THEN
+      n_ipol=1
+    ELSE
+      n_ipol=3
+      ipol = 1
+    ENDIF
 
-  ! Polarization symmetry
-  IF ( .not. sym_op == 0 ) THEN
-!    CALL errore("tddfpt_pp","Unsupported symmetry operation",1)
-   IF (sym_op == 1) THEN
-    WRITE(stdout,'(5x,"All polarization axes will be considered to be equal.")')
-    n_ipol=3
-    ipol=1
-   ELSE
-    CALL errore("tddfpt_pp","Unsupported symmetry operation",1)
-   ENDIF
+    ! Polarization symmetry
+    IF ( .not. sym_op == 0 ) THEN
+    ! CALL errore("tddfpt_pp","Unsupported symmetry operation",1)
+    IF (sym_op == 1) THEN
+      WRITE(stdout,'(5x,"All polarization axes will be considered to be equal.")')
+      n_ipol=3
+      ipol=1
+    ELSE
+     CALL errore("tddfpt_pp","Unsupported symmetry operation",1)
+    ENDIF
+
   ENDIF
   ! Terminator Scheme
   IF (trim(extrapolation)=="no") THEN
@@ -571,6 +580,7 @@ CLOSE(17)
   CALL environment_end( 'TDDFPT_PP' )
   !
 ENDIF
+555 print *, "Calculation is finished."
 #ifdef __MPI
   CALL mp_barrier ()
   CALL mp_global_end ()

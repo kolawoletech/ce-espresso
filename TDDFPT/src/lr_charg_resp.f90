@@ -299,7 +299,10 @@ CONTAINS
     IF (lr_verbosity > 5) THEN
        WRITE(stdout,'("<lr_calc_w_T>")')
     ENDIF
-    IF (omeg == 0.D0) RETURN
+    IF (omeg == 0.D0) THEN
+       CALL stop_clock( 'post-processing' )
+       RETURN
+    END IF
     !
     ALLOCATE(a(itermax_int))
     ALLOCATE(b(itermax_int))

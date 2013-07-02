@@ -45,6 +45,7 @@ PROGRAM lr_main
   USE control_flags,         ONLY : tddfpt
   USE check_stop,            ONLY : check_stop_now, check_stop_init
   USE funct,                 ONLY : dft_is_hybrid
+  USE fft_base,              ONLY : dffts
 
   !Debugging
   USE lr_variables, ONLY: check_all_bands_gamma, check_density_gamma,check_vector_gamma
@@ -55,7 +56,7 @@ PROGRAM lr_main
   !
   INTEGER            :: ip,pol_index,ibnd_occ,ibnd_virt,ibnd
   INTEGER            :: iter_restart,iteration
-  LOGICAL            :: rflag, nomsg
+  LOGICAL            :: rflag, nomsg, tg_tmp
   COMPLEX(kind=dp)   :: sum_F,sum_c
   !
   !
@@ -93,12 +94,14 @@ PROGRAM lr_main
   !
   CALL init_index_over_band(inter_bgrp_comm,nbnd)
   !
+  tg_tmp = dffts%have_task_groups
   !   Set up initial response orbitals
   IF ( test_restart(1) ) THEN
      CALL lr_read_d0psi()
   ELSE
      CALL lr_solve_e()
   ENDIF
+  dffts%have_task_groups = tg_tmp
   !
   DEALLOCATE( psic )
   !

@@ -77,8 +77,8 @@ contains
     implicit none
     integer :: ierr
 
-    WRITE(stdout,'(5x,"Num of eigen values=",I15)') num_eign
-    WRITE(stdout,'(5x,"Allocating parameters for davidson ...")')
+    write(stdout,'(5x,"Num of eigen values=",I15)') num_eign
+    write(stdout,'(5x,"Allocating parameters for davidson ...")')
 
     call estimate_ram()
 
@@ -124,7 +124,7 @@ contains
     IF (ierr /= 0) call errore('lr_dav_alloc_init',"no enough memory",ierr) 
 
     if( .not. poor_of_ram .and. okvan ) then
-      WRITE(stdout,'(5x,"poor_of_ram is set to .false.. This means that you &
+      write(stdout,'(5x,"poor_of_ram is set to .false.. This means that you &
                      &would like to increase the speed of",/5x,"your calculation with&
                      & USPP by paying double memory.",/5x,"Switch it to .true. if you need &
                      &to save memory.",/)')
@@ -133,7 +133,7 @@ contains
     endif
 
     if( .not. poor_of_ram2 ) then
-      WRITE(stdout,'(5x,"poor_of_ram2 is set to .false.. This means that you &
+      write(stdout,'(5x,"poor_of_ram2 is set to .false.. This means that you &
                      &would like to increase the speed ",/5x,"by storing the D_basis&
                      & and C_basis vectors which will cause three time of the memory cost.",&
                      /5x,"Switch it to .true. if you need &
@@ -149,7 +149,7 @@ contains
     if ( p_nbnd_virt > nbnd_total-nbnd ) p_nbnd_virt = nbnd_total-nbnd
 
     if ( p_nbnd_occ*p_nbnd_virt .lt. num_init .and. .not. if_random_init) then
-      WRITE(stdout,'(/5X,"Initial vectors are forced to be chosen &
+      write(stdout,'(/5X,"Initial vectors are forced to be chosen &
                &randomly because no enough particle-hole pairs are available.",/5x, &
                "You may want to try to calculate more virtual states or include more occupied states by changing &
                p_nbnd_occ in the input.",/)')
@@ -184,7 +184,7 @@ contains
     integer :: ib,ia,ipw,ibnd
     real(dp) :: temp,R,R2
 
-    WRITE(stdout,'(5x,"Initiating variables for davidson ...")')
+    write(stdout,'(5x,"Initiating variables for davidson ...")')
     ! set initial basis
     num_basis=num_init
     num_basis_tot=num_init
@@ -206,7 +206,7 @@ contains
     dav_conv=.false.
     dav_iter=0
     ! call check_orth()
-    WRITE(stdout,'(5x,"Finished initiating.")')
+    write(stdout,'(5x,"Finished initiating.")')
   END subroutine  lr_dav_set_init
   !-------------------------------------------------------------------------------
 
@@ -234,8 +234,9 @@ contains
     implicit none
     complex(kind=dp),external :: lr_dot
     integer :: ik, ip, ibnd,ig, pol_index, ibr, ibl, ieign,ios
-    CHARACTER(len=6), EXTERNAL :: int_to_char
+    CHARACTER(len=6), external :: int_to_char
     real(dp) :: inner
+    real(DP), external ::  get_clock
 
     ! dummy variables for math routines
     integer :: dummy_ILO, dummy_IHI,dummy_IWORK
@@ -245,6 +246,8 @@ contains
                 dummy_RCONDV(num_basis_max)
 
     call start_clock('one_step')
+    write( stdout, 9000 ) get_clock( 'lr_dav_main' )
+9000  format(/'     total cpu time spent up to now is ',F10.1,' secs' )
     write(stdout,'(/7x,"==============================")') 
     write(stdout,'(/7x,"Davidson iteration:",1x,I8)') dav_iter
     write(stdout,'(7x,"num of basis:",I5,3x,"total built basis:",I5)') num_basis,num_basis_tot
@@ -406,7 +409,7 @@ contains
     use lr_dav_variables, only : right_res,left_res,svecwork,C_vec_b,D_vec_b,&
                                  kill_left,kill_right,poor_of_ram2,right2,left2,&
                                  right_full,left_full,eign_value_order,residue_conv_thr,&
-                                 toadd,left_M,right_M,num_eign,dav_conv,num_basis,zero
+                                 toadd,left_M,right_M,num_eign,dav_conv,num_basis,zero,max_res
     use lr_variables,    only : evc0, sevc0
     use kinds,  only : dp
     use io_global, only : stdout
@@ -416,7 +419,6 @@ contains
     use lr_us
     
     implicit none
-    real(dp) :: max_res
     integer :: ieign, flag,ibr
     complex(kind=dp) :: temp(npwx,nbnd)
 
@@ -473,8 +475,7 @@ contains
  
     write(stdout,'(7x,"Largest residue:",5x,F20.12)') max_res
     if(max_res .lt. residue_conv_thr) dav_conv=.true.
-
-    return
+   return
   end subroutine dav_calc_residue
   !-------------------------------------------------------------------------------
     
@@ -559,6 +560,12 @@ contains
             call lr_apply_s(vec_b(:,:,:,num_basis),svec_b(:,:,:,num_basis))
         endif
       enddo
+    endif
+    if(conv_assistant) then
+      if(max_res .lt. 10*residue_conv_thr .and. .not. ploted(1)) then
+        call interpret_eign('10')
+	ploted(1)=.true.
+      endif
     endif
     return
     end subroutine dav_expan_basis
@@ -757,7 +764,7 @@ contains
   end subroutine treat_residue
   !-------------------------------------------------------------------------------
 
-  subroutine interpret_eign()
+  subroutine interpret_eign(message)
     !-------------------------------------------------------------------------------
     ! Created by X.Ge in Jan. 2013
     !-------------------------------------------------------------------------------
@@ -773,31 +780,42 @@ contains
     use lr_us
     
     implicit none
+    character(len=*) :: message
     integer :: ieign, ia,ic,iv,ipol
     real(kind=dp), external   :: ddot
     real(dp) :: norm, normx, normy, alpha, shouldbe1,temp
     real(dp) :: C_right_M(num_basis_max),D_left_M(num_basis_max)
 
-    allocate(norm_F(num_eign))
+    if(.not. allocated(norm_F)) allocate(norm_F(num_eign))
 
-    write(stdout,'(/7x,"================================================================")') 
-    write(stdout,'(/7x,"Davidson diagonalization has finished in",I5," steps.")') dav_iter
-    write(stdout,'(10x,"the number of current basis is",I5)') num_basis
-    write(stdout,'(10x,"the number of total basis built is",I5)') num_basis_tot
+    if(message=="END") then
+      write(stdout,'(/7x,"================================================================")') 
+      write(stdout,'(/7x,"Davidson diagonalization has finished in",I5," steps.")') dav_iter
+      write(stdout,'(10x,"the number of current basis is",I5)') num_basis
+      write(stdout,'(10x,"the number of total basis built is",I5)') num_basis_tot
 
-    write(stdout,'(/7x,"Now print out information of eigenstates")') 
+      write(stdout,'(/7x,"Now print out information of eigenstates")') 
+    endif
 
-    call lr_calc_R()
+    if(message=="10")&
+      write(stdout,'(/7x,"Quasi convergence(10*residue_conv_thr) has been arrived in",I5," steps.")') dav_iter
+    
+    if(.not. done_calc_R) then
+      call lr_calc_R()
+      done_calc_R=.true.
+    endif
     
     ! Print out Oscilation strength
-    write(stdout,'(/,/5x,"K-S Oscillator strengths")')
-    WRITE(stdout,'(5x,"occ",1x,"con",8x,"R-x",14x,"R-y",14x,"R-z")')
-    do iv=nbnd-p_nbnd_occ+1, nbnd
-      do ic=1,p_nbnd_virt
-        write(stdout,'(5x,i3,1x,i3,3x,E16.8,2X,E16.8,2X,E16.8)') &
-           &iv,ic,dble(R(iv,ic,1)),dble(R(iv,ic,2)),dble(R(iv,ic,3))
-      enddo 
-    enddo
+    if(message == "END") then
+      write(stdout,'(/,/5x,"K-S Oscillator strengths")')
+      write(stdout,'(5x,"occ",1x,"con",8x,"R-x",14x,"R-y",14x,"R-z")')
+      do iv=nbnd-p_nbnd_occ+1, nbnd
+        do ic=1,p_nbnd_virt
+          write(stdout,'(5x,i3,1x,i3,3x,E16.8,2X,E16.8,2X,E16.8)') &
+             &iv,ic,dble(R(iv,ic,1)),dble(R(iv,ic,2)),dble(R(iv,ic,3))
+        enddo 
+      enddo
+    endif
 
     ! Analysis of each eigen-state
     do ieign = 1, num_eign
@@ -806,7 +824,8 @@ contains
   if(ionode) then
 #endif
       ia = eign_value_order(ieign)
-      write(stdout,'(/7x,"! The",I5,1x,"-th eigen state. The transition&
+      if(message=="END")&
+        write(stdout,'(/7x,"! The",I5,1x,"-th eigen state. The transition&
          & energy is: ", 5x, F12.8)') ieign, tr_energy(ia)
       ! Please see Documentation for the explain of the next four steps
       ! In short it gets the right components of X and Y
@@ -816,7 +835,7 @@ contains
       omegar(ieign)=ddot(num_basis,left_M(:,ia),1,left_M(:,ia),1)
       omegar(ieign)=ddot(num_basis,C_right_M,1,left_M(:,ia),1)
 
-      ! Apply D to the lfet eigen state in order to calculate the left omega
+      ! Apply D to the left eigen state in order to calculate the left omega
       call dgemv('N',num_basis,num_basis,(1.0D0,0.0D0),dble(M_D),&
            &num_basis_max,left_M(:,ia),1,(0.0D0,0.0D0),D_left_M,1)
       omegal(ieign)=ddot(num_basis,right_M(:,ia),1,right_M(:,ia),1)
@@ -857,9 +876,11 @@ contains
       normy=-dble(lr_dot_us(right_res(1,1,1,ieign),right_res(1,1,1,ieign)))
       norm_F(ieign)=normx+normy  !! Actually norm_F should always be one since it was previously normalized
       
-      write(stdout,'(/5x,"The two digitals below indicate the importance of doing beyong TDA: ")')
-      write(stdout,'(/5x,"Components: X",2x,F12.5,";",4x,"Y",2x,F12.5)') &
+      if(message=="END") then
+        write(stdout,'(/5x,"The two digitals below indicate the importance of doing beyong TDA: ")')
+        write(stdout,'(/5x,"Components: X",2x,F12.5,";",4x,"Y",2x,F12.5)') &
                normx/norm_F(ieign),normy/norm_F(ieign)
+      endif
 
       call lr_calc_Fxy(ieign)
     
@@ -876,9 +897,11 @@ contains
         normy=-normy
       endif
 
-      write (stdout,'(/5x,"In the occ-virt project subspace the total Fxy is:")')
-      write(stdout,'(/5x,"X",2x,F12.5,";",4x,"Y",2x,F12.5,4x,"total",2x,F12.5,2x,&
+      if(message=="END") then
+        write (stdout,'(/5x,"In the occ-virt project subspace the total Fxy is:")')
+        write(stdout,'(/5x,"X",2x,F12.5,";",4x,"Y",2x,F12.5,4x,"total",2x,F12.5,2x,&
               &"/ ",F12.5)') normx,normy,normx+normy,norm_F(ieign)
+      endif
       
       do ipol = 1 ,3
         chi_dav(ipol,ieign)=dav_calc_chi("X",ieign,ipol)+dav_calc_chi("Y",ieign,ipol)
@@ -887,30 +910,32 @@ contains
 
       total_chi(ieign)=chi_dav(1,ieign)+chi_dav(2,ieign)+chi_dav(3,ieign)
 
-      write (stdout,'(/5x,"The Chi_i_i is",5x,"Total",10x,"1",15x,"2",15x,"3")')
-      write (stdout,'(/12x,8x,E15.8,3x,E15.8,3x,E15.8,3x,E15.8)') total_chi(ieign),&
+      if(message=="END") then
+        write (stdout,'(/5x,"The Chi_i_i is",5x,"Total",10x,"1",15x,"2",15x,"3")')
+        write (stdout,'(/12x,8x,E15.8,3x,E15.8,3x,E15.8,3x,E15.8)') total_chi(ieign),&
            &chi_dav(1,ieign),chi_dav(2,ieign), chi_dav(3,ieign)
 
-     ! Components analysis
-      write (stdout,'(/5x,"Now is the components analysis of this transition.")')
+       ! Components analysis
+        write (stdout,'(/5x,"Now is the components analysis of this transition.")')
 
-      call print_principle_components()
+        call print_principle_components()
 
-      write (stdout,'(/5x,"Now for all the calculated particle and hole pairs : ")')
-      write (stdout,'(/5x,"occ",5x,"virt",7x,"FX",14x,"FY",/)')
-      do iv = nbnd-p_nbnd_occ+1, nbnd
-        do ic = 1, p_nbnd_virt
-          write (stdout,'(3x,I5,I5,5x,E15.8,5x,E15.8)') iv, ic, dble(Fx(iv,ic)), dble(Fy(iv,ic))
+        write (stdout,'(/5x,"Now for all the calculated particle and hole pairs : ")')
+        write (stdout,'(/5x,"occ",5x,"virt",7x,"FX",14x,"FY",/)')
+        do iv = nbnd-p_nbnd_occ+1, nbnd
+          do ic = 1, p_nbnd_virt
+            write (stdout,'(3x,I5,I5,5x,E15.8,5x,E15.8)') iv, ic, dble(Fx(iv,ic)), dble(Fy(iv,ic))
+          enddo
         enddo
-      enddo
-      write(stdout,'(/7x,"**************",/)') 
+        write(stdout,'(/7x,"**************",/)') 
+      endif
     enddo
 
 #ifdef __MPI
     if(ionode) then
 #endif
-      call write_eigenvalues()
-      call write_spectrum()
+      call write_eigenvalues(message)
+      call write_spectrum(message)
 #ifdef __MPI
     endif
 #endif
@@ -942,7 +967,7 @@ contains
   end function dav_calc_chi
   !-------------------------------------------------------------------------------
 
-  subroutine write_spectrum()
+  subroutine write_spectrum(message)
     !-------------------------------------------------------------------------------
     ! Created by X.Ge in Feb. 2013
     !-------------------------------------------------------------------------------
@@ -954,14 +979,16 @@ contains
     use io_global,              only : stdout
 
     implicit none
-    character(len=20) :: filename
+    character(len=*)  :: message
+    character(len=256) :: filename
     integer :: ieign, nstep, istep
     real(dp) :: frequency
     real(dp), allocatable :: absorption(:,:)
     
     Write(stdout,'(5x,"Now generate the spectrum plot file...")') 
 
-    filename = trim(prefix)  // ".plot"
+    if(message=="END") filename = trim(prefix)  // ".plot"
+    if(message=="10") filename = trim(prefix)  // ".plot-quasi-conv"
     OPEN(17,file=filename,status="unknown")
 
     write(17,'("#",2x,"Energy(Ry)",10x,"total",13x,"X",13x,"Y",13x,"Z")') 
@@ -1231,7 +1258,7 @@ contains
   end subroutine random_init
   !-------------------------------------------------------------------------------
 
-  subroutine write_eigenvalues()
+  subroutine write_eigenvalues(message)
     !-------------------------------------------------------------------------------
     ! Created by X.Ge in Feb. 2013
     !-------------------------------------------------------------------------------
@@ -1243,12 +1270,14 @@ contains
     use io_global,     only : stdout
 
     implicit none
-    character(len=20) :: filename
+    character(len=*) :: message
+    character(len=256) :: filename
     integer :: ieign
     
     Write(stdout,'(5x,"Now generate the eigenvalues list...")') 
 
-    filename = trim(prefix)  // ".eigen"
+    if(message=="END") filename = trim(prefix)  // ".eigen"
+    if(message=="10") filename = trim(prefix)  // ".eigen-quasi-conv"
     OPEN(18,file=filename,status="unknown")
     write(18,'("#",2x,"Energy(Ry)",10x,"total",13x,"X",13x,"Y",13x,"Z")') 
     

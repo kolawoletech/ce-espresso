@@ -1509,8 +1509,8 @@ CONTAINS
     WRITE(158,'(a)') 'END_DATAGRID_3D'
     WRITE(158,'(a)') 'END_BLOCK_DATAGRID_3D'
 #endif
-    RETURN
     CALL stop_clock( 'post-processing' )
+    RETURN
     !
 501 CALL errore ('lr_dump_rho_tot_xyzd', 'Unable to open file for writing', 1 )
     !-----------------------------------------------------------------------

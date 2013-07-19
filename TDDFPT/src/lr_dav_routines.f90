@@ -427,6 +427,8 @@ contains
     kill_right(:)=.false.
     toadd=2*num_eign
 
+    call start_clock("calc_residue")
+
     do ieign = 1, num_eign
       if(poor_of_ram2) then ! If D_ C_ basis are not stored, we have to apply liouvillian again
         call lr_apply_liouvillian(right_full(:,:,:,ieign),right_res(:,:,:,ieign),svecwork(:,:,:),.true.) ! Apply lanczos
@@ -470,11 +472,12 @@ contains
       endif
       if( dble(left2(ieign)) .gt. max_res )  max_res = dble(left2(ieign))
       
-      write (stdout,'(5x,"residue:",I5,2x,2F15.7)') ieign, dble(right2(ieign)), dble(left2(ieign))
+      write (stdout,'(5x,"Residue(Squared modulus):",I5,2x,2F15.7)') ieign, dble(right2(ieign)), dble(left2(ieign))
     enddo
  
     write(stdout,'(7x,"Largest residue:",5x,F20.12)') max_res
     if(max_res .lt. residue_conv_thr) dav_conv=.true.
+    call stop_clock("calc_residue")
    return
   end subroutine dav_calc_residue
   !-------------------------------------------------------------------------------
@@ -495,6 +498,8 @@ contains
     real (dp) :: temp
 
     if(dav_conv) return ! Already converged
+
+    call start_clock("expan_basis")
 
     if (precondition) then
       do ieign = 1, num_eign
@@ -567,6 +572,9 @@ contains
 	ploted(1)=.true.
       endif
     endif
+
+    call stop_clock("expan_basis")
+
     return
     end subroutine dav_expan_basis
   !-------------------------------------------------------------------------------
@@ -586,6 +594,7 @@ contains
     integer :: ib,ieign,ieign2,ia
     real(dp) :: temp
     
+    call start_clock("mGS_orth")
     ! first orthogonalize to old basis
     do ib = 1, num_basis
       do ieign = 1, num_eign
@@ -625,6 +634,7 @@ contains
           call lr_1to1orth(right_res(1,1,1,ieign2),right_res(1,1,1,ieign))
       enddo
     enddo
+    call stop_clock("mGS_orth")
     return
   end subroutine lr_mGS_orth
   !-------------------------------------------------------------------------------
@@ -646,6 +656,7 @@ contains
     integer :: ieign,ia
     real(dp) :: norm_res
   
+    call start_clock("mGS_orth_pp")
     do ieign = 1, num_eign
       if(.not. kill_left(ieign)) then
         norm_res = dble(lr_dot_us(left_res(1,1,1,ieign),left_res(1,1,1,ieign)))
@@ -669,6 +680,8 @@ contains
         endif
       endif
     enddo
+    call stop_clock("mGS_orth_pp")
+    return
   end subroutine lr_mGS_orth_pp
   !-------------------------------------------------------------------------------
 

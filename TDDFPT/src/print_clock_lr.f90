@@ -19,6 +19,7 @@ SUBROUTINE print_clock_lr()
    USE io_global,        ONLY : stdout
    USE mp_global,        ONLY : mpime, root
    USE realus,           ONLY : real_space,real_space_debug
+   use lr_variables,     only : davidson
    !
    IMPLICIT NONE
    !
@@ -28,30 +29,42 @@ SUBROUTINE print_clock_lr()
    !
    WRITE( stdout, * )
    !
-   CALL print_clock( 'lr_main' )
-   !
+   
+   if(.not. davidson) CALL print_clock( 'lr_main' )
+   CALL print_clock( 'read_wf' )
    CALL print_clock( 'lr_solve_e' )
-   !
+   if(davidson) then
+     CALL print_clock( 'lr_dav_main' )
+     CALL print_clock( 'calc_residue' )
+     CALL print_clock( 'expan_basis' )
+   endif
    CALL print_clock( 'one_step' )
    !
    WRITE( stdout, * )
    !
    CALL print_clock('lr_apply')
    CALL print_clock('lr_apply_int')
-   CALL print_clock('lr_exx_int')
    CALL print_clock('lr_apply_no')
-   CALL print_clock('lr_exx_noint')
+   if(davidson) then
+     CALL print_clock( 'mGS_orth' )
+     CALL print_clock( 'mGS_orth_pp' )
+   endif
    !
    WRITE( stdout, * )
    !
    CALL print_clock( 'lr_apply' )
    CALL print_clock( 'h_psi' )
+   CALL print_clock('lr_exx_noint')
    CALL print_clock( 'lr_calc_dens' )
    CALL print_clock( 'lr_addusdens' )
    CALL print_clock( 'lr_dv' )
    CALL print_clock( 'lr_ortho' )
    CALL print_clock( 'interaction' )
    CALL print_clock( 'lr_dot' )
+   !
+   WRITE( stdout, * )
+   CALL print_clock( 'lr_calc_dens' )
+   CALL print_clock('lr_exx_int')
    !
    WRITE( stdout, * )
    WRITE( stdout, '(5X,"US routines")' )

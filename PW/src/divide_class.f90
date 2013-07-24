@@ -2697,3 +2697,25 @@ is_parallel=(ABS(cross)< 1.d-6)
 RETURN
 END FUNCTION is_parallel
 
+FUNCTION angle_vectors(ax,bx)
+!
+!  This function returns the angle, in degrees between two vectors
+!
+USE kinds, ONLY : DP
+USE constants, ONLY : pi
+IMPLICIT none
+REAL(DP) :: angle_vectors
+REAL(DP) :: ax(3), bx(3)
+REAL(DP) :: cosangle, moda, modb
+
+moda=sqrt(ax(1)**2+ax(2)**2+ax(3)**2)
+modb=sqrt(bx(1)**2+bx(2)**2+bx(3)**2)
+
+IF (moda<1.d-12.OR.modb<1.d-12) &
+   CALL errore('angle vectors','zero module vector',1)
+
+cosangle = (ax(1)*bx(1)+ax(2)*bx(2)+ax(3)*bx(3))/moda/modb
+angle_vectors = acos(cosangle) * 180.d0 / pi
+
+RETURN
+END FUNCTION angle_vectors

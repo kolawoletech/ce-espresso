@@ -170,7 +170,7 @@ SUBROUTINE iosys()
                             lkpoint_dir_      => lkpoint_dir, &
                             tqr_              => tqr, &
                             io_level, ethr, lscf, lbfgs, lmd, &
-                            ldamped, lbands, llang,           &
+                            ldamped, lbands, llang, use_SMC,  &
                             lconstrain, restart, twfcollect, &
                             llondon, do_makov_payne, &
                             lecrpa_           => lecrpa, &
@@ -393,10 +393,12 @@ SUBROUTINE iosys()
         !
         CONTINUE
         !
-     CASE( 'langevin' )
+     CASE( 'langevin', 'langevin-smc', 'langevin+smc' )
         !
         llang       = .true.
         temperature = tempw
+        use_SMC     = ( trim( ion_dynamics ) == 'langevin-smc' .OR. & 
+                        trim( ion_dynamics ) == 'langevin+smc' )
         !
      CASE DEFAULT
         !

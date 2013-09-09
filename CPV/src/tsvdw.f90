@@ -27,8 +27,6 @@ USE funct,              ONLY: get_iexch          !retrieves type of exchange uti
 USE funct,              ONLY: get_icorr          !retrieves type of correlation utilized in functional
 USE funct,              ONLY: get_igcx           !retrieves type of gradient correction to exchange utilized in functional
 USE funct,              ONLY: get_igcc           !retrieves type of gradient correction to correlation utilized in functional
-USE input_parameters,   ONLY: ts_vdw_isolated    !isolated system control
-USE input_parameters,   ONLY: ts_vdw_econv_thr   !energy convergence threshold for periodic systems
 USE io_global,          ONLY: stdout             !print/write argument for standard output (to output file)
 USE ions_base,          ONLY: nat                !number of total atoms (all atomic species)
 USE ions_base,          ONLY: nsp                !number of unique atomic species
@@ -50,6 +48,8 @@ SAVE
 !
 ! PUBLIC variables 
 !
+LOGICAL, PUBLIC :: vdw_isolated    ! isolated system control
+REAL(DP), PUBLIC:: vdw_econv_thr   ! energy convergence threshold for periodic systems
 REAL(DP), PUBLIC :: EtsvdW                                   !the TS-vdW energy
 REAL(DP), DIMENSION(:), ALLOCATABLE, PUBLIC :: UtsvdW        !the TS-vdW wavefunction forces (dispersion potential)
 REAL(DP), DIMENSION(:,:), ALLOCATABLE, PUBLIC :: FtsvdW      !the TS-vdW ionic forces (-dE/dR)
@@ -413,7 +413,8 @@ PRIVATE :: GetVdWParam
     !
     WRITE(stdout,'(5X,"The magnitude of the atomic pseudo-density at the radial grid cutoff is ",ES13.6,".")') atrhor(icutrA)
     WRITE(stdout,'(5X,"Using this radial grid cutoff value of ",F25.15," au:")') atgrdr(icutrA)
-    WRITE(stdout,'(5X,"The free atom volume computed with this cutoff is ",F25.15," bohr^3 with an error of ",F6.3,"%.")') vfree(is),verr
+    WRITE(stdout,'(5X,"The free atom volume computed with this cutoff is ",F25.15," bohr^3 with an error of ",F6.3,"%.")') &
+         vfree(is),verr
     !
     ! Form 1st derivative of atrhor for input into cubic spline coefficient subroutine...
     !
@@ -1428,7 +1429,7 @@ PRIVATE :: GetVdWParam
     !
 !$omp parallel do private(dq,dqA,dqAs,dqAmic,ir,dk1,rhoA,drhoA, &
 !$omp off1,dptmp1,dptmp2,dptmp3,dptmp4,dVAdRA,dptmp5,i,j), &
-!$omp reduction(+:dveffdh),reduction(+:dveffdR) 
+!$omp reduction(-:dveffdh),reduction(+:dveffdR) 
     DO iq=1,NsomegaAr(ia)
       !
       ! Compute global/cell reference frame Cartesian coordinates of given real-space grid point...
@@ -1553,7 +1554,7 @@ PRIVATE :: GetVdWParam
     !
 !$omp parallel do private(dqB,dqBs,dqBmic,ir,dk1,rhoB,drhoB,dVAdRB,dVBdRA, &
 !$omp i,j,ib,ibs,spcutB,spdB,ioff,boff), &
-!$omp reduction(+:dveffdR),reduction(+:dveffdh) 
+!$omp reduction(+:dveffdR),reduction(-:dveffdh) 
     DO ipair=1,npair(ia)
       !
       ! Connect pair number with atom...
@@ -1870,8 +1871,8 @@ PRIVATE :: GetVdWParam
 !$omp dAB,dAB2,FDVi,FDRi,FDRii,FCVi,FRRi,FRRii,n1,n2,n3,dsAB,dABimg2, &
 !$omp dABimg,dABimgn1,dABimgn2,dABimgn5,dABimgn6,edamp,fdamp,fdamp2,dptmp1, &
 !$omp dptmp2,i,j,vtmp1,vtmp2,D1A,D2A,D1B,D2B,D12A,D12B,ic), &
-!$omp reduction(+:EtsvdW_period),reduction(+:FtsvdW_period), &
-!$omp reduction(+:HtsvdW_period),reduction(+:predveffAdn_period)
+!$omp reduction(-:EtsvdW_period),reduction(+:FtsvdW_period), &
+!$omp reduction(+:HtsvdW_period),reduction(-:predveffAdn_period)
 !$omp do      
       DO ib=1,nat
         !
@@ -2117,7 +2118,7 @@ PRIVATE :: GetVdWParam
     !
     ! Periodic convergence loop conditionals...
     !
-    IF ((ts_vdw_isolated.EQV..TRUE.).OR.(DABS(EtsvdW_period).LE.(ts_vdw_econv_thr))) periodic_converged=.TRUE.
+    IF ( vdw_isolated .OR. (ABS(EtsvdW_period) <= vdw_econv_thr) ) periodic_converged=.TRUE.
     !
     n_period=n_period+1
     !

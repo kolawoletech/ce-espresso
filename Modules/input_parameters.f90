@@ -260,15 +260,6 @@ MODULE input_parameters
           ! if memory = 'large' then QE tries to use (when implemented) algorithms using more memory
           !                     to enhance performance.
 
-        LOGICAL :: ts_vdw = .FALSE.
-          ! if .TRUE., include TS-vdW correction (Tkatchenko & Scheffler, Phys. Rev. Lett. 102, 073005 (2009))
-          ! if .FALSE., do not include TS-vdW correction
-        LOGICAL :: ts_vdw_isolated = .FALSE.
-          ! if .TRUE., TS-vdW correction for isolated system
-          ! if .FALSE., TS-vdW correction for periodic system
-        REAL(DP) :: ts_vdw_econv_thr = 1.0E-6_DP
-          ! convergence criterion for TS-vdW energy for periodic system 
-
 #if defined (__MS2)
         LOGICAL :: MS2_enabled = .false.       ! Enable the shared memory exchange in MS2
         CHARACTER(len=256) :: MS2_handler = ' '! Name for the shared memory handler in MS2
@@ -280,8 +271,7 @@ MODULE input_parameters
           forc_conv_thr, pseudo_dir, disk_io, tefield, dipfield, lberry,  &
           gdir, nppstr, wf_collect, printwfc, lelfield, nberrycyc, refg,  &
           tefield2, saverho, tabps, lkpoint_dir, use_wannier, lecrpa,     &
-          vdw_table_name, lorbm, memory, ts_vdw, ts_vdw_isolated,         &
-          ts_vdw_econv_thr
+          vdw_table_name, lorbm, memory
 
 
 #if defined ( __MS2)
@@ -470,20 +460,38 @@ MODULE input_parameters
         LOGICAL :: one_atom_occupations=.false.
 
         CHARACTER(len=80) :: assume_isolated = 'none'
-          ! used to define corrections for isolated systems
-          ! other possibilities:
-          !  'makov-payne', 'martyna-tuckerman`, `dcc`, 'esm'
-!
+          ! possible corrections for isolated systems:
+          !  'none', 'makov-payne', 'martyna-tuckerman', 'esm'
+          ! plus ENVIRON-specific:
+          !  'slabx', 'slaby', 'slabz', 'pcc'
+
+        CHARACTER(len=80) :: vdw_corr = 'none'
+          ! semi-empirical van der Waals corrections
+          ! (not to be confused with nonlocal functionals,
+          !  specified in input_dft!). Default is 'none', allowed values:
+          !  'dft-d' or 'grimme-d2' [S.Grimme, J.Comp.Chem. 27, 1787 (2006)]
+          !  'ts', 'ts-vdW', 'tkatchenko-scheffler'
+          !  (Tkatchenko & Scheffler, Phys. Rev. Lett. 102, 073005 (2009))
+
         LOGICAL   :: london = .false.
-          ! if .true. compute semi-empirical dispersion term ( C6_ij / R_ij**6 )
-          ! other DFT-D parameters ( see PW/mm_dispersion.f90 )
-        REAL ( DP ) :: london_s6   =   0.75_DP , & ! default global scaling parameter for PBE
+          ! OBSOLESCENT: same as vdw_corr='grimme-d2'
+          ! other DFT-D parameters ( see Modules/mm_dispersion.f90 )
+          ! london_s6 = default global scaling parameter for PBE
+        REAL ( DP ) :: london_s6   =   0.75_DP , &
                        london_rcut = 200.00_DP
+
+        LOGICAL   :: ts_vdw = .false.
+          ! OBSOLESCENT: same as vdw_corr='Tkatchenko-Scheffler'
+        LOGICAL :: ts_vdw_isolated = .FALSE.
+          ! if .TRUE., TS-vdW correction for isolated system
+          ! if .FALSE., TS-vdW correction for periodic system
+        REAL(DP) :: ts_vdw_econv_thr = 1.0E-6_DP
+          ! convergence criterion for TS-vdW energy for periodic system 
+          !
 #ifdef __ENVIRON
-!
         LOGICAL   :: do_environ = .false.
 #endif
-!
+          !
         CHARACTER(LEN=3) :: esm_bc = 'pbc'
           ! 'pbc': ordinary calculation with periodic boundary conditions
           ! 'bc1': vacuum-slab-vacuum
@@ -527,169 +535,11 @@ MODULE input_parameters
              report,              &
              constrained_magnetization, B_field, fixed_magnetization,         &
              sic, sic_epsilon, force_pairing, sic_alpha,                      &
-             tot_charge, tot_magnetization,                                   &
-             spline_ps, one_atom_occupations, london, london_s6, london_rcut, &
+             tot_charge, tot_magnetization, spline_ps, one_atom_occupations,  &
+             vdw_corr, london, london_s6, london_rcut,                        &
+             ts_vdw, ts_vdw_isolated, ts_vdw_econv_thr,                       &
              step_pen, A_pen, sigma_pen, alpha_pen, no_t_rev,                 &
              esm_bc, esm_efield, esm_w, esm_nfit, esm_debug, esm_debug_gpmax
-#ifdef __ENVIRON
-!
-!=----------------------------------------------------------------------------=!
-!  ENVIRON Namelist Input Parameters
-!=----------------------------------------------------------------------------=!
-!
-! Global parameters
-!
-        INTEGER  :: verbose = 0
-        ! verbosity  0: only prints summary of polarization charge calculation; 
-        !    1: prints an extra file with details of iterative convergence;
-        !    2: prints 3D cube files of physical properties
-        REAL(DP) :: environ_thr = 1.d-1
-        ! how early in scf should the corrective pot start being calculated
-        CHARACTER( LEN = 256 ) :: environ_type = 'input'
-        ! keyword to set up all the environment parameters at once to a specific set
-        ! vacuum = all the flags are off (perm=1.d0, surf=0.0, pres=0.0)
-        ! water = parameters optimized for water solutions in Andreussi et al. 
-        !         J. Chem. Phys. 136, 064102 (perm=78, surf=50, pres=-0.35)
-        ! input = do not use any predefined set, use paramters from input
-!
-! Switching function parameters
-!
-        REAL(DP) :: stype = 1
-        ! type of switching functions used in the solvation models
-        !    0: original Fattebert-Gygi
-        !    1: ultrasoft dielectric function as defined in Andreussi et al.
-        REAL(DP) :: rhomax = 0.005
-        ! first parameter of the sw function, roughly corresponding 
-        ! to the density threshold of the solvation model
-        REAL(DP) :: rhomin = 0.0001
-        ! second parameter of the sw function when stype=1
-        REAL(DP) :: tbeta = 4.8
-        ! second parameter of the sw function when stype=0
-!
-! Dielectric solvent parameters
-!
-        REAL(DP) :: env_static_permittivity = 1.D0
-        ! static dielectric permittivity of the solvation model. If set equal
-        ! to one (=vacuum) no dielectric effects
-        CHARACTER( LEN = 256 ) :: eps_mode = 'electronic'
-        !  eps_mode method for calculating the density that sets 
-        !  the dielectric constant
-        !  electronic = dielectric depends self-consist. on electronic density
-        !  ionic = dielectric defined on a fictitious ionic density, generated
-        !          as the sum of exponential functions centered on atomic 
-        !          positions of width specified in input by solvationrad(ityp)
-        !  full  = similar to electronic, but an extra density is added to 
-        !          represent the core electrons and the nuclei. This extra 
-        !          density is defined as the sum of gaussian functions centered
-        !          on atomic positions of width equal to atomicspread(ityp)
-        REAL(DP) :: solvationrad(nsx) = 3.D0
-        ! solvationrad radius of the solvation shell for each species when the
-        ! ionic dielectric function is adopted
-        REAL(DP) :: atomicspread(nsx) = 0.5D0
-        ! gaussian spreads of the atomic density of charge
-        LOGICAL :: add_jellium = .false.
-        ! depending on periodic boundary corrections, one may need to explicitly
-        ! polarize the compensatinig jellium background
-!
-! Numerical differentiators paramters
-!
-        INTEGER  :: ifdtype = 1 
-        ! type of numerical differentiator: 1=central differences, 
-        ! 2=low-noise lanczos (m=2), 3=low-noise lanczos (m=4), 
-        ! 4=smooth noise-robust (n=2), 5=smooth noise-robust (n=4)
-        INTEGER  :: nfdpoint = 1
-        ! number of points used in the numerical differentiator 
-        ! N = 2*nfdpoint+1
-!
-! Iterative solver parameters
-!
-        CHARACTER( LEN=256 ) :: mixtype = 'linear'
-        ! mixing method for iterative calculation of polarization charges
-        ! 'linear', 'anderson', 'diis', 'broyden'
-        REAL(DP) :: mixrhopol = 0.5D0
-        ! mixing param to be used in iter calculation of polarization charges
-        REAL(DP) :: tolrhopol = 1.D-10
-        ! convergence threshold for polarization charges in iterative procedure
-        INTEGER :: ndiis=1
-        ! order of DIIS interpolation of iterative polarization charge
-!
-! Cavitation energy parameters
-!
-        REAL(DP) :: env_surface_tension = 0.D0
-        ! solvent surface tension, if equal to zero no cavitation term 
-        REAL(DP) :: delta = 0.00001D0
-        ! finite difference parameter to compute the molecular surface
-!
-! PV energy parameters
-!
-        REAL(DP) :: env_pressure = 0.D0
-        ! external pressure for PV energy, if equal to zero no pressure term 
-!
-! Ionic countercharge parameters
-!
-        REAL(DP) :: env_ioncc_concentration = 0.D0
-        ! molar concentration of ionic countercharge (M=mol/L)
-        REAL(DP) :: zion = 1.D0
-        ! valence of ionic countercharge
-        REAL(DP) :: rhopb = 0.0001D0
-        ! density threshold for the onset of ionic countercharge
-        REAL(DP) :: solvent_temperature = 300.D0
-        ! temperature of the solution
-
-        NAMELIST / environ /                                           &
-             verbose, environ_thr, environ_type,                       &
-             stype, rhomax, rhomin, tbeta,                             &
-             env_static_permittivity, eps_mode,                        &
-             solvationrad, atomicspread, add_jellium,                  &
-             ifdtype, nfdpoint,                                        &
-             mixtype, ndiis, mixrhopol, tolrhopol,                     &
-             env_surface_tension, delta,                               &
-             env_pressure,                                             &
-             env_ioncc_concentration, zion, rhopb,                     &
-             solvent_temperature
-#endif
-!
-!=----------------------------------------------------------------------------=!
-!  EE Namelist Input Parameters
-!=----------------------------------------------------------------------------=!
-!
-! kinetic energy cutoff for the coarse (MultiGrid) grid
-        REAL(DP) :: ecutcoarse = 100.0d0
-! amount of "new" correction introduced when mixing
-        REAL(DP) :: mixing_charge_compensation = 1.0
-! error tolerance for the multigrid solver
-        REAL(DP) :: errtol = 1.d-22
-! how early in scf itarations should the corrective pot start being calculated
-        REAL(DP) :: comp_thr = 1.d-2
-! nlev number of grid levels in the multigrid solver
-        INTEGER :: nlev = 2
-! itmax maximum number of iterations in the multigrid solver
-        INTEGER :: itmax = 1000
-! whichbc 0 if aperiodic
-        INTEGER :: whichbc(3) = 0
-! sets after how many scf cycles the corrective potential should be calculated
-        INTEGER :: n_charge_compensation = 5
-!
-        INTEGER :: ncompx = 1
-        INTEGER :: ncompy = 1
-        INTEGER :: ncompz = 1
-          ! ONLY PWSCF
-!
-        INTEGER :: mr1 = 0
-        INTEGER :: mr2 = 0
-        INTEGER :: mr3 = 0
-
-        REAL(DP) :: cellmin( 3 ) = 0.D0
-          ! ONLY PWSCF
-
-        REAL(DP) :: cellmax( 3 ) = 1.D0
-
-        NAMELIST / ee / comp_thr,    &
-             ncompx,n_charge_compensation,              &
-             ncompy, ncompz,mixing_charge_compensation, &
-             mr1, mr2, mr3, ecutcoarse,                 &
-             errtol, nlev, itmax, whichbc,              &
-             cellmin, cellmax
 
 !=----------------------------------------------------------------------------=!
 !  ELECTRONS Namelist Input Parameters
@@ -1035,9 +885,10 @@ MODULE input_parameters
 
         CHARACTER(len=80) :: ion_dynamics = 'none'
           ! set how ions should be moved
-        CHARACTER(len=80) :: ion_dynamics_allowed(8)
+        CHARACTER(len=80) :: ion_dynamics_allowed(9)
         DATA ion_dynamics_allowed / 'none', 'sd', 'cg', 'langevin', &
-                                    'damp', 'verlet', 'bfgs', 'beeman' /
+                                    'damp', 'verlet', 'bfgs', 'beeman',& 
+                                    'langevin-smc' /
 
         REAL(DP) :: ion_radius(nsx) = 0.5_DP
           ! pseudo-atomic radius of the i-th atomic species

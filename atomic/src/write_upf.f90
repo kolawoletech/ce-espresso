@@ -439,7 +439,7 @@ end subroutine write_pseudo_addinfo
        write ( ounps, '(a)', err = 100, iostat = ios ) &
             "<PP_PAW_FORMAT_VERSION>"
        write ( ounps, '(a)', err=100, iostat=ios ) &
-            "0.1"
+            "1"
        write ( ounps, '(a)', err = 100, iostat = ios ) &
             "</PP_PAW_FORMAT_VERSION>"
        write ( ounps, '(a)', err = 100, iostat = ios ) &
@@ -451,7 +451,7 @@ end subroutine write_pseudo_addinfo
        write ( ounps, '(//a25)', err = 100, iostat = ios ) &
             "<PP_GIPAW_FORMAT_VERSION>"
        write ( ounps, '(a3)', err=100, iostat=ios ) &
-            "0.1"
+            "1"
        write ( ounps, '(a26)', err = 100, iostat = ios ) &
             "</PP_GIPAW_FORMAT_VERSION>"
        

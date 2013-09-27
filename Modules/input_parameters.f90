@@ -251,6 +251,8 @@ MODULE input_parameters
 
         CHARACTER(len=256) :: vdw_table_name = ' '
 
+        CHARACTER(len=10) :: point_label_type='SC'
+
         CHARACTER(len=80) :: memory = 'default' 
           ! controls memory usage 
         CHARACTER(len=80) :: memory_allowed(3)
@@ -271,7 +273,7 @@ MODULE input_parameters
           forc_conv_thr, pseudo_dir, disk_io, tefield, dipfield, lberry,  &
           gdir, nppstr, wf_collect, printwfc, lelfield, nberrycyc, refg,  &
           tefield2, saverho, tabps, lkpoint_dir, use_wannier, lecrpa,     &
-          vdw_table_name, lorbm, memory
+          vdw_table_name, lorbm, memory, point_label_type
 
 
 #if defined ( __MS2)
@@ -472,6 +474,7 @@ MODULE input_parameters
           !  'dft-d' or 'grimme-d2' [S.Grimme, J.Comp.Chem. 27, 1787 (2006)]
           !  'ts', 'ts-vdW', 'tkatchenko-scheffler'
           !  (Tkatchenko & Scheffler, Phys. Rev. Lett. 102, 073005 (2009))
+          !  'xdm' (Otero de la Roza and Johnson, J. Chem. Phys. 136 (2012) 174109)
 
         LOGICAL   :: london = .false.
           ! OBSOLESCENT: same as vdw_corr='grimme-d2'
@@ -488,6 +491,14 @@ MODULE input_parameters
         REAL(DP) :: ts_vdw_econv_thr = 1.0E-6_DP
           ! convergence criterion for TS-vdW energy for periodic system 
           !
+
+        LOGICAL :: xdm = .FALSE.
+          ! OBSOLESCENT: same as vdw_corr='xdm'
+        REAL(DP) :: xdm_a1 = 0.6836_DP
+        REAL(DP) :: xdm_a2 = 1.5045_DP	
+          ! xdm_a1 and xdm_a2 -- parameters for the BJ damping function
+          ! The default values are for the b86bpbe functional.
+
 #ifdef __ENVIRON
         LOGICAL   :: do_environ = .false.
 #endif
@@ -538,6 +549,7 @@ MODULE input_parameters
              tot_charge, tot_magnetization, spline_ps, one_atom_occupations,  &
              vdw_corr, london, london_s6, london_rcut,                        &
              ts_vdw, ts_vdw_isolated, ts_vdw_econv_thr,                       &
+             xdm, xdm_a1, xdm_a2,                                             &
              step_pen, A_pen, sigma_pen, alpha_pen, no_t_rev,                 &
              esm_bc, esm_efield, esm_w, esm_nfit, esm_debug, esm_debug_gpmax
 

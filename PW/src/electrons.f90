@@ -250,7 +250,7 @@ SUBROUTINE electrons_scf()
   USE wvfct,                ONLY : nbnd, et, npwx, ecutwfc
   USE ener,                 ONLY : etot, hwf_energy, eband, deband, ehart, &
                                    vtxc, etxc, etxcc, ewld, demet, epaw, &
-                                   elondon, ef_up, ef_dw
+                                   elondon, ef_up, ef_dw, exdm
   USE scf,                  ONLY : scf_type, scf_type_COPY, bcast_scf_type,&
                                    create_scf_type, destroy_scf_type, &
                                    open_mix_file, close_mix_file, &
@@ -260,7 +260,7 @@ SUBROUTINE electrons_scf()
                                    iprint, istep, conv_elec, &
                                    restart, io_level, do_makov_payne,  &
                                    gamma_only, iverbosity, textfor,     &
-                                   llondon, scf_must_converge
+                                   llondon, scf_must_converge, lxdm
   USE io_files,             ONLY : iunwfc, iunmix, nwordwfc, output_drho, &
                                    iunres, iunefield, seqopn
   USE buffers,              ONLY : save_buffer, close_buffer
@@ -280,6 +280,7 @@ SUBROUTINE electrons_scf()
   USE mp,                   ONLY : mp_sum, mp_bcast
   !
   USE london_module,        ONLY : energy_london
+  USE xdm_module,           ONLY : energy_xdm
   !
   USE paw_variables,        ONLY : okpaw, ddd_paw, total_core_energy, only_paw
   USE paw_onecenter,        ONLY : PAW_potential
@@ -685,6 +686,12 @@ SUBROUTINE electrons_scf()
         etot = etot + elondon
         hwf_energy = hwf_energy + elondon
      END IF
+     ! calculate the xdm energy contribution with converged density
+     if (lxdm .and. conv_elec) then
+        exdm = energy_xdm()
+        etot = etot + exdm
+        hwf_energy = hwf_energy + exdm
+     end if
      ! 
      If ( exx_is_active () ) THEN
         etot = etot - 0.5D0*fock2

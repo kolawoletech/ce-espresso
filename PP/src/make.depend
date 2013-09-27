@@ -394,7 +394,6 @@ projwfc.o : ../../Modules/uspp.o
 projwfc.o : ../../Modules/wavefunctions.o
 projwfc.o : ../../Modules/zhpev_drv.o
 projwfc.o : ../../PW/src/atomic_wfc_mod.o
-projwfc.o : ../../PW/src/ldaU.o
 projwfc.o : ../../PW/src/pwcom.o
 projwfc.o : ../../PW/src/symm_base.o
 projwfc.o : ../../iotk/src/iotk_module.o
@@ -447,6 +446,7 @@ pw2bgw.o : ../../Modules/kind.o
 pw2bgw.o : ../../Modules/mp.o
 pw2bgw.o : ../../Modules/mp_global.o
 pw2bgw.o : ../../Modules/mp_wave.o
+pw2bgw.o : ../../Modules/mp_world.o
 pw2bgw.o : ../../Modules/noncol.o
 pw2bgw.o : ../../Modules/parallel_include.o
 pw2bgw.o : ../../Modules/paw_variables.o

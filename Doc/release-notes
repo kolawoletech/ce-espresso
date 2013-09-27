@@ -1,11 +1,13 @@
 New in svn version
 
+   * PW: partial support to the use of k-points label in the Brillouin zone
    * PW: Langevin dynamics with Smart Monte Carlo
    * CP: Tkatchenko-Scheffler vdW correction
    * GWW replaced by GWL (using Lanczos chains)
    * turboTDDFT: pseudo_Hamiltonians, Davidson-like diagonalization
    * PWCOND with DFT+U
-   * New functional 'gau-pbe'
+   * New functionals: gau-pbe, PW86 (unrevised), B86B, XDM (exchange-hole 
+     dipole moment) model of dispersions
    * Added the subdirectory FD in PHonon. Calculation of phonon dispersions 
      using the finite displacements supercell approach.
    * dynmat.x can calculate phonon contribution to dielectric tensor

@@ -3,7 +3,7 @@
 include ../../make.sys
 
 # location of needed modules and included files (if any)
-MODFLAGS= $(MOD_FLAG)../../iotk/src $(MOD_FLAG)../../Modules $(MOD_FLAG).
+MODFLAGS= $(MOD_FLAG)../../iotk/src $(MOD_FLAG)../../Modules
 IFLAGS=
 
 PWOBJS = \
@@ -218,6 +218,7 @@ vcsubs.o \
 vhpsi.o \
 vloc_of_g.o \
 vloc_psi.o \
+xdm_dispersion.o \
 xk_wk_collect.o \
 wfcinit.o \
 write_ns.o \
@@ -231,7 +232,7 @@ wannier_clean.o \
 wannier_occ.o \
 wannier_enrg.o \
 
-QEMODS=../../Modules/libqemod.a 
+QEMODS=../../Modules/libqemod.a
 
 TLDEPS=bindir mods libs liblapack libblas libenviron
 

@@ -33,6 +33,7 @@ MODULE scf
   USE paw_variables,ONLY : okpaw
   USE uspp_param,   ONLY : nhm
   USE extfield,     ONLY : dipfield, emaxpos, eopreg, edir
+  USE control_flags,ONLY : lxdm
   !
   SAVE
   !
@@ -120,7 +121,7 @@ CONTAINS
 #ifdef __STD_F95
  nullify (rho%kin_r, rho%kin_g, rho%ns, rho%ns_nc, rho%bec)
 #endif
-   if (dft_is_meta()) then
+   if (dft_is_meta() .or. lxdm) then
       allocate ( rho%kin_r( dfftp%nnr, nspin) )
       allocate ( rho%kin_g( ngm, nspin ) )
    else
@@ -177,7 +178,7 @@ CONTAINS
    nullify (rho%kin_g, rho%ns, rho%ns_nc, rho%bec)
 #endif
    rho%of_g = 0._dp
-   if (dft_is_meta()) then
+   if (dft_is_meta() .or. lxdm) then
       allocate (rho%kin_g( ngms, nspin ) )
       rho%kin_g = 0._dp
    end if
@@ -227,7 +228,7 @@ CONTAINS
       
    rho_m%of_g(1:ngms,:) = rho_s%of_g(1:ngms,:)
    
-   if (dft_is_meta()) rho_m%kin_g(1:ngms,:) = rho_s%kin_g(1:ngms,:)
+   if (dft_is_meta() .or. lxdm) rho_m%kin_g(1:ngms,:) = rho_s%kin_g(1:ngms,:)
    if (lda_plus_u_nc) rho_m%ns_nc  = rho_s%ns_nc
    if (lda_plus_u_co) rho_m%ns     = rho_s%ns
    if (okpaw)         rho_m%bec = rho_s%bec
@@ -260,7 +261,7 @@ CONTAINS
       rho_s%of_r(:,is) = psic(:)
    END DO
 
-   if (dft_is_meta()) then
+   if (dft_is_meta() .or. lxdm) then
       rho_s%kin_g(1:ngms,:) = rho_m%kin_g(:,:)
       ! define rho_s%kin_r 
       DO is = 1, nspin
@@ -289,7 +290,7 @@ CONTAINS
   TYPE(scf_type), INTENT(INOUT) :: Y
   Y%of_r  = X%of_r
   Y%of_g  = X%of_g
-  if (dft_is_meta()) then
+  if (dft_is_meta() .or. lxdm) then
      Y%kin_r = X%kin_r
      Y%kin_g = X%kin_g
   end if
@@ -311,7 +312,7 @@ CONTAINS
   TYPE(mix_type), INTENT(IN)    :: X
   TYPE(mix_type), INTENT(INOUT) :: Y
   Y%of_g  = Y%of_g  + A * X%of_g
-  if (dft_is_meta()) Y%kin_g = Y%kin_g + A * X%kin_g
+  if (dft_is_meta() .or. lxdm) Y%kin_g = Y%kin_g + A * X%kin_g
   if (lda_plus_u_nc) Y%ns_nc = Y%ns_nc + A * X%ns_nc
   if (lda_plus_u_co) Y%ns = Y%ns + A * X%ns
   if (okpaw)     Y%bec = Y%bec + A * X%bec
@@ -329,7 +330,7 @@ CONTAINS
   TYPE(mix_type), INTENT(IN)    :: X
   TYPE(mix_type), INTENT(INOUT) :: Y
   Y%of_g  = X%of_g
-  if (dft_is_meta()) Y%kin_g = X%kin_g
+  if (dft_is_meta() .or. lxdm) Y%kin_g = X%kin_g
   if (lda_plus_u_nc) Y%ns_nc  = X%ns_nc
   if (lda_plus_u_co) Y%ns  = X%ns
   if (okpaw)      Y%bec = X%bec
@@ -348,7 +349,7 @@ CONTAINS
   REAL(DP),       INTENT(IN)    :: A
   TYPE(mix_type), INTENT(INOUT) :: X
   X%of_g(:,:)  = A * X%of_g(:,:)
-  if (dft_is_meta()) X%kin_g = A * X%kin_g
+  if (dft_is_meta() .or. lxdm) X%kin_g = A * X%kin_g
   if (lda_plus_u_nc) X%ns_nc = A * X%ns_nc
   if (lda_plus_u_co) X%ns    = A * X%ns
   if (okpaw)      X%bec= A * X%bec
@@ -378,7 +379,7 @@ CONTAINS
          rhoin%of_r(:,is) = psic(:)
       END DO
       !
-      if (dft_is_meta()) then
+      if (dft_is_meta() .or. lxdm) then
          rhoin%kin_g = rhoin%kin_g + alphamix * ( input_rhout%kin_g-rhoin%kin_g)
          rhoin%kin_g(1:ngms,1:nspin) = (0.d0,0.d0)
          ! define rho_s%of_r 
@@ -393,7 +394,7 @@ CONTAINS
    else
       rhoin%of_g(:,:)= (0.d0,0.d0)
       rhoin%of_r(:,:)= 0.d0
-      if (dft_is_meta()) then
+      if (dft_is_meta() .or. lxdm) then
          rhoin%kin_g(:,:)= (0.d0,0.d0)
          rhoin%kin_r(:,:)= 0.d0
       endif
@@ -413,7 +414,7 @@ CONTAINS
    logical :: exst
    ! define lengths (in real numbers) of different record chunks
    rlen_rho = 2 * ngms * nspin
-   if (dft_is_meta() ) rlen_kin =  2 * ngms * nspin
+   if (dft_is_meta() .or. lxdm) rlen_kin =  2 * ngms * nspin
    if (lda_plus_u_co)  rlen_ldaU = (2*Hubbard_lmax+1)**2 *nspin*nat
    if (lda_plus_u_nc)  rlen_ldaU = 2 * (2*Hubbard_lmax+1)**2 *nspin*nat
    if (okpaw)          rlen_bec = (nhm*(nhm+1)/2) * nat * nspin
@@ -454,7 +455,7 @@ CONTAINS
 
    if (iflag > 0) then      
       call DCOPY(rlen_rho,rho%of_g,1,io_buffer(start_rho),1)
-      if (dft_is_meta())  call DCOPY(rlen_kin, rho%kin_g,1,io_buffer(start_kin),1)
+      if (dft_is_meta() .or. lxdm)  call DCOPY(rlen_kin, rho%kin_g,1,io_buffer(start_kin),1)
       if (lda_plus_u_nc)  call DCOPY(rlen_ldaU,rho%ns_nc, 1,io_buffer(start_ldaU),1)
       if (lda_plus_u_co)  call DCOPY(rlen_ldaU,rho%ns,   1,io_buffer(start_ldaU),1)
       if (okpaw)          call DCOPY(rlen_bec, rho%bec,  1,io_buffer(start_bec),1)
@@ -463,7 +464,7 @@ CONTAINS
    else if (iflag < 0 ) then 
       CALL get_buffer( io_buffer, record_length, iunit, record )
       call DCOPY(rlen_rho,io_buffer(start_rho),1,rho%of_g,1)
-      if (dft_is_meta()) call DCOPY(rlen_kin,io_buffer(start_kin), 1,rho%kin_g,1)
+      if (dft_is_meta() .or. lxdm) call DCOPY(rlen_kin,io_buffer(start_kin), 1,rho%kin_g,1)
       if (lda_plus_u_co) call DCOPY(rlen_ldaU,io_buffer(start_ldaU),1,rho%ns,1)
       if (lda_plus_u_nc) call DCOPY(rlen_ldaU,io_buffer(start_ldaU),1,rho%ns_nc,1)
       if (okpaw)         call DCOPY(rlen_bec, io_buffer(start_bec), 1,rho%bec,1)
@@ -823,7 +824,7 @@ END FUNCTION ns_ddot
   !
   CALL mp_bcast ( rho%of_g, root, comm )
   CALL mp_bcast ( rho%of_r, root, comm )
-  IF ( dft_is_meta() ) THEN
+  IF ( dft_is_meta() .or. lxdm) THEN
      CALL mp_bcast ( rho%kin_g, root, comm )
      CALL mp_bcast ( rho%kin_r, root, comm )
   END IF

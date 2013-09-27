@@ -25,16 +25,17 @@ MODULE mp_world
 CONTAINS
   !
   !-----------------------------------------------------------------------
-  SUBROUTINE mp_global_start ( )
+  SUBROUTINE mp_global_start ( my_world_comm )
     !-----------------------------------------------------------------------
     !
     IMPLICIT NONE
+    INTEGER, INTENT(IN) :: my_world_comm
     !
+    world_comm = my_world_comm
     ! ... get the basic parameters from communications sub-system
     ! ... to handle processors
     ! ... nproc = number of processors
     ! ... mpime = processor number, starting from 0
-    ! ... world_comm = group index of all processors
     !
     CALL mp_start( nproc, mpime, world_comm )
     !
@@ -53,7 +54,7 @@ CONTAINS
   SUBROUTINE mp_global_end ( )
     !-----------------------------------------------------------------------
     !
-    CALL mp_barrier()
+    CALL mp_barrier( world_comm )
     CALL mp_end ()
     !
   END SUBROUTINE mp_global_end

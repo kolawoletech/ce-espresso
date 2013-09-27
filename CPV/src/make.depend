@@ -96,6 +96,7 @@ cp_autopilot.o : ../../Modules/io_global.o
 cp_autopilot.o : ../../Modules/ions_base.o
 cp_autopilot.o : ../../Modules/kind.o
 cp_autopilot.o : ../../Modules/mp.o
+cp_autopilot.o : ../../Modules/mp_world.o
 cp_autopilot.o : ../../Modules/parser.o
 cp_autopilot.o : ../../Modules/timestep.o
 cp_autopilot.o : ../../Modules/wave_base.o
@@ -121,6 +122,7 @@ cp_restart.o : ../../Modules/kernel_table.o
 cp_restart.o : ../../Modules/kind.o
 cp_restart.o : ../../Modules/mp.o
 cp_restart.o : ../../Modules/mp_global.o
+cp_restart.o : ../../Modules/mp_world.o
 cp_restart.o : ../../Modules/parameters.o
 cp_restart.o : ../../Modules/parser.o
 cp_restart.o : ../../Modules/recvec.o

@@ -47,7 +47,7 @@ SUBROUTINE vol_clu(rho_real,rho_g,s_fac,flag)
       include 'mpif.h'
 #endif
 
-      real(kind=8) dx, dxx, xcc(4500)
+      real(kind=8) dx, dxx, xcc(4800)
       real(kind=8) weight0, wpiu, wmeno, maxr, minr
       real(kind=8) tau00(3), dist
       real(kind=8) rho_real(dfftp%nnr,nspin), rhoc

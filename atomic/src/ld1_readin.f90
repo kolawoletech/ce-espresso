@@ -18,6 +18,7 @@ subroutine ld1_readin(input_file)
   use constants,  ONLY : rytoev, c_au
   USE io_global,  ONLY : ionode, ionode_id, qestdin, stdout
   USE mp,         ONLY : mp_bcast
+  USE mp_world,   ONLY : world_comm
   USE open_close_input_file,  ONLY : open_input_file, close_input_file
   use ld1inc,     only : els, lls, betas, qq, qvan, ikk, nbeta, pseudotype, &
                          el, nn, ll, jj, oc, isw, nwf,rcut, rcutus, &
@@ -223,24 +224,24 @@ subroutine ld1_readin(input_file)
 
   ios = 0
   if (ionode) ios = open_input_file(input_file)
-  call mp_bcast(ios, ionode_id)
+  call mp_bcast(ios, ionode_id, world_comm)
   If ( ios > 0 ) call errore('ld1_readin','opening input file ',abs(ios))
   vshift(:) = 0.d0
 
   ! read the namelist input
 
   if (ionode) read(qestdin,input,err=100,iostat=ios) 
-100  call mp_bcast(ios, ionode_id)
+100  call mp_bcast(ios, ionode_id, world_comm)
   call errore('ld1_readin','reading input namelist ',abs(ios))
 
   call bcast_input()
-  call mp_bcast( xmin, ionode_id )
-  call mp_bcast( dx, ionode_id )
-  call mp_bcast( rmax, ionode_id )
-  call mp_bcast(atom, ionode_id )
-  call mp_bcast(config, ionode_id )
-  call mp_bcast(dft, ionode_id )
-  call mp_bcast(rel_dist, ionode_id )
+  call mp_bcast( xmin, ionode_id, world_comm )
+  call mp_bcast( dx, ionode_id, world_comm )
+  call mp_bcast( rmax, ionode_id, world_comm )
+  call mp_bcast(atom, ionode_id, world_comm )
+  call mp_bcast(config, ionode_id, world_comm )
+  call mp_bcast(dft, ionode_id, world_comm )
+  call mp_bcast(rel_dist, ionode_id, world_comm )
 !
   IF (iswitch /= 2 ) call set_dft_from_name(dft)
 
@@ -384,9 +385,11 @@ subroutine ld1_readin(input_file)
      lnc2paw = .false.
      rmatch_augfun=-1.0_dp   ! force a crash
      rmatch_augfun_nc =.false.
+     lgipaw_reconstruction = .true.
+     use_paw_as_gipaw = .true. 
 
      if (ionode) read(qestdin,inputp,err=500,iostat=ios)
-500  call mp_bcast(ios, ionode_id)
+500  call mp_bcast(ios, ionode_id, world_comm)
      call errore('ld1_readin','reading inputp',abs(ios))
 
      call bcast_inputp()
@@ -406,6 +409,14 @@ subroutine ld1_readin(input_file)
      if (rel==2 .and. pseudotype==1 ) &
           call errore('ld1_readin','Generation of a FR PP with'// & 
                   &     ' pseudotype=1 not allowed',1)
+!
+!  gipaw reconstruction is not implemented in the fully relativistic case
+!
+     if (rel==2.OR..NOT.lpaw) then
+        lgipaw_reconstruction = .false.
+        use_paw_as_gipaw = .false. 
+     endif
+
      if (which_augfun=='PSQ'.and.pseudotype.ne.3) &
           call errore('ld1_readin','PSQ requires pseudotype=3',1)
      !
@@ -476,7 +487,7 @@ subroutine ld1_readin(input_file)
   ! read test namelist, if present
 
   if (ionode) read(qestdin,test,end=300,err=300,iostat=ios)
-300  call mp_bcast(ios, ionode_id)
+300  call mp_bcast(ios, ionode_id, world_comm)
 
   if(iswitch==4.and.rcutv<0.0) call errore('ld1_readin','inconsistent rcutv',1)
   if (iswitch==2.or.iswitch==4) call errore('ld1_readin','reading test',abs(ios))
@@ -484,7 +495,7 @@ subroutine ld1_readin(input_file)
   if(iswitch==4) nconf = 2
   !
   call bcast_test()
-  call mp_bcast(configts, ionode_id)
+  call mp_bcast(configts, ionode_id, world_comm)
   !
   !  PP generation: if namelist test is not found, use defaults
   !
@@ -536,8 +547,8 @@ subroutine ld1_readin(input_file)
            call read_psconfig (rel, lsdts(nc), nwftsc(nc), eltsc(1,nc), &
                 nntsc(1,nc), lltsc(1,nc), octsc(1,nc), iswtsc(1,nc), &
                 jjtsc(1,nc), enltsc(1,nc), rcuttsc(1,nc), rcutustsc(1,nc) )
-           call mp_bcast(eltsc(:,nc),ionode_id)
-           call mp_bcast(enltsc(:,nc),ionode_id)
+           call mp_bcast(eltsc(:,nc),ionode_id, world_comm)
+           call mp_bcast(enltsc(:,nc),ionode_id, world_comm)
            do ns=1,nwftsc(nc)
               do ns1=1,ns-1
                  if (eltsc(ns,nc) == eltsc(ns1,nc)   &
@@ -672,34 +683,36 @@ end subroutine ld1_readin
 subroutine bcast_input()
   USE io_global,  ONLY : ionode_id
   USE mp,         ONLY : mp_bcast
+  USE mp_world,   ONLY : world_comm
   USE ld1inc,   ONLY : zed, beta, tr2, iswitch, nlc, rlderiv, eminld, emaxld, &
                      deld, lsd, rel, lsmall, isic, latt, title, prefix, vdw, &
-                     nld, noscf, relpert, file_charge, max_out_wfc
+                     nld, noscf, relpert, file_charge, max_out_wfc, upf1_v1_format
 
 
 implicit none
 #ifdef __MPI
-   call mp_bcast( zed, ionode_id )
-   call mp_bcast( beta, ionode_id )
-   call mp_bcast( tr2, ionode_id )
-   call mp_bcast( iswitch, ionode_id )
-   call mp_bcast( nld, ionode_id )
-   call mp_bcast( rlderiv, ionode_id )
-   call mp_bcast( eminld, ionode_id )
-   call mp_bcast( emaxld, ionode_id )
-   call mp_bcast( deld, ionode_id )
-   call mp_bcast( lsd, ionode_id )
-   call mp_bcast( rel, ionode_id )
-   call mp_bcast( lsmall, ionode_id )
-   call mp_bcast( isic, ionode_id )
-   call mp_bcast( latt, ionode_id )
-   call mp_bcast( title, ionode_id )
-   call mp_bcast( prefix, ionode_id )
-   call mp_bcast( noscf, ionode_id )
-   call mp_bcast( relpert, ionode_id )
-   call mp_bcast( vdw, ionode_id )
-   call mp_bcast( file_charge, ionode_id )
-   call mp_bcast( max_out_wfc, ionode_id )
+   call mp_bcast( zed, ionode_id, world_comm )
+   call mp_bcast( beta, ionode_id, world_comm )
+   call mp_bcast( tr2, ionode_id, world_comm )
+   call mp_bcast( iswitch, ionode_id, world_comm )
+   call mp_bcast( nld, ionode_id, world_comm )
+   call mp_bcast( rlderiv, ionode_id, world_comm )
+   call mp_bcast( eminld, ionode_id, world_comm )
+   call mp_bcast( emaxld, ionode_id, world_comm )
+   call mp_bcast( deld, ionode_id, world_comm )
+   call mp_bcast( lsd, ionode_id, world_comm )
+   call mp_bcast( rel, ionode_id, world_comm )
+   call mp_bcast( lsmall, ionode_id, world_comm )
+   call mp_bcast( isic, ionode_id, world_comm )
+   call mp_bcast( latt, ionode_id, world_comm )
+   call mp_bcast( title, ionode_id, world_comm )
+   call mp_bcast( prefix, ionode_id, world_comm )
+   call mp_bcast( noscf, ionode_id, world_comm )
+   call mp_bcast( relpert, ionode_id, world_comm )
+   call mp_bcast( vdw, ionode_id, world_comm )
+   call mp_bcast( file_charge, ionode_id, world_comm )
+   call mp_bcast( max_out_wfc, ionode_id, world_comm )
+   call mp_bcast( upf_v1_format, ionode_id, world_comm )
 #endif
 return
 end subroutine bcast_input
@@ -707,6 +720,7 @@ end subroutine bcast_input
 subroutine bcast_inputp()
   USE io_global,  ONLY : ionode_id
   USE mp,         ONLY : mp_bcast
+  USE mp_world,   ONLY : world_comm
   use ld1inc,     ONLY : pseudotype, tm, rho0, zval, lloc, nlcc, &
                          rcore, rcloc, new_core_ps, lpaw, verbosity, &
                          file_pseudopw, file_screen, file_core, file_beta, &
@@ -717,33 +731,33 @@ subroutine bcast_inputp()
                          use_paw_as_gipaw, vshift !EMINE
 implicit none
 #ifdef __MPI
-  call mp_bcast( pseudotype, ionode_id )
-  call mp_bcast( tm,  ionode_id ) 
-  call mp_bcast( rho0,  ionode_id )
-  call mp_bcast( zval,  ionode_id )
-  call mp_bcast( lloc,  ionode_id )
-  call mp_bcast( nlcc,  ionode_id )
-  call mp_bcast( rcore, ionode_id )
-  call mp_bcast( rcloc, ionode_id )
-  call mp_bcast( new_core_ps,  ionode_id )
-  call mp_bcast( lpaw,  ionode_id )
-  call mp_bcast( verbosity,  ionode_id )
-  call mp_bcast( file_pseudopw, ionode_id )
-  call mp_bcast( file_screen, ionode_id ) 
-  call mp_bcast( file_core, ionode_id )
-  call mp_bcast( file_beta, ionode_id )
-  call mp_bcast( file_chi, ionode_id )
-  call mp_bcast( file_qvan, ionode_id )
-  call mp_bcast( file_wfcaegen, ionode_id )
-  call mp_bcast( file_wfcncgen, ionode_id )
-  call mp_bcast( file_wfcusgen, ionode_id )
-  call mp_bcast( file_recon,  ionode_id )
-  call mp_bcast( which_augfun,  ionode_id )
-  call mp_bcast( rmatch_augfun,  ionode_id )
-  call mp_bcast( rmatch_augfun_nc, ionode_id )
-  call mp_bcast( lsave_wfc, ionode_id )
-  call mp_bcast( lgipaw_reconstruction, ionode_id )
-  call mp_bcast( vshift, ionode_id )
+  call mp_bcast( pseudotype, ionode_id, world_comm )
+  call mp_bcast( tm,  ionode_id, world_comm ) 
+  call mp_bcast( rho0,  ionode_id, world_comm )
+  call mp_bcast( zval,  ionode_id, world_comm )
+  call mp_bcast( lloc,  ionode_id, world_comm )
+  call mp_bcast( nlcc,  ionode_id, world_comm )
+  call mp_bcast( rcore, ionode_id, world_comm )
+  call mp_bcast( rcloc, ionode_id, world_comm )
+  call mp_bcast( new_core_ps,  ionode_id, world_comm )
+  call mp_bcast( lpaw,  ionode_id, world_comm )
+  call mp_bcast( verbosity,  ionode_id, world_comm )
+  call mp_bcast( file_pseudopw, ionode_id, world_comm )
+  call mp_bcast( file_screen, ionode_id, world_comm ) 
+  call mp_bcast( file_core, ionode_id, world_comm )
+  call mp_bcast( file_beta, ionode_id, world_comm )
+  call mp_bcast( file_chi, ionode_id, world_comm )
+  call mp_bcast( file_qvan, ionode_id, world_comm )
+  call mp_bcast( file_wfcaegen, ionode_id, world_comm )
+  call mp_bcast( file_wfcncgen, ionode_id, world_comm )
+  call mp_bcast( file_wfcusgen, ionode_id, world_comm )
+  call mp_bcast( file_recon,  ionode_id, world_comm )
+  call mp_bcast( which_augfun,  ionode_id, world_comm )
+  call mp_bcast( rmatch_augfun,  ionode_id, world_comm )
+  call mp_bcast( rmatch_augfun_nc, ionode_id, world_comm )
+  call mp_bcast( lsave_wfc, ionode_id, world_comm )
+  call mp_bcast( lgipaw_reconstruction, ionode_id, world_comm )
+  call mp_bcast( vshift, ionode_id, world_comm )
 #endif
   return
 end subroutine bcast_inputp
@@ -751,19 +765,20 @@ end subroutine bcast_inputp
 subroutine bcast_test()
   USE io_global,  ONLY : ionode_id
   USE mp,         ONLY : mp_bcast
+  USE mp_world,   ONLY : world_comm
   USE ld1inc,     ONLY : nconf, file_pseudo, ecutmin, ecutmax, decut, rm, &
                          frozen_core, lsdts
 
 implicit none
 #ifdef __MPI
-   call mp_bcast( nconf, ionode_id ) 
-   call mp_bcast( file_pseudo, ionode_id )
-   call mp_bcast( ecutmin, ionode_id ) 
-   call mp_bcast( ecutmax, ionode_id ) 
-   call mp_bcast( decut, ionode_id ) 
-   call mp_bcast( rm, ionode_id )      
-   call mp_bcast( frozen_core, ionode_id )
-   call mp_bcast( lsdts, ionode_id )
+   call mp_bcast( nconf, ionode_id, world_comm ) 
+   call mp_bcast( file_pseudo, ionode_id, world_comm )
+   call mp_bcast( ecutmin, ionode_id, world_comm ) 
+   call mp_bcast( ecutmax, ionode_id, world_comm ) 
+   call mp_bcast( decut, ionode_id, world_comm ) 
+   call mp_bcast( rm, ionode_id, world_comm )      
+   call mp_bcast( frozen_core, ionode_id, world_comm )
+   call mp_bcast( lsdts, ionode_id, world_comm )
 #endif
 return
 end subroutine bcast_test
@@ -771,17 +786,18 @@ end subroutine bcast_test
 subroutine bcast_config()
   USE io_global,  ONLY : ionode_id
   USE mp,         ONLY : mp_bcast
+  USE mp_world,   ONLY : world_comm
   USE ld1inc,     ONLY : nwf, el, nn, ll, oc, isw, jj
 
 implicit none
 #ifdef __MPI
-  call mp_bcast( nwf, ionode_id )
-  call mp_bcast( el, ionode_id )
-  call mp_bcast( nn, ionode_id )
-  call mp_bcast( ll, ionode_id )
-  call mp_bcast( oc, ionode_id )
-  call mp_bcast( isw, ionode_id )
-  call mp_bcast( jj, ionode_id )
+  call mp_bcast( nwf, ionode_id, world_comm )
+  call mp_bcast( el, ionode_id, world_comm )
+  call mp_bcast( nn, ionode_id, world_comm )
+  call mp_bcast( ll, ionode_id, world_comm )
+  call mp_bcast( oc, ionode_id, world_comm )
+  call mp_bcast( isw, ionode_id, world_comm )
+  call mp_bcast( jj, ionode_id, world_comm )
 #endif
 return
 end subroutine bcast_config
@@ -789,21 +805,22 @@ end subroutine bcast_config
 subroutine bcast_psconfig()
   USE io_global,  ONLY : ionode_id
   USE mp,         ONLY : mp_bcast
+  USE mp_world,   ONLY : world_comm
   USE ld1inc,     ONLY : nwfs, els, nns, lls, ocs, jjs, isws, enls, rcut, &
                          rcutus
 
 implicit none
 #ifdef __MPI
-  call mp_bcast( nwfs, ionode_id )
-  call mp_bcast( els, ionode_id )
-  call mp_bcast( nns, ionode_id )
-  call mp_bcast( lls, ionode_id )
-  call mp_bcast( ocs, ionode_id )
-  call mp_bcast( jjs, ionode_id )
-  call mp_bcast( isws, ionode_id )
-  call mp_bcast( enls, ionode_id )
-  call mp_bcast( rcut, ionode_id )
-  call mp_bcast( rcutus, ionode_id )
+  call mp_bcast( nwfs, ionode_id, world_comm )
+  call mp_bcast( els, ionode_id, world_comm )
+  call mp_bcast( nns, ionode_id, world_comm )
+  call mp_bcast( lls, ionode_id, world_comm )
+  call mp_bcast( ocs, ionode_id, world_comm )
+  call mp_bcast( jjs, ionode_id, world_comm )
+  call mp_bcast( isws, ionode_id, world_comm )
+  call mp_bcast( enls, ionode_id, world_comm )
+  call mp_bcast( rcut, ionode_id, world_comm )
+  call mp_bcast( rcutus, ionode_id, world_comm )
 #endif
 return
 end subroutine bcast_psconfig
@@ -811,19 +828,20 @@ end subroutine bcast_psconfig
 subroutine bcast_pstsconfig()
   USE io_global,  ONLY : ionode_id
   USE mp,         ONLY : mp_bcast
+  USE mp_world,   ONLY : world_comm
   USE ld1inc,     ONLY : nwftsc, nntsc, lltsc, octsc, jjtsc, iswtsc, rcuttsc,&
                          rcutustsc
 
 implicit none
 #ifdef __MPI
-  call mp_bcast( nwftsc, ionode_id )
-  call mp_bcast( nntsc, ionode_id )
-  call mp_bcast( lltsc, ionode_id )
-  call mp_bcast( octsc, ionode_id )
-  call mp_bcast( jjtsc, ionode_id )
-  call mp_bcast( iswtsc, ionode_id )
-  call mp_bcast( rcuttsc, ionode_id ) 
-  call mp_bcast( rcutustsc, ionode_id )
+  call mp_bcast( nwftsc, ionode_id, world_comm )
+  call mp_bcast( nntsc, ionode_id, world_comm )
+  call mp_bcast( lltsc, ionode_id, world_comm )
+  call mp_bcast( octsc, ionode_id, world_comm )
+  call mp_bcast( jjtsc, ionode_id, world_comm )
+  call mp_bcast( iswtsc, ionode_id, world_comm )
+  call mp_bcast( rcuttsc, ionode_id, world_comm ) 
+  call mp_bcast( rcutustsc, ionode_id, world_comm )
 #endif
 return
 end subroutine bcast_pstsconfig

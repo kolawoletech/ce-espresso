@@ -1,6 +1,7 @@
 berry_phase.o : ../../Modules/io_global.o
 berry_phase.o : ../../Modules/mp.o
 berry_phase.o : ../../Modules/mp_global.o
+berry_phase.o : ../../Modules/mp_world.o
 berry_phase.o : ../../Modules/recvec.o
 berry_phase.o : ../../Modules/stick_base.o
 berryion.o : ../../Modules/cell_base.o
@@ -227,7 +228,6 @@ cprstart.o : ../../Modules/check_stop.o
 cprstart.o : ../../Modules/command_line_options.o
 cprstart.o : ../../Modules/environment.o
 cprstart.o : ../../Modules/io_global.o
-cprstart.o : ../../Modules/mp.o
 cprstart.o : ../../Modules/mp_global.o
 cprstart.o : ../../Modules/mp_images.o
 cprstart.o : ../../Modules/read_input.o
@@ -585,6 +585,7 @@ makov_payne.o : ../../Modules/ions_base.o
 makov_payne.o : ../../Modules/kind.o
 makov_payne.o : ../../Modules/mp.o
 makov_payne.o : ../../Modules/mp_global.o
+makov_payne.o : ../../Modules/mp_world.o
 makov_payne.o : ../../Modules/parallel_include.o
 makov_payne.o : gvecw.o
 makov_payne.o : ions_positions.o
@@ -903,8 +904,6 @@ spline.o : ../../Modules/kind.o
 stop_run.o : ../../Modules/constraints_module.o
 stop_run.o : ../../Modules/control_flags.o
 stop_run.o : ../../Modules/environment.o
-stop_run.o : ../../Modules/io_files.o
-stop_run.o : ../../Modules/io_global.o
 stop_run.o : ../../Modules/mp_global.o
 stress.o : ../../Modules/cell_base.o
 stress.o : ../../Modules/constants.o
@@ -929,6 +928,7 @@ tsvdw.o : ../../Modules/ions_base.o
 tsvdw.o : ../../Modules/kind.o
 tsvdw.o : ../../Modules/mp.o
 tsvdw.o : ../../Modules/mp_global.o
+tsvdw.o : ../../Modules/mp_world.o
 tsvdw.o : ../../Modules/parallel_include.o
 tsvdw.o : ../../Modules/uspp.o
 tsvdw.o : mainvar.o

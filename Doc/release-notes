@@ -1,5 +1,6 @@
 New in svn version
 
+   * PW: Hybrid functionals for USPP and PAW (experimental)
    * PW: partial support to the use of k-points label in the Brillouin zone
    * PW: Langevin dynamics with Smart Monte Carlo
    * CP: Tkatchenko-Scheffler vdW correction
@@ -18,6 +19,12 @@ New in svn version
 
 Incompatible changes in svn version:
 
+   * Initialization of MPI modified in order to simplify usage of QE routines
+     from external codes. It is now possible to run an instance of QE into a
+     mpi communicator passed by the external routine. Changes affect a few MPI
+     initialization routines (e.g. mp_start) and some MPI related modules;
+     the communicator must be explicitly specified when calling mp_* interfaces
+     to low-level MPI libraries.
    * Input variable "london" should be replaced by " vdw_corr='Grimme-D2' "
    * Routine "electrons" doesn't deal any longer with non-scf cases;
      Use routine "non_scf" instead.
@@ -37,6 +44,7 @@ Incompatible changes in svn version:
 
 Fixed in svn version:
 
+   * PWscf: spin-polarized HSE for PAW was incorrectly implemented
    * PHonon: epsil + paw was not working with k-point parallelization.
    * PHonon: problem with the symmetry analysis in D_6h. The problem appeared
      in special cases after the symmetry reshuffling made by the phonon code.

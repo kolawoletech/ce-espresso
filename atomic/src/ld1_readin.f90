@@ -686,7 +686,7 @@ subroutine bcast_input()
   USE mp_world,   ONLY : world_comm
   USE ld1inc,   ONLY : zed, beta, tr2, iswitch, nlc, rlderiv, eminld, emaxld, &
                      deld, lsd, rel, lsmall, isic, latt, title, prefix, vdw, &
-                     nld, noscf, relpert, file_charge, max_out_wfc, upf1_v1_format
+                     nld, noscf, relpert, file_charge, max_out_wfc, upf_v1_format
 
 
 implicit none

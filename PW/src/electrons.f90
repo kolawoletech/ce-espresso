@@ -211,12 +211,9 @@ SUBROUTINE electrons()
   !
   ! ... formats
   !
-9002 FORMAT(/'     Self-consistent Calculation' )
 9066 FORMAT( '     est. exchange err (dexx)  =',F17.8,' Ry' )
 9101 FORMAT(/'     End of self-consistent calculation' )
-9110 FORMAT(/'     convergence has been achieved in ',i3,' iterations' )
 9120 FORMAT(/'     convergence NOT achieved after ',i3,' iterations: stopping' )
-9122 FORMAT(/'     WARNING: convergence NOT achieved after ',i3,' iterations' )
 9121 FORMAT(/'     scf convergence threshold =',1PE17.1,' Ry' )
   !
 END SUBROUTINE electrons
@@ -297,6 +294,7 @@ SUBROUTINE electrons_scf()
 #endif
   USE dfunct,                 only : newd
   USE esm,                  ONLY : do_comp_esm, esm_printpot
+  USE iso_c_binding,        ONLY : c_int
   !
   
   IMPLICIT NONE
@@ -312,7 +310,8 @@ SUBROUTINE electrons_scf()
       i,            &! counter on polarization
       idum,         &! dummy counter on iterations
       iter,         &! counter on iterations
-      ios, kilobytes
+      ios
+  INTEGER(kind=c_int) :: kilobytes
   REAL(DP) :: &
       tr2_min,     &! estimated error on energy coming from diagonalization
       descf,       &! correction for variational energy
@@ -778,9 +777,6 @@ SUBROUTINE electrons_scf()
 9101 FORMAT(/'     End of self-consistent calculation' )
 9110 FORMAT(/'     convergence has been achieved in ',i3,' iterations' )
 9120 FORMAT(/'     convergence NOT achieved after ',i3,' iterations: stopping' )
-9122 FORMAT(/'     WARNING: convergence NOT achieved after ',i3,' iterations' )
-9121 FORMAT(/'     scf convergence threshold =',1PE17.1,' Ry' )
-9200 FORMAT(/'     add environment contribution to local potential')
   !
   CONTAINS
      !
@@ -1043,6 +1039,8 @@ SUBROUTINE electrons_scf()
           !
           IF ( llondon ) WRITE ( stdout , 9074 ) elondon
           !
+          IF ( lxdm ) WRITE ( stdout , 9075 ) exdm
+          !
           IF ( dft_is_hybrid()) THEN
              WRITE( stdout, 9062 ) - fock1
              WRITE( stdout, 9064 ) 0.5D0*fock2
@@ -1122,9 +1120,9 @@ SUBROUTINE electrons_scf()
 9069 FORMAT( '     scf correction            =',F17.8,' Ry' )
 9070 FORMAT( '     smearing contrib. (-TS)   =',F17.8,' Ry' )
 9071 FORMAT( '     Magnetic field            =',3F12.7,' Ry' )
-9072 FORMAT( '     Magnetic field            =',F12.7, ' Ry' )
 9073 FORMAT( '     lambda                    =',F11.2,' Ry' )
 9074 FORMAT( '     Dispersion Correction     =',F17.8,' Ry' )
+9075 FORMAT( '     Dispersion XDM Correction =',F17.8,' Ry' )
 9080 FORMAT(/'     total energy              =',0PF17.8,' Ry' &
             /'     Harris-Foulkes estimate   =',0PF17.8,' Ry' &
             /'     estimated scf accuracy    <',0PF17.8,' Ry' )

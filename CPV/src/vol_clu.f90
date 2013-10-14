@@ -105,6 +105,7 @@ SUBROUTINE vol_clu(rho_real,rho_g,s_fac,flag)
 ! We smear the step function defining the volume and approximate its derivative
 ! with a gaussian. Here we sample the integral of this gaussian. It has to 
 ! be done once for ever
+! XXX: using an array for xcc() is a big waste. two scalar variables would do.
       dx = 5.d0*sigma/60.d0
       if (flag.eq.1) then
          dxx = dx/40.d0

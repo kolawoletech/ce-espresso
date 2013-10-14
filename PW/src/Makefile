@@ -126,7 +126,6 @@ martyna_tuckerman.o \
 memory_report.o \
 mix_rho.o \
 move_ions.o \
-ms2.o \
 multable.o \
 n_plane_waves.o \
 new_ns.o \
@@ -139,6 +138,7 @@ openfil.o \
 orthoatwfc.o \
 output_tau.o \
 para.o \
+paw_exx.o \
 paw_init.o \
 paw_onecenter.o \
 paw_symmetry.o \
@@ -211,6 +211,7 @@ transform_qq_so.o \
 trnvecc.o \
 tweights.o \
 update_pot.o \
+us_exx.o \
 usnldiag.o \
 v_of_rho.o \
 vcsmd.o \

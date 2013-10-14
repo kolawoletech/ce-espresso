@@ -68,6 +68,7 @@ MODULE london_module
       !
 #if defined __MPI
       USE mp,                  ONLY : mp_bcast
+      USE mp_world,            ONLY : world_comm
 #endif
       !
       IMPLICIT NONE
@@ -269,10 +270,10 @@ MODULE london_module
 #if defined __MPI
       ! broadcast data to all processors
       !
-      CALL mp_bcast ( C6_ij,  ionode_id )
-      CALL mp_bcast ( R_sum,  ionode_id )
-      CALL mp_bcast ( r_cut,  ionode_id )
-      CALL mp_bcast ( mxr  ,  ionode_id )
+      CALL mp_bcast ( C6_ij,  ionode_id, world_comm )
+      CALL mp_bcast ( R_sum,  ionode_id, world_comm )
+      CALL mp_bcast ( r_cut,  ionode_id, world_comm )
+      CALL mp_bcast ( mxr  ,  ionode_id, world_comm )
       !
 #endif
       !
@@ -299,7 +300,7 @@ MODULE london_module
     ! and scal6 is a global scaling factor
     !
 #if defined __MPI
-    USE mp_global,    ONLY : me_image , nproc_image, intra_image_comm
+    USE mp_images,    ONLY : me_image , nproc_image, intra_image_comm
     USE mp,           ONLY : mp_sum
 #endif
     !
@@ -398,7 +399,7 @@ MODULE london_module
       !
       !
 #if defined (__MPI)
-999 CALL mp_sum ( energy_london , intra_image_comm )
+    CALL mp_sum ( energy_london , intra_image_comm )
 #endif
     !
     RETURN
@@ -413,7 +414,7 @@ MODULE london_module
     !
     !
 #if defined __MPI
-    USE mp_global,    ONLY : me_image , nproc_image , intra_image_comm
+    USE mp_images,    ONLY : me_image , nproc_image , intra_image_comm
     USE mp,           ONLY : mp_sum
 #endif
     !
@@ -537,7 +538,7 @@ MODULE london_module
       END DO
       !
 #if defined (__MPI)
-999 CALL mp_sum ( force_london , intra_image_comm )
+    CALL mp_sum ( force_london , intra_image_comm )
 #endif
     !
     RETURN
@@ -553,7 +554,7 @@ MODULE london_module
     !
     !
 #if defined __MPI
-    USE mp_global,    ONLY : me_image , nproc_image , intra_image_comm
+    USE mp_images,    ONLY : me_image , nproc_image , intra_image_comm
     USE mp,           ONLY : mp_sum
 #endif
     !
@@ -693,7 +694,7 @@ MODULE london_module
       stres_london ( : , : ) = - stres_london ( : , : ) / ( 2.d0 * omega )
       !
 #if defined (__MPI)
-999 CALL mp_sum ( stres_london , intra_image_comm )
+    CALL mp_sum ( stres_london , intra_image_comm )
 #endif
     !
     RETURN

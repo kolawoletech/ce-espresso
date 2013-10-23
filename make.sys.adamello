@@ -26,7 +26,7 @@
 
 
 # topdir for linking espresso libs with plugins
-TOPDIR = /ccc/cont005/home/ra0736/ceresold/Codes/qe-espresso/trunk
+TOPDIR = /home/ceresoli/Codes/qe-espresso/trunk
 
 # DFLAGS  = precompilation options (possible arguments to -D and -U)
 #           used by the C compiler and preprocessor
@@ -35,9 +35,12 @@ TOPDIR = /ccc/cont005/home/ra0736/ceresold/Codes/qe-espresso/trunk
 # With the exception of IBM xlf, FDFLAGS = $(DFLAGS)
 # For IBM xlf, FDFLAGS is the same as DFLAGS with separating commas 
 
+# MANUAL_DFLAGS  = additional precompilation option(s), if desired
+#                  You may use this instead of tweaking DFLAGS and FDFLAGS
+#                  BEWARE: will not work for IBM xlf! Manually edit FDFLAGS
 MANUAL_DFLAGS  = -D__PTRACE
-DFLAGS         =  -D__INTEL -D__FFTW -D__MPI -D__PARA -D__SCALAPACK -D__OPENMP $(MANUAL_DFLAGS)
-FDFLAGS        = $(DFLAGS)
+DFLAGS         =  -D__INTEL -D__FFTW3 -D__MPI -D__PARA -D__SCALAPACK $(MANUAL_DFLAGS)
+FDFLAGS        = $(DFLAGS) $(MANUAL_DFLAGS)
 
 # IFLAGS = how to locate directories where files to be included are
 # In most cases, IFLAGS = -I../include
@@ -75,13 +78,14 @@ CPPFLAGS       = -P -traditional $(DFLAGS) $(IFLAGS)
 # F90 flags must include MODFLAGS, IFLAGS, and FDFLAGS with appropriate syntax
 
 CFLAGS         = -O3 $(DFLAGS) $(IFLAGS)
-F90FLAGS       = $(FFLAGS) -nomodule -openmp -fpp $(FDFLAGS) $(IFLAGS) $(MODFLAGS)
-FFLAGS         = -O2 -assume byterecl -g -traceback -par-report0 -vec-report0 -openmp
+F90FLAGS       = $(FFLAGS) -nomodule -fpp $(FDFLAGS) $(IFLAGS) $(MODFLAGS)
+FFLAGS         = -O2 -assume byterecl -g -traceback -par-report0 -vec-report0
+#FFLAGS         = $(FFLAGS_NOOPT)
 
 # compiler flags without optimization for fortran-77
 # the latter is NEEDED to properly compile dlamch.f, used by lapack
 
-FFLAGS_NOOPT   = -O0 -assume byterecl -g -traceback
+FFLAGS_NOOPT   = -O0 -assume byterecl -g -traceback #-check all
 
 # compiler flag needed by some compilers when the main is not fortran
 # Currently used for Yambo
@@ -92,7 +96,7 @@ FFLAGS_NOMAIN   = -nofor_main
 # Typically LD coincides with F90 or MPIF90, LD_LIBS is empty
 
 LD             = mpif90
-LDFLAGS        = -static-intel  -openmp
+LDFLAGS        = -static-intel -g 
 LD_LIBS        = 
 
 # External Libraries (if any) : blas, lapack, fft, MPI
@@ -101,7 +105,7 @@ LD_LIBS        =
 # BLAS_LIBS = /your/path/to/espresso/BLAS/blas.a
 # BLAS_LIBS_SWITCH = internal
 
-BLAS_LIBS      = -L/usr/local/Intel_compilers/11.1.072/cproc/mkl/lib/em64t -lmkl_intel_lp64  -lmkl_intel_thread -lmkl_core
+BLAS_LIBS      = -L/opt/intel/2013.0.079/mkl/lib/intel64 -lmkl_intel_lp64  -lmkl_sequential -lmkl_core
 BLAS_LIBS_SWITCH = external
 
 # If you have nothing better, use the local copy :
@@ -119,7 +123,7 @@ SCALAPACK_LIBS = -lmkl_scalapack_lp64 -lmkl_blacs_openmpi_lp64
 # nothing needed here if the the internal copy of FFTW is compiled
 # (needs -D__FFTW in DFLAGS)
 
-FFT_LIBS       = 
+FFT_LIBS       =  -lfftw3 
 
 # For parallel execution, the correct path to MPI libraries must
 # be specified in MPI_LIBS (except for IBM if you use mpxlf)

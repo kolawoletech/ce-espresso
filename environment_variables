@@ -65,8 +65,7 @@ PARA_PREFIX=" "
 #                  -nd n        number of processors for linear algebra 
 #                                            (or -ndiag, -northo) 
 #
-#PARA_POSTFIX=" -nk 1 -nd 1 -nb 1 -nt 1 "
-PARA_POSTFIX=""
+PARA_POSTFIX=" -nk 1 -nd 1 -nb 1 -nt 1 "
 #
 # The following variables are used for image parallelization of PHonon 
 # (see example in PHonon/examples/Image_example) 

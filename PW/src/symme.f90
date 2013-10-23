@@ -464,8 +464,8 @@ CONTAINS
     !
     !  Initialize arrays needed for parallel symmetrization
     ! 
-    USE mp_global, ONLY : nproc_bgrp, me_bgrp, intra_bgrp_comm
     USE parallel_include
+    USE mp_bands, ONLY : nproc_bgrp, me_bgrp, intra_bgrp_comm
     USE gvect, ONLY : ngm, gcutm, g, gg
     !
     IMPLICIT NONE

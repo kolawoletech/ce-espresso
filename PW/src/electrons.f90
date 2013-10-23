@@ -777,6 +777,9 @@ SUBROUTINE electrons_scf()
 9101 FORMAT(/'     End of self-consistent calculation' )
 9110 FORMAT(/'     convergence has been achieved in ',i3,' iterations' )
 9120 FORMAT(/'     convergence NOT achieved after ',i3,' iterations: stopping' )
+#ifdef __ENVIRON
+9200 FORMAT(/'     add environment contribution to local potential')
+#endif
   !
   CONTAINS
      !

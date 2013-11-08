@@ -4,7 +4,7 @@
 
 !* Creation Date : 15-05-2013
 
-!* Last Modified : Fri May 31 15:18:48 2013
+!* Last Modified : Wed Nov  6 08:40:35 2013
 
 !* Created By : Marco Buongiorno Nardelli 
 
@@ -14,7 +14,7 @@ program fd
   use io_files,   ONLY : prefix, tmp_dir, outdir
   use io_files,   ONLY : psfile, pseudo_dir
   use io_global,  ONLY : stdout, ionode, ionode_id
-  USE mp_global,  ONLY : mp_startup,mpime,kunit
+  USE mp_global,  ONLY : mp_startup
   USE environment,ONLY : environment_start
   USE mp,         ONLY : mp_bcast
   USE mp_world,   ONLY : world_comm
@@ -37,7 +37,7 @@ program fd
 
   implicit none
   character(len=9) :: code = 'FD'
-  integer :: ios, kunittmp
+  integer :: ios
   CHARACTER(LEN=256), EXTERNAL :: trimcheck
   character(len=200) :: pp_file
   logical :: uspp_spsi, ascii, single_file, raw, disp_only
@@ -112,7 +112,7 @@ program fd
   CALL mp_bcast( prefix, ionode_id, world_comm )
 
   !reading the xml file
-  call read_file
+  call read_xml_file
 
   if (ionode) then
     write(6,*) '**************************************************'

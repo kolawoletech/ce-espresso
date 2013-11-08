@@ -43,9 +43,9 @@
 !
       USE mp_wave
       USE mp, ONLY: mp_sum, mp_get, mp_max
-      USE mp_global, ONLY: mpime, nproc, root, me_pool, my_pool_id, &
+      USE mp_pools, ONLY: me_pool, my_pool_id, &
         nproc_pool, intra_pool_comm, root_pool
-      USE mp_world,  ONLY: world_comm
+      USE mp_world,  ONLY: mpime, nproc, root, world_comm
       USE io_global, ONLY: ionode, ionode_id
       USE iotk_module
 !
@@ -274,9 +274,10 @@ PROGRAM pw_export
   USE io_files,  ONLY : prefix, tmp_dir, outdir
   USE ions_base, ONLY : ntype => nsp
   USE iotk_module
-  USE mp_global, ONLY : mp_startup, mpime, kunit
-  USE mp, ONLY: mp_bcast
-  USE mp_world, ONLY: world_comm
+  USE mp_global, ONLY : mp_startup
+  USE mp_pools,  ONLY : kunit
+  USE mp_world,  ONLY: world_comm
+  USE mp,        ONLY: mp_bcast
   USE environment,   ONLY : environment_start
   !
   IMPLICIT NONE
@@ -388,10 +389,10 @@ SUBROUTINE write_export (pp_file,kunit,uspp_spsi, ascii, single_file, raw)
   USE io_base_export, ONLY : write_restart_wfc
   USE io_global,      ONLY : ionode, stdout
   USE ions_base,      ONLY : atm, nat, ityp, tau, nsp
-  USE mp_global,      ONLY : nproc, nproc_pool, mpime
-  USE mp_global,      ONLY : my_pool_id, intra_pool_comm, inter_pool_comm
+  USE mp_pools,       ONLY : my_pool_id, intra_pool_comm, inter_pool_comm, &
+                             nproc_pool
   USE mp,             ONLY : mp_sum, mp_max
-  USE mp_world,       ONLY : world_comm
+  USE mp_world,       ONLY : world_comm, nproc
 
   IMPLICIT NONE
 
@@ -421,6 +422,8 @@ SUBROUTINE write_export (pp_file,kunit,uspp_spsi, ascii, single_file, raw)
   LOGICAL :: twf0, twfm
   CHARACTER(iotk_attlenx) :: attr
   COMPLEX(DP), ALLOCATABLE :: sevc (:,:)
+
+  REAL(DP), ALLOCATABLE :: raux(:)
 
   IF( nkstot > 0 ) THEN
 
@@ -739,7 +742,9 @@ SUBROUTINE write_export (pp_file,kunit,uspp_spsi, ascii, single_file, raw)
 #ifdef __MPI
   CALL poolrecover (et, nbnd, nkstot, nks)
 #endif
-
+!
+  ALLOCATE(raux(1:nbnd))
+!
 
   WRITE(0,*) "Writing band structure"
 
@@ -762,13 +767,22 @@ SUBROUTINE write_export (pp_file,kunit,uspp_spsi, ascii, single_file, raw)
     CALL iotk_write_attr (attr,"nbnd",nbnd)
     CALL iotk_write_begin(50,"OCCUPATIONS",attr=attr)
     DO ik=1,nkstot
-      CALL iotk_write_dat(50,"wg"//iotk_index(ik),wg(1:nbnd,ik))
+      IF ( wk(ik) == 0.D0 ) THEN
+        !
+        raux = wg(:,ik)
+        !
+      ELSE
+        !
+        raux = wg(:,ik) / wk(ik)
+        !
+      END IF
+      CALL iotk_write_dat(50,"wg"//iotk_index(ik),raux(1:nbnd))
     ENDDO
     CALL iotk_write_end  (50,"OCCUPATIONS")
   ENDIF
-
-
-
+  !
+  DEALLOCATE(raux)
+  !
   wfc_scal = 1.0d0
   twf0 = .true.
   twfm = .false.

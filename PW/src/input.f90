@@ -32,6 +32,7 @@ SUBROUTINE iosys()
   USE bp,            ONLY : nppstr_    => nppstr, &
                             gdir_      => gdir, &
                             lberry_    => lberry, &
+                            lcalc_z2_  => lcalc_z2, &
                             lelfield_  => lelfield, &
                             lorbm_     => lorbm, &
                             efield_    => efield, &
@@ -201,7 +202,7 @@ SUBROUTINE iosys()
                                pseudo_dir, disk_io, tefield, dipfield, lberry, &
                                gdir, nppstr, wf_collect,lelfield,lorbm,efield, &
                                nberrycyc, lkpoint_dir, efield_cart, lecrpa,    &
-                               vdw_table_name, memory, tqmmm
+                               vdw_table_name, memory, tqmmm, lcalc_z2
 
   !
   ! ... SYSTEM namelist
@@ -1049,6 +1050,7 @@ SUBROUTINE iosys()
   nppstr_     = nppstr
   gdir_       = gdir
   lberry_     = lberry
+  lcalc_z2_   = lcalc_z2
   lelfield_   = lelfield
   lorbm_      = lorbm
   efield_     = efield

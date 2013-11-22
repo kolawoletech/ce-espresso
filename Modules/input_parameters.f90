@@ -211,6 +211,9 @@ MODULE input_parameters
         LOGICAL :: lberry = .false.
           ! if .TRUE., use modern theory of the polarization
 
+        LOGICAL :: lcalc_z2 = .false.
+          ! if .TRUE., calculate Z2 without inversion symmetry
+
         INTEGER :: gdir = 0
           ! G-vector for polarization calculation ( related to lberry )
           ! only used in PW
@@ -270,7 +273,7 @@ MODULE input_parameters
           forc_conv_thr, pseudo_dir, disk_io, tefield, dipfield, lberry,  &
           gdir, nppstr, wf_collect, printwfc, lelfield, nberrycyc, refg,  &
           tefield2, saverho, tabps, lkpoint_dir, use_wannier, lecrpa,     &
-          tqmmm, vdw_table_name, lorbm, memory, point_label_type
+          tqmmm, vdw_table_name, lorbm, memory, point_label_type, lcalc_z2
 
 !
 !=----------------------------------------------------------------------------=!

@@ -446,6 +446,9 @@ CONTAINS
     CASE ( 'lberry' )
        CALL iotk_scan_dat_inside( xmlinputunit, lberry, ierr = ierr )
        !
+    CASE ( 'lcalc_z2' )
+       CALL iotk_scan_dat_inside( xmlinputunit, lcalc_z2, ierr = ierr )
+       !
     CASE ( 'lda_plus_u' ) 
        CALL iotk_scan_dat_inside( xmlinputunit, lda_plus_u, ierr = ierr )
        !

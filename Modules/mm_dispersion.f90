@@ -306,9 +306,6 @@ MODULE london_module
     !
     IMPLICIT NONE
     !
-    !INTEGER , PARAMETER :: mxr = 500000
-    ! local:    max number of r ( see rgen )
-    !
     INTEGER :: ata , atb , nrm , nr
     ! locals : 
     ! ata , atb : atom counters
@@ -377,6 +374,7 @@ MODULE london_module
           !
           CALL rgen ( dtau, r_cut, mxr, at, bg, r, dist2, nrm )
           !
+!$omp parallel do private(nr,dist,dist6,f_damp) default(shared), reduction(-:energy_london)
           DO nr = 1 , nrm
             !
             dist  = alat * sqrt ( dist2 ( nr ) )
@@ -390,13 +388,13 @@ MODULE london_module
                   f_damp
             !
           END DO
+!$omp end parallel do
           !
         END DO
         !
       END DO
       !
       energy_london = scal6 * 0.5d0 * energy_london
-      !
       !
 #if defined (__MPI)
     CALL mp_sum ( energy_london , intra_image_comm )
@@ -419,9 +417,6 @@ MODULE london_module
 #endif
     !
     IMPLICIT NONE
-    !
-    !INTEGER , PARAMETER :: mxr = 500000
-    ! local:    max number of r ( see rgen )
     !
     INTEGER :: ata , atb , nrm , nr , ipol
     ! locals :
@@ -506,18 +501,17 @@ MODULE london_module
            !
            par = beta / ( R_sum ( ityp ( atb ) , ityp ( ata ) ) )
            !
+!$omp parallel do private(nr,dist,dist6,dist7,exparg,expval,fac,add,ipol) default(shared), reduction(+:force_london)
            DO nr = 1 , nrm
             !
             dist  = alat * sqrt ( dist2 ( nr ) )
             dist6 = dist ** 6
             dist7 = dist6 * dist
             !
-            exparg = - beta * ( dist / ( R_sum ( ityp ( atb ) , ityp ( ata ) ) ) - 1 )
-            !
+            exparg = - beta * ( dist / ( R_sum ( ityp(atb) , ityp(ata) ) ) - 1 )
             expval = exp ( exparg )
             !
             fac = C6_ij ( ityp ( atb ) , ityp ( ata ) ) / dist6
-            !
             add = 6.d0 / dist
             !
             DO ipol = 1 , 3
@@ -530,6 +524,7 @@ MODULE london_module
             END DO
             !
            END DO
+!$omp end parallel do 
            !
          END IF
          !
@@ -559,9 +554,6 @@ MODULE london_module
 #endif
     !
     IMPLICIT NONE
-    !
-    !INTEGER , PARAMETER :: mxr = 500000
-    ! local:    max number of r ( see rgen )
     !
     INTEGER :: ata , atb , nrm , nr , ipol , lpol , spol
     ! locals :
@@ -706,8 +698,6 @@ MODULE london_module
    !---------------------------------------------------------------------------
    !
    SUBROUTINE dealloca_london
-   !
-   ! 
    !
    IMPLICIT NONE
    !

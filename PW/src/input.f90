@@ -1204,7 +1204,7 @@ SUBROUTINE iosys()
   END SELECT
   IF (ts_vdw) CALL errore("iosys","Tkatchenko-Scheffler not implemented", 1)
   IF ( london ) THEN
-     CALL infomsg("iosys","london is obsolete, use ''vdw_corr='grimme-d2''' instead")
+     CALL infomsg("iosys","london is obsolete, use ""vdw_corr='grimme-d2'"" instead")
      llondon = .TRUE.
   END IF
   IF ( llondon) THEN
@@ -1214,7 +1214,7 @@ SUBROUTINE iosys()
      !   CALL init_london ( )
   END IF
   IF ( xdm ) THEN
-     CALL infomsg("iosys","xdm is obsolete, use ''vdw_corr='xdm''' instead")
+     CALL infomsg("iosys","xdm is obsolete, use ""vdw_corr='xdm'"" instead")
      lxdm = .TRUE.
   END IF
   IF ( lxdm) THEN
@@ -1387,8 +1387,8 @@ SUBROUTINE iosys()
   ! ... read the vdw kernel table if needed
   !
   inlc = get_inlc()
-  if (inlc == 1 .or. inlc == 2) then
-      call initialize_kernel_table()
+  if (inlc > 0) then
+      call initialize_kernel_table(inlc)
   endif
   !
   ! ... if DFT finite size corrections are needed, define the appropriate volume

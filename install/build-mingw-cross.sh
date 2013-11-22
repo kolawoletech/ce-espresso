@@ -68,15 +68,16 @@ unix2dos ${MINGW_BUILD_DIR}/qe-docs/*.html
 make distclean
 
 # serial 32-bit
-mingw32-configure LIBDIRS=$PWD/install/blas-win32
-make -j${NUMCPU} MANUAL_DFLAGS="-D_WIN32" all
+mingw32-configure LIBDIRS=$PWD/install/blas-win32 FFLAGS="-O3 -march=core2" CFLAGS="-O3 -march=core2"
+make -j${NUMCPU} all || exit 1
+make w90 || exit 1
 
 STRIP=$(eval `rpm --eval %{mingw32_env}`; echo $STRIP)
 pushd bin
 for s in *.x
 do \
     cp -v $s ${MINGW_BUILD_DIR}/qe-serial-32/$s.exe
-    ${STRIP} ${MINGW_BUILD_DIR}/qe-serial-32/$s.exe
+    ${STRIP} -g ${MINGW_BUILD_DIR}/qe-serial-32/$s.exe
 done
 popd
 cp install/blas-win32/libopenblas.dll ${MINGW_BUILD_DIR}/qe-serial-32
@@ -84,32 +85,34 @@ cp install/blas-win32/libopenblas.dll ${MINGW_BUILD_DIR}/qe-serial-32
 make distclean
 
 # serial 64-bit
-mingw64-configure LIBDIRS=$PWD/install/blas-win64
-make -j${NUMCPU} MANUAL_DFLAGS="-D_WIN32" all
+mingw64-configure FFLAGS="-O3 -march=core2" CFLAGS="-O3 -march=core2" # LIBDIRS=$PWD/install/blas-win64
+make -j${NUMCPU} all || exit 1
+make w90 || exit 1
 
 STRIP=$(eval `rpm --eval %{mingw64_env}`; echo $STRIP)
 pushd bin
 for s in *.x
 do \
     cp -v $s ${MINGW_BUILD_DIR}/qe-serial-64/$s.exe
-    ${STRIP} ${MINGW_BUILD_DIR}/qe-serial-64/$s.exe
+    ${STRIP} -g ${MINGW_BUILD_DIR}/qe-serial-64/$s.exe
 done
 popd
-cp install/blas-win64/libopenblas.dll ${MINGW_BUILD_DIR}/qe-serial-64
+#cp install/blas-win64/libopenblas.dll ${MINGW_BUILD_DIR}/qe-serial-64
 
 make distclean
 
 # mpich2 32-bit
-mingw32-configure LIBDIRS=$PWD/install/blas-win32 \
+mingw32-configure LIBDIRS=$PWD/install/blas-win32 FFLAGS="-O3 -march=core2" CFLAGS="-O3 -march=core2" \
     MPI_LIBS="-L$PWD/install/mpich2-win32/lib -lfmpi -lmpi"
-make -j${NUMCPU} MANUAL_DFLAGS="-D_WIN32 -I$PWD/install/mpich2-win32/include" all
+make -j${NUMCPU} MANUAL_DFLAGS="-I$PWD/install/mpich2-win32/include" all || exit 1
+make w90 || exit 1
 
 STRIP=$(eval `rpm --eval %{mingw32_env}`; echo $STRIP)
 pushd bin
 for s in *.x
 do \
     cp -v $s ${MINGW_BUILD_DIR}/qe-mpich2-32/$s.exe
-    ${STRIP} ${MINGW_BUILD_DIR}/qe-mpich2-32/$s.exe
+    ${STRIP} -g ${MINGW_BUILD_DIR}/qe-mpich2-32/$s.exe
 done
 popd
 cp install/blas-win32/libopenblas.dll ${MINGW_BUILD_DIR}/qe-mpich2-32
@@ -118,19 +121,25 @@ make distclean
 
 # mpich2 64-bit
 
-mingw64-configure LIBDIRS=$PWD/install/blas-win64 \
+mingw64-configure FFLAGS="-O3 -march=core2" CFLAGS="-O3 -march=core2" \
     MPI_LIBS="-L$PWD/install/mpich2-win64/lib -lfmpi -lmpi"
-make -j${NUMCPU} MANUAL_DFLAGS="-D_WIN32 -I$PWD/install/mpich2-win64/include" all
+# LIBDIRS=$PWD/install/blas-win64 
+make -j${NUMCPU} MANUAL_DFLAGS="-I$PWD/install/mpich2-win64/include" all || exit 1
+make w90 || exit 1
+make -C W90/doc/user_guide
+make -C W90/doc/tutorial
+cp -v W90/doc/user_guide.pdf W ${MINGW_BUILD_DIR}/qe-docs/W90_UserGuide.pdf
+cp -v W90/doc/tutorial.pdf W ${MINGW_BUILD_DIR}/qe-docs/W90_Tutorial.pdf
 
 STRIP=$(eval `rpm --eval %{mingw64_env}`; echo $STRIP)
 pushd bin
 for s in *.x
 do \
     cp -v $s ${MINGW_BUILD_DIR}/qe-mpich2-64/$s.exe
-    ${STRIP} ${MINGW_BUILD_DIR}/qe-mpich2-64/$s.exe
+    ${STRIP} -g ${MINGW_BUILD_DIR}/qe-mpich2-64/$s.exe
 done
 popd
-cp install/blas-win64/libopenblas.dll ${MINGW_BUILD_DIR}/qe-mpich2-64
+#cp install/blas-win64/libopenblas.dll ${MINGW_BUILD_DIR}/qe-mpich2-64
 
 make distclean
 

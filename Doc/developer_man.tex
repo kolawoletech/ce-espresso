@@ -1863,7 +1863,7 @@ read\_namelists.f90 )
  \begin{verbatim}
                 subroutine control_bcast( )
                 ...
-                call mp_bcast( pippo )
+                call mp_bcast( pippo, world_comm )
                 ...
                 end subroutine
 \end{verbatim}

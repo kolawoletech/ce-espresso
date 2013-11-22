@@ -112,10 +112,6 @@ MODULE exx
               fock1 = 0.0_DP, & !   sum <psi|vx(phi)|psi>
               fock2 = 0.0_DP, & !   sum <psi|vx(psi)|psi>
               dexx  = 0.0_DP    !   fock1  - 0.5*(fock2+fock0)
-  REAL(DP) :: fock0x = 0.0_DP, & !   sum <phi|Vx(phi)|phi>
-              fock1x = 0.0_DP, & !   sum <psi|vx(phi)|psi>
-              fock2x = 0.0_DP    !   sum <psi|vx(psi)|psi>
-
   !
   ! custom fft grids
   !
@@ -186,13 +182,20 @@ MODULE exx
   !------------------------------------------------------------------------
   SUBROUTINE exx_fft_create ()
     USE wvfct,        ONLY : ecutwfc, npw
-    USE gvect,        ONLY : ig_l2g
+    USE gvect,        ONLY : ecutrho, ig_l2g
+    USE uspp,         ONLY : okvan
+    USE paw_variables,ONLY : okpaw
+    USE control_flags,ONLY : gamma_only
 
     IMPLICIT NONE
 
     IF(ecutfock <= 0.0_DP) ecutfock = 4.0_DP*ecutwfc
     IF(ecutfock < ecutwfc) CALL errore('exx_fft_create', &
             'ecutfock can not be smaller than ecutwfc!', 1) 
+    IF(ecutfock < ecutrho .AND. .NOT.gamma_only)  CALL infomsg &
+        ('exx_fft_create','Warning: ecutfock implemented only for Gamma')
+    IF(ecutfock < ecutrho .AND. (okvan .OR. okpaw)) CALL errore &
+        ('exx_fft_create','ecutfock not implemented with US or PAW',2)
 
     ! Initalise the g2r grid that allows us to put the wavefunction
     ! onto the new (smaller) grid for rho.
@@ -353,7 +356,7 @@ MODULE exx
                    s(:,3,isym)*xk_cryst(3)
           ! add sxk to the auxiliary list IF it is not already present
           xk_not_found = .true.
-          ! *** do-loop skipped the first time becasue temp_nksq == 0
+          ! *** do-loop skipped the first time because temp_nksq == 0
           DO ikq=1, temp_nkqs
             IF (xk_not_found ) THEN
                 dxk(:) = sxk(:)-temp_xkq(:,ikq) - nint(sxk(:)-temp_xkq(:,ikq))
@@ -1945,7 +1948,7 @@ MODULE exx
               CALL g2_convolution(exx_fft_r2g%ngmt, exx_fft_r2g%gt, xk(:,current_ik), xkq, fac) 
               fac(exx_fft_r2g%gstart_t:) = 2 * fac(exx_fft_r2g%gstart_t:)
             ELSE
-                CALL g2_convolution(ngms, g, xk(:,current_ik), xkq, fac)
+               CALL g2_convolution(ngms, g, xk(:,current_ik), xkq, fac)
             ENDIF
 
             IF_GAMMA_ONLY : &
@@ -2019,7 +2022,7 @@ MODULE exx
                 !
                 vc = vc * omega * 0.25d0 / nqs
                 energy = energy - exxalfa * vc * wg(jbnd,ikk)
-                ! gau-pbe see latar
+                ! gau-pbe see later
                 !
                 IF(okpaw.and.dopawxx) THEN
                    IF(ibnd>=ibnd_start) &
@@ -2108,7 +2111,6 @@ MODULE exx
     CALL mp_sum( energy, inter_pool_comm )
     !
     exxenergy2 = energy
-    print *, exxenergy2
     !
     CALL stop_clock ('exxen2')
 

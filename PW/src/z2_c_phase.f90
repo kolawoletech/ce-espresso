@@ -112,7 +112,6 @@ SUBROUTINE c_phase_z2
    USE fft_base,             ONLY : dfftp
    USE uspp,                 ONLY : nkb, vkb, okvan
    USE uspp_param,           ONLY : upf, lmaxq, nbetam, nh, nhm
-   USE lsda_mod,             ONLY : nspin
    USE klist,                ONLY : nks, xk, wk
    USE wvfct,                ONLY : npwx, nbnd, ecutwfc
    USE wavefunctions_module, ONLY : evc
@@ -180,13 +179,8 @@ SUBROUTINE c_phase_z2
    REAL(DP) :: gpar(3)
    REAL(DP) :: gtr(3)
    REAL(DP) :: gvec
-   REAL(DP), ALLOCATABLE :: loc_k(:)
-   REAL(DP), ALLOCATABLE :: phik(:)
-   REAL(DP) :: phik_ave
    REAL(DP) :: qrad_dk(nbetam,nbetam,lmaxq,ntyp)
    REAL(DP) :: weight
-   REAL(DP) :: phidw
-   REAL(DP) :: phiup
    REAL(DP), ALLOCATABLE :: wstring(:)
    REAL(DP) :: ylm_dk(lmaxq*lmaxq)
    COMPLEX(DP), ALLOCATABLE :: aux(:)
@@ -194,26 +188,23 @@ SUBROUTINE c_phase_z2
    COMPLEX(DP), ALLOCATABLE :: aux0(:)
    TYPE (bec_type) :: becp0
    TYPE (bec_type) :: becp_bp
-   COMPLEX(DP) :: cave
-   COMPLEX(DP) , ALLOCATABLE :: cphik(:)
-   COMPLEX(DP) :: dtheta
    COMPLEX(DP) :: mat(nbnd,nbnd)
    COMPLEX(DP) :: pref
    COMPLEX(DP), ALLOCATABLE :: psi(:,:)
    COMPLEX(DP), ALLOCATABLE :: q_dk_so(:,:,:,:)
    COMPLEX(DP) :: q_dk(nhm,nhm,ntyp)
    COMPLEX(DP) :: struc(nat)
-   COMPLEX(DP) :: theta0
    COMPLEX(DP), external :: zdotc
 
 !  -------------------------------------------------------------------------   !
 !                               Z2 variables
 !  -------------------------------------------------------------------------   !
    real(dp), parameter :: m_threshold = 0.7d0
+   real(dp), parameter :: z_threshold = 0.05d0
    complex(dp), allocatable :: UU(:,:), VT(:,:), work(:), lambda(:,:), eig(:)
-   real(dp), allocatable :: SV(:), rwork(:), zz(:), gaps(:)
+   real(dp), allocatable :: SV(:), rwork(:), zz(:), gaps(:), numbers(:,:)
    integer, allocatable :: ind(:)
-   real(dp) :: point, max_gap
+   real(dp) :: point, max_gap, center, counter, mid1, mid2, theta1, theta2, p
    integer :: lwork, kk
 
 !  -------------------------------------------------------------------------   !
@@ -269,13 +260,7 @@ SUBROUTINE c_phase_z2
    endif
 !  --- Get the number of strings ---
    nstring=nks/nppstr
-   nkort=nstring/nspin_lsda
-
-!  --- Allocate memory for arrays ---
-   ALLOCATE(phik(nstring))
-   ALLOCATE(loc_k(nstring))
-   ALLOCATE(cphik(nstring))
-   ALLOCATE(wstring(nstring))
+   nkort=nstring   !/nspin_lsda
 
 !  -------------------------------------------------------------------------   !
 !           electronic polarization: set values for k-points strings           !
@@ -316,6 +301,7 @@ SUBROUTINE c_phase_z2
 !                   electronic polarization: weight strings                    !
 !  -------------------------------------------------------------------------   !
 
+#if 0
 !  --- Calculate string weights, normalizing to 1 (no spin or noncollinear)
 !       or 1+1 (spin) ---
    DO is=1,nspin_lsda
@@ -330,6 +316,7 @@ SUBROUTINE c_phase_z2
          wstring(istring)=wstring(istring)/weight
       END DO
    END DO
+#endif
 
 !  -------------------------------------------------------------------------   !
 !                  electronic polarization: structure factor                   !
@@ -376,6 +363,8 @@ SUBROUTINE c_phase_z2
 
    allocate (SV(nbnd), UU(nbnd,nbnd), VT(nbnd,nbnd), lambda(nbnd,nbnd), eig(nbnd), zz(nbnd))
    allocate (ind(nbnd), gaps(nbnd))
+   allocate (numbers(nkort, nbnd+2))
+   numbers = 0.d0
    allocate (l_cal(nbnd))  ! l_cal(n) = .true./.false. if n-th state is occupied/empty
    nbnd_occ = nbnd
    l_cal(1:nbnd) = .true.
@@ -699,66 +688,49 @@ SUBROUTINE c_phase_z2
          endif
          print*, nb+1, zz(1) + 1
          print*, nb+2, point
+         numbers(kort,1:nbnd) = zz(1:nbnd)
+         numbers(kort,nbnd+1) = zz(1) + 1.d0
+         numbers(kort,nbnd+2) = point
 
 !     --- End loop over orthogonal k-points ---
       END DO  ! kort
 
 !  --- End loop over spin ---
    END DO
-   DEALLOCATE ( l_cal ) 
 
 !  -------------------------------------------------------------------------   !
-!                    electronic polarization: phase average                    !
+!  THE FOLLOWING CODE IS TAKEN FROM z2_final.f90 BY ALEXEY SOLUYANOV
 !  -------------------------------------------------------------------------   !
+   counter = 0
+   do kort = 2, nkort
+      mid1 = numbers(kort-1, nbnd+2)
+      mid2 = numbers(kort, nbnd+2)
+      theta1 = min(mid1, mid2)
+      theta2 = max(mid1, mid2)
+      do nb = 1, nbnd
+         if (dabs(numbers(kort,nb)-mid1) < z_threshold) &
+            call errore('z2_c_phase', 'strings are too coarse', -1)
+         if (numbers(kort,nb) > theta1 .and. numbers(kort,nb) < theta2) &
+            counter = counter + 1
+      enddo          
+   enddo
 
-!  --- Start loop over spins ---
-   DO is=1,nspin_lsda
-
-!  --- Initialize average of phases as complex numbers ---
-      cave=(0.0_dp,0.0_dp)
-      phik_ave=(0.0_dp,0.0_dp)
-
-!     --- Start loop over strings with same spin ---
-      DO kort=1,nkort
-
-!        --- Calculate string index ---
-         istring=kort+(is-1)*nkort
-
-!        --- Average phases as complex numbers ---
-         cave=cave+wstring(istring)*cphik(istring)
-
-!     --- End loop over strings with same spin ---
-      END DO
-
-!     --- Get the angle corresponding to the complex numbers average ---
-      theta0=atan2(AIMAG(cave), DBLE(cave))
-!     --- Put the phases in an around theta0 ---
-      DO kort=1,nkort
-        istring=kort+(is-1)*nkort
-        cphik(istring)=cphik(istring)/cave
-        dtheta=atan2(AIMAG(cphik(istring)), DBLE(cphik(istring)))
-        phik(istring)=theta0+dtheta
-        phik_ave=phik_ave+wstring(istring)*phik(istring)
-      END DO
-
-!     --- Assign this angle to the corresponding spin phase average ---
-      IF (nspin == 1) THEN
-         phiup=phik_ave !theta0+dtheta
-         phidw=phik_ave !theta0+dtheta
-      ELSE IF (nspin == 2) THEN
-         IF (is == 1) THEN
-            phiup=phik_ave !theta0+dtheta
-         ELSE IF (is == 2) THEN
-            phidw=phik_ave !theta0+dtheta
-         END IF
-      ELSE IF (nspin==4 ) THEN
-         phiup=phik_ave
-         phidw=0.0_DP
-      END IF
-
-!  --- End loop over spins
-   END DO
-
+   counter = 1
+   do kort = 2, nkort
+      mid1 = 2.d0*pi*numbers(kort-1, nbnd+2)
+      mid2 = 2.d0*pi*numbers(kort, nbnd+2)
+      do nb = 1, nbnd
+         center = 2.d0*pi*numbers(kort,nb)
+         if (dabs(dsin(mid2-mid1) + dsin(center-mid2) + dsin(mid1-center)) < 1d-7) then
+            p = 1.d0
+         else
+            p = (dsin(mid2-mid1) + dsin(center-mid2) + dsin(mid1-center)) / &
+                (dabs(dsin(mid2-mid1) + dsin(center-mid2) + dsin(mid1-center)))
+         endif
+         counter = counter * p
+       enddo
+    enddo
+   
 
 !  -------------------------------------------------------------------------   !
 !                           write output information                           !
@@ -773,6 +745,8 @@ SUBROUTINE c_phase_z2
            gvec
    WRITE( stdout,"(7X,'Number of k-points per string:',I4)") nppstr
    WRITE( stdout,"(7X,'Number of different strings  :',I4)") nkort
+   WRITE( stdout,* )
+   WRITE( stdout,"(7X,'The Z2 invariant for the current TRS surface is:',F10.4)") counter
 
 !  --- End of information relative to polarization calculation ---
    WRITE( stdout,"(/,/,15X,50('=')/,/)")
@@ -782,10 +756,6 @@ SUBROUTINE c_phase_z2
 !  -------------------------------------------------------------------------   !
 
 !  --- Free memory ---
-   DEALLOCATE(wstring)
-   DEALLOCATE(cphik)
-   DEALLOCATE(loc_k)
-   DEALLOCATE(phik)
    DEALLOCATE(ln)
    DEALLOCATE(aux)
    DEALLOCATE(aux0)

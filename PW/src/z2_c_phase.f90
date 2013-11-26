@@ -19,7 +19,7 @@
 !#   This routine is largerly inspired from bp_c_phase.f90                    #!
 !#                                                                            #!
 !#                                                                            #!
-!#   BRIEF SUMMARY OF THE METHODOLOGY                                         #!
+!#   BRIEF SUMMARY OF THE METHODOLOGY  (REWRITE)                              #!
 !#   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                                         #!
 !#   The standard procedure would be for the user to first perform a          #!
 !#   self-consistent (sc) calculation to obtain a converged charge density.   #!
@@ -67,7 +67,7 @@
 !#     symmetry-reduced string.                                               #!
 !#                                                                            #!
 !#                                                                            #!
-!#   EXPLANATION OF K-POINT MESH                                              #!
+!#   EXPLANATION OF K-POINT MESH  (REWRITE)                                   #!
 !#   ~~~~~~~~~~~~~~~~~~~~~~~~~~~                                              #!
 !#   If gdir=1, the program takes the standard input specification of the     #!
 !#   k-point mesh (nk1 x nk2 x nk3) and stops if the k-points in dimension    #!
@@ -105,16 +105,16 @@ SUBROUTINE c_phase_z2
    USE io_global,            ONLY : stdout
    USE io_files,             ONLY : iunwfc, nwordwfc
    USE buffers,              ONLY : get_buffer
-   USE ions_base,            ONLY : nat, ntyp => nsp, ityp, tau, zv, atm
-   USE cell_base,            ONLY : at, alat, tpiba, omega, tpiba2
+   USE cell_base,            ONLY : at, tpiba, omega, tpiba2
+   USE ions_base,            ONLY : nat, ntyp => nsp, ityp, tau
    USE constants,            ONLY : pi, tpi
    USE gvect,                ONLY : ngm, g, gcutm, ngm_g, ig_l2g
    USE fft_base,             ONLY : dfftp
    USE uspp,                 ONLY : nkb, vkb, okvan
    USE uspp_param,           ONLY : upf, lmaxq, nbetam, nh, nhm
    USE lsda_mod,             ONLY : nspin
-   USE klist,                ONLY : nelec, degauss, nks, xk, wk
-   USE wvfct,                ONLY : npwx, npw, nbnd, ecutwfc, wg
+   USE klist,                ONLY : nks, xk, wk
+   USE wvfct,                ONLY : npwx, nbnd, ecutwfc
    USE wavefunctions_module, ONLY : evc
    USE bp,                   ONLY : gdir, nppstr, mapgm_global
    USE becmod,               ONLY : calbec, bec_type, allocate_bec_type, &
@@ -132,17 +132,14 @@ SUBROUTINE c_phase_z2
    INTEGER :: igk1(npwx)
    INTEGER :: igk0(npwx)
    INTEGER :: ig
-   INTEGER :: ind1
    INTEGER :: info
    INTEGER :: is
    INTEGER :: istring
    INTEGER :: iv
-   INTEGER :: ivpt(nbnd)
    INTEGER :: j
    INTEGER :: jkb
    INTEGER :: jkb_bp
    INTEGER :: jkb1
-   INTEGER :: job
    INTEGER :: jv
    INTEGER :: kindex
    INTEGER :: kort
@@ -153,14 +150,7 @@ SUBROUTINE c_phase_z2
    INTEGER :: mk1
    INTEGER :: mk2
    INTEGER :: mk3
-   INTEGER , ALLOCATABLE :: mod_elec(:)
    INTEGER , ALLOCATABLE :: ln(:,:,:)
-   INTEGER :: mod_elec_dw
-   INTEGER :: mod_elec_tot
-   INTEGER :: mod_elec_up
-   INTEGER :: mod_ion(nat)
-   INTEGER :: mod_ion_tot
-   INTEGER :: mod_tot
    INTEGER :: n1
    INTEGER :: n2
    INTEGER :: n3
@@ -179,37 +169,26 @@ SUBROUTINE c_phase_z2
    INTEGER :: nbnd_occ
    INTEGER :: nt
    INTEGER, ALLOCATABLE :: map_g(:)
-   LOGICAL :: lodd
    LOGICAL :: l_para
    LOGICAL, ALLOCATABLE :: l_cal(:) ! flag for occupied/empty states
    REAL(DP) :: dk(3)
    REAL(DP) :: dkmod
    REAL(DP) :: el_loc
-   REAL(DP) :: eps
+   REAL(DP), parameter :: eps = 1d-6
    REAL(DP) :: fac
    REAL(DP) :: g2kin_bp(npwx)
    REAL(DP) :: gpar(3)
    REAL(DP) :: gtr(3)
    REAL(DP) :: gvec
    REAL(DP), ALLOCATABLE :: loc_k(:)
-   REAL(DP), ALLOCATABLE :: pdl_elec(:)
    REAL(DP), ALLOCATABLE :: phik(:)
    REAL(DP) :: phik_ave
    REAL(DP) :: qrad_dk(nbetam,nbetam,lmaxq,ntyp)
    REAL(DP) :: weight
-   REAL(DP) :: upol(3)
-   REAL(DP) :: pdl_elec_dw
-   REAL(DP) :: pdl_elec_tot
-   REAL(DP) :: pdl_elec_up
-   REAL(DP) :: pdl_ion(nat)
-   REAL(DP) :: pdl_ion_tot
-   REAL(DP) :: pdl_tot
    REAL(DP) :: phidw
    REAL(DP) :: phiup
-   REAL(DP) :: rmod
    REAL(DP), ALLOCATABLE :: wstring(:)
    REAL(DP) :: ylm_dk(lmaxq*lmaxq)
-   REAL(DP) :: zeta_mod
    COMPLEX(DP), ALLOCATABLE :: aux(:)
    COMPLEX(DP), ALLOCATABLE :: aux_g(:)
    COMPLEX(DP), ALLOCATABLE :: aux0(:)
@@ -217,7 +196,6 @@ SUBROUTINE c_phase_z2
    TYPE (bec_type) :: becp_bp
    COMPLEX(DP) :: cave
    COMPLEX(DP) , ALLOCATABLE :: cphik(:)
-   COMPLEX(DP) :: det
    COMPLEX(DP) :: dtheta
    COMPLEX(DP) :: mat(nbnd,nbnd)
    COMPLEX(DP) :: pref
@@ -226,8 +204,17 @@ SUBROUTINE c_phase_z2
    COMPLEX(DP) :: q_dk(nhm,nhm,ntyp)
    COMPLEX(DP) :: struc(nat)
    COMPLEX(DP) :: theta0
-   COMPLEX(DP) :: zdotc
-   COMPLEX(DP) :: zeta
+   COMPLEX(DP), external :: zdotc
+
+!  -------------------------------------------------------------------------   !
+!                               Z2 variables
+!  -------------------------------------------------------------------------   !
+   real(dp), parameter :: m_threshold = 0.7d0
+   complex(dp), allocatable :: UU(:,:), VT(:,:), work(:), lambda(:,:), eig(:)
+   real(dp), allocatable :: SV(:), rwork(:), zz(:), gaps(:)
+   integer, allocatable :: ind(:)
+   real(dp) :: point, max_gap
+   integer :: lwork, kk
 
 !  -------------------------------------------------------------------------   !
 !                               INITIALIZATIONS
@@ -253,15 +240,8 @@ SUBROUTINE c_phase_z2
    WRITE( stdout,"(27X,'Z2 INVARIANT CALCULATION')")
    WRITE( stdout,"(25X,'!!! NOT THOROUGHLY TESTED !!!')")
    WRITE( stdout,"(15X,50('='),/)")
-
-#if 0
-!  --- Check that we are working with an insulator with no empty bands ---
-   IF ( degauss > 0.0_dp ) CALL errore('c_phase_z2', &
-                'Polarization only for insulators',1)
-#endif
-
-!  --- Define a small number ---
-   eps=1.0E-6_dp
+   if (.not. lspinorb) call errore('z2_c_phase', 'Z2 needs spin orbit', 1)
+   if (nspin_lsda /= 1) call errore('z2_c_phase', 'internal error: nspin_lsda=', nspin_lsda)
 
 !  --- Recalculate FFT correspondence (see ggen.f90) ---
    ALLOCATE (ln (-dfftp%nr1:dfftp%nr1, -dfftp%nr2:dfftp%nr2, -dfftp%nr3:dfftp%nr3) )
@@ -296,8 +276,6 @@ SUBROUTINE c_phase_z2
    ALLOCATE(loc_k(nstring))
    ALLOCATE(cphik(nstring))
    ALLOCATE(wstring(nstring))
-   ALLOCATE(pdl_elec(nstring))
-   ALLOCATE(mod_elec(nstring))
 
 !  -------------------------------------------------------------------------   !
 !           electronic polarization: set values for k-points strings           !
@@ -395,22 +373,16 @@ SUBROUTINE c_phase_z2
 
    el_loc=0.d0
    kpoint=0
-   ALLOCATE ( l_cal(nbnd) ) 
-   CALL weights()
+
+   allocate (SV(nbnd), UU(nbnd,nbnd), VT(nbnd,nbnd), lambda(nbnd,nbnd), eig(nbnd), zz(nbnd))
+   allocate (ind(nbnd), gaps(nbnd))
+   allocate (l_cal(nbnd))  ! l_cal(n) = .true./.false. if n-th state is occupied/empty
+   nbnd_occ = nbnd
+   l_cal(1:nbnd) = .true.
+   call weights()
 
 !  --- Start loop over spin ---
    DO is=1,nspin_lsda
-
-      ! l_cal(n) = .true./.false. if n-th state is occupied/empty
-#if 0
-      nbnd_occ=0
-      DO nb = 1, nbnd
-         l_cal(nb) = (wg(nb,1+nks*(is-1)/2) > eps)
-         IF (l_cal(nb)) nbnd_occ = nbnd_occ + 1
-      END DO
-#endif
-      nbnd_occ = nbnd
-      l_cal(1:nbnd) = .true.
 
 !     --- Start loop over orthogonal k-points ---
       DO kort=1,nkort
@@ -418,9 +390,10 @@ SUBROUTINE c_phase_z2
 !        --- Index for this string ---
          istring=kort+(is-1)*nkort
 
-!        --- Initialize expectation value of the phase operator ---
-         zeta=(1.d0,0.d0)
-         zeta_mod = 1.d0
+   lambda = (0.d0, 0.d0)
+   do nb = 1, nbnd
+       lambda(nb,nb) = (1.d0, 0.d0)
+   enddo
 
 !        --- Start loop over parallel k-points ---
          DO kpar = 1,nppstr
@@ -628,35 +601,107 @@ SUBROUTINE c_phase_z2
                   ENDDO
                ENDDO
 
-!              --- Calculate matrix determinant ---
-               CALL ZGETRF (nbnd,nbnd,mat,nbnd,ivpt,info)
-               CALL errore('c_phase_z2','error in factorization',abs(info))
-               det=(1.d0,0.d0)
-               do nb=1,nbnd
-                  det = det*mat(nb,nb)
-                  if(nb.ne.ivpt(nb)) det=-det
-               enddo
-!              --- Multiply by the already calculated determinants ---
-               zeta=zeta*det
+!  -------------------------------------------------------------------------   !
+!  THE FOLLOWING CODE IS TAKEN FROM z2_main.f90 BY ALEXEY SOLUYANOV
+!  -------------------------------------------------------------------------   !
+!              --- Calculate SVD of M matrix: M = UU * SV * VV^* ---
+               allocate (work(1))
+               lwork = -1
+               call ZGESVD('A','A',nbnd,nbnd,aux,nbnd,SV,UU,nbnd,VT,nbnd,work,lwork,rwork,info)
+               lwork = int(dble(work(1)))
+               deallocate (work)
 
+               allocate (work(lwork), rwork(5*nbnd))
+               call ZGESVD('A','A',nbnd,nbnd,mat,nbnd,SV,UU,nbnd,VT,nbnd,work,lwork,rwork,info)
+               deallocate (work, rwork)
+               if (info > 0) call errore('c_phase_z2','error in SVD factorization, info > 0', info)
+               if (info < 0) call errore('c_phase_z2','error in SVD factorization, info < 0', -info)
+
+               write(stdout,*)
+               write(stdout,'(5X,''kort,kpar='',2I4,10X,''k,kp='',2I4)') kort, kpar, kpoint-1, kpoint
+               write(stdout,'(5X,''sigmas'')')
+               write(stdout,'(''  '',8F9.4)') (SV(nb), nb=1,nbnd)
+               ! test for Mmn threshold
+               do nb = 1, nbnd
+                  if (SV(nb) < m_threshold) call errore('c_phase_z2', 'k-point string too coarse', -1)
+               enddo
+               mat = matmul(UU, VT)
+               lambda = matmul(lambda, mat)
 !           --- End of dot products between wavefunctions and betas ---
             ENDIF
 
 !        --- End loop over parallel k-points ---
-         END DO 
+         END DO  ! kpar
 
-!        --- Calculate the phase for this string ---
-         phik(istring)=AIMAG(LOG(zeta))
-         cphik(istring)=COS(phik(istring))*(1.0_dp,0.0_dp) &
-                     +SIN(phik(istring))*(0.0_dp,1.0_dp)
+         ! diagonalize lamdba matrix
+         lwork = -1
+         allocate(work(1))
+         call ZGEEV('N','N',nbnd,aux,nbnd,eig,VT,nbnd,UU,nbnd,work,lwork,rwork,info)
+         lwork = int(dble(work(1)))
+         deallocate (work)
 
-!        --- Calculate the localization for current kort ---
-         zeta_mod= DBLE(CONJG(zeta)*zeta)
-
-         loc_k(istring)= - (nppstr-1) / gvec**2 / nbnd_occ *log(zeta_mod)
+         allocate (work(lwork), rwork(2*nbnd))
+         call ZGEEV('N','N',nbnd,lambda,nbnd,eig,VT,nbnd,UU,nbnd,work,lwork,rwork,info)
+         deallocate (work, rwork)
+         if (info > 0) call errore('c_phase_z2','error in diagonalization, info > 0', info)
+         if (info < 0) call errore('c_phase_z2','error in diagonalization, info < 0', -info)
+         write(stdout,*)
+         write(stdout,*)
+         write(stdout,'(5X,''========== kort='',I4,'' =========='')') kort
+         write(stdout,'(5X,''eigenvalues (real part)'')')
+         write(stdout,'(''  '',8F9.4)') (dble(eig(nb)), nb=1,nbnd)
+         write(stdout,'(5X,''eigenvalues (imag part)'')')
+         write(stdout,'(''  '',8F9.4)') (dimag(eig(nb)), nb=1,nbnd)
+         do nb = 1, nbnd
+            if (dreal(cdlog(eig(nb)))>1d-8) print*, 'eigenvalue', nb, 'has real part'
+            zz(nb) = dimag(cdlog(eig(nb))) / (2.d0*PI)
+            !print*, zz(nb)
+            print*, nb, cdlog(eig(nb)), zz(nb)
+         enddo
+         write(70,*) kort, (zz(nb), nb=1,nbnd)
+         ! putting eigenvalues within the [-0.5,0.5) window
+         print*, 'wrap'
+         do nb = 1, nbnd
+             i = int(zz(nb))
+             zz(nb) = zz(nb) - i
+             if (zz(nb) <= -0.5d0) zz(nb) = zz(nb) + 1.d0
+             if (zz(nb) > 0.5d0) zz(nb) = zz(nb) - 1.d0
+            print*, nb, zz(nb)
+         enddo
+         write(71,*) kort, (zz(nb), nb=1,nbnd)
+         call hpsort(nbnd, zz, ind)
+         print*, 'wrap+sort'
+         do nb = 1, nbnd
+            print*, nb, zz(nb)
+         enddo
+         write(72,*) kort, (zz(nb), nb=1,nbnd)
+         ! gaps
+         do nb = 1, nbnd
+           if (nb < nbnd) then
+              gaps(nb) = zz(nb+1)-zz(nb)
+           else
+              gaps(nb) = zz(1)+1.d0-zz(nb)
+           endif
+         enddo
+         !print*, 'gaps'
+         !do nb = 1, nbnd
+         !   print*, nb, gaps(nb)
+         !enddo
+         ! find largest gap
+         max_gap = maxval(gaps)
+         do nb = 1, nbnd
+            if (gaps(nb) == max_gap) kk = nb
+         enddo
+         if (kk /= nbnd) then
+            point = (zz(kk+1) + zz(kk))/2.d0
+         else
+            point = (zz(1) + 1.d0 + zz(kk))/2.d0
+         endif
+         print*, nb+1, zz(1) + 1
+         print*, nb+2, point
 
 !     --- End loop over orthogonal k-points ---
-      END DO
+      END DO  ! kort
 
 !  --- End loop over spin ---
    END DO
@@ -714,80 +759,6 @@ SUBROUTINE c_phase_z2
 !  --- End loop over spins
    END DO
 
-!  -------------------------------------------------------------------------   !
-!                     electronic polarization: remap phases                    !
-!  -------------------------------------------------------------------------   !
-
-!  --- Remap string phases to interval [-0.5,0.5) ---
-   pdl_elec=phik/(2.0_dp*pi)
-   mod_elec=1
-
-!  --- Remap spin average phases to interval [-0.5,0.5) ---
-   pdl_elec_up=phiup/(2.0_dp*pi)
-   mod_elec_up=1
-   pdl_elec_dw=phidw/(2.0_dp*pi)
-   mod_elec_dw=1
-
-!  --- Depending on nspin, remap total phase to [-1,1) or [-0.5,0.5) ---
-   pdl_elec_tot=pdl_elec_up+pdl_elec_dw
-   IF (nspin == 1) THEN
-      pdl_elec_tot=pdl_elec_tot-2.0_dp*NINT(pdl_elec_tot/2.0_dp)
-      mod_elec_tot=2
-   ELSE IF (nspin == 2 .OR. nspin == 4) THEN
-      pdl_elec_tot=pdl_elec_tot-1.0_dp*NINT(pdl_elec_tot/1.0_dp)
-      mod_elec_tot=1
-   END IF
-
-#if 0
-!  -------------------------------------------------------------------------   !
-!                              ionic polarization                              !
-!  -------------------------------------------------------------------------   !
-
-!  --- Look for ions with odd number of charges ---
-   mod_ion=2
-   lodd=.FALSE.
-   DO na=1,nat
-      IF (MOD(NINT(zv(ityp(na))),2) == 1) THEN
-         mod_ion(na)=1
-         lodd=.TRUE.
-      END IF
-   END DO
-
-!  --- Calculate ionic polarization phase for every ion ---
-   pdl_ion=0.0_dp
-   DO na=1,nat
-      DO i=1,3
-         pdl_ion(na)=pdl_ion(na)+zv(ityp(na))*tau(i,na)*gpar(i)
-      ENDDO
-      IF (mod_ion(na) == 1) THEN
-         pdl_ion(na)=pdl_ion(na)-1.0_dp*nint(pdl_ion(na)/1.0_dp)
-      ELSE IF (mod_ion(na) == 2) THEN
-         pdl_ion(na)=pdl_ion(na)-2.0_dp*nint(pdl_ion(na)/2.0_dp)
-      END IF
-   ENDDO
-
-!  --- Add up the phases modulo 2 iff the ionic charges are even numbers ---
-   pdl_ion_tot=SUM(pdl_ion(1:nat))
-   IF (lodd) THEN
-      pdl_ion_tot=pdl_ion_tot-1.d0*nint(pdl_ion_tot/1.d0)
-      mod_ion_tot=1
-   ELSE
-      pdl_ion_tot=pdl_ion_tot-2.d0*nint(pdl_ion_tot/2.d0)
-      mod_ion_tot=2
-   END IF
-
-!  -------------------------------------------------------------------------   !
-!                              total polarization                              !
-!  -------------------------------------------------------------------------   !
-
-!  --- Add electronic and ionic contributions to total phase ---
-   pdl_tot=pdl_elec_tot+pdl_ion_tot
-   IF ((.NOT.lodd).AND.(nspin == 1)) THEN
-      mod_tot=2
-   ELSE
-      mod_tot=1
-   END IF
-#endif
 
 !  -------------------------------------------------------------------------   !
 !                           write output information                           !
@@ -803,118 +774,6 @@ SUBROUTINE c_phase_z2
    WRITE( stdout,"(7X,'Number of k-points per string:',I4)") nppstr
    WRITE( stdout,"(7X,'Number of different strings  :',I4)") nkort
 
-#if 0
-!  --- Information about ionic polarization phases ---
-   WRITE( stdout,"(2/,31X,'IONIC POLARIZATION')")
-   WRITE( stdout,"(31X,18('~'),/)")
-   WRITE( stdout,"(8X,'Note: (mod 1) means that the phases (angles ranging from' &
-           & /,8X,'-pi to pi) have been mapped to the interval [-1/2,+1/2) by',&
-           & /,8X,'dividing by 2*pi; (mod 2) refers to the interval [-1,+1)',&
-           & /)")
-   WRITE( stdout,"(2X,76('='))")
-   WRITE( stdout,"(4X,'Ion',4X,'Species',4X,'Charge',14X, &
-           & 'Position',16X,'Phase')")
-   WRITE( stdout,"(2X,76('-'))")
-   DO na=1,nat
-      WRITE( stdout,"(3X,I3,8X,A2,F12.3,5X,3F8.4,F12.5,' (mod ',I1,')')") &
-           & na,atm(ityp(na)),zv(ityp(na)), &
-           & tau(1,na),tau(2,na),tau(3,na),pdl_ion(na),mod_ion(na)
-   END DO
-   WRITE( stdout,"(2X,76('-'))")
-   WRITE( stdout,"(47X,'IONIC PHASE: ',F9.5,' (mod ',I1,')')") pdl_ion_tot,mod_ion_tot
-   WRITE( stdout,"(2X,76('='))")
-#endif
-
-!  --- Information about electronic polarization phases ---
-   WRITE( stdout,"(2/,28X,'ELECTRONIC POLARIZATION')")
-   WRITE( stdout,"(28X,23('~'),/)")
-   WRITE( stdout,"(8X,'Note: (mod 1) means that the phases (angles ranging from' &
-           & /,8X,'-pi to pi) have been mapped to the interval [-1/2,+1/2) by',&
-           & /,8X,'dividing by 2*pi; (mod 2) refers to the interval [-1,+1)',&
-           & /)")
-   WRITE( stdout,"(2X,76('='))")
-   WRITE( stdout,"(3X,'Spin',4X,'String',5X,'Weight',6X, &
-            &  'First k-point in string',9X,'Phase')")
-   WRITE( stdout,"(2X,76('-'))")
-   DO istring=1,nstring/nspin_lsda
-      ind1=1+(istring-1)*nppstr
-      WRITE( stdout,"(3X,' up ',3X,I5,F14.6,4X,3(F8.4),F12.5,' (mod ',I1,')')") &
-          &  istring,wstring(istring), &
-          &  xk(1,ind1),xk(2,ind1),xk(3,ind1),pdl_elec(istring),mod_elec(istring)
-   END DO
-   WRITE( stdout,"(2X,76('-'))")
-!  --- Treat unpolarized/polarized spin cases ---
-   IF (nspin_lsda == 1) THEN
-!     --- In unpolarized spin, just copy again the same data ---
-      DO istring=1,nstring
-         ind1=1+(istring-1)*nppstr
-         WRITE( stdout,"(3X,'down',3X,I5,F14.6,4X,3(F8.4),F12.5,' (mod ',I1,')')") &
-              istring,wstring(istring), xk(1,ind1),xk(2,ind1),xk(3,ind1), &
-              pdl_elec(istring),mod_elec(istring)
-      END DO
-   ELSE IF (nspin_lsda == 2) THEN
-!     --- If there is spin polarization, write information for new strings ---
-      DO istring=nstring/2+1,nstring
-         ind1=1+(istring-1)*nppstr
-         WRITE( stdout,"(3X,'down',3X,I4,F15.6,4X,3(F8.4),F12.5,' (mod ',I1,')')") &
-           &    istring,wstring(istring), xk(1,ind1),xk(2,ind1),xk(3,ind1), &
-           &    pdl_elec(istring),mod_elec(istring)
-      END DO
-   END IF
-   WRITE( stdout,"(2X,76('-'))")
-   IF (noncolin) THEN
-      WRITE( stdout,"(42X,'Average phase   : ',F9.5,' (mod ',I1,')')") & 
-        pdl_elec_up,mod_elec_up
-   ELSE
-      WRITE( stdout,"(40X,'Average phase (up): ',F9.5,' (mod ',I1,')')") & 
-        pdl_elec_up,mod_elec_up
-      WRITE( stdout,"(38X,'Average phase (down): ',F9.5,' (mod ',I1,')')")& 
-        pdl_elec_dw,mod_elec_dw
-      WRITE( stdout,"(42X,'ELECTRONIC PHASE: ',F9.5,' (mod ',I1,')')") & 
-        pdl_elec_tot,mod_elec_tot
-   ENDIF
-   WRITE( stdout,"(2X,76('='))")
-
-!  --- Information about total phase ---
-   WRITE( stdout,"(2/,31X,'SUMMARY OF PHASES')")
-   WRITE( stdout,"(31X,17('~'),/)")
-   WRITE( stdout,"(26X,'Ionic Phase:',F9.5,' (mod ',I1,')')") &
-        pdl_ion_tot,mod_ion_tot
-   WRITE( stdout,"(21X,'Electronic Phase:',F9.5,' (mod ',I1,')')") &
-        pdl_elec_tot,mod_elec_tot
-   WRITE( stdout,"(26X,'TOTAL PHASE:',F9.5,' (mod ',I1,')')") &
-        pdl_tot,mod_tot
-
-!  --- Information about the value of polarization ---
-   WRITE( stdout,"(2/,29X,'VALUES OF POLARIZATION')")
-   WRITE( stdout,"(29X,22('~'),/)")
-   WRITE( stdout,"( &
-      &   8X,'The calculation of phases done along the direction of vector ',I1, &
-      &   /,8X,'of the reciprocal lattice gives the following contribution to', &
-      &   /,8X,'the polarization vector (in different units, and being Omega', &
-      &   /,8X,'the volume of the unit cell):')") &
-          gdir
-!  --- Calculate direction of polarization and modulus of lattice vector ---
-   rmod=SQRT(at(1,gdir)*at(1,gdir)+at(2,gdir)*at(2,gdir) &
-            +at(3,gdir)*at(3,gdir))
-   upol(:)=at(:,gdir)/rmod
-   rmod=alat*rmod
-!  --- Give polarization in units of (e/Omega).bohr ---
-   fac=rmod
-   WRITE( stdout,"(/,11X,'P = ',F11.7,'  (mod ',F11.7,')  (e/Omega).bohr')") &
-        fac*pdl_tot,fac*DBLE(mod_tot)
-!  --- Give polarization in units of e.bohr ---
-   fac=rmod/omega
-   WRITE( stdout,"(/,11X,'P = ',F11.7,'  (mod ',F11.7,')  e/bohr^2')") &
-        fac*pdl_tot,fac*DBLE(mod_tot)
-!  --- Give polarization in SI units (C/m^2) ---
-   fac=(rmod/omega)*(1.60097E-19_dp/5.29177E-11_dp**2)
-   WRITE( stdout,"(/,11X,'P = ',F11.7,'  (mod ',F11.7,')  C/m^2')") &
-        fac*pdl_tot,fac*DBLE(mod_tot)
-!  --- Write polarization direction ---
-   WRITE( stdout,"(/,8X,'The polarization direction is:  ( ', &
-       &  F7.5,' , ',F7.5,' , ',F7.5,' )')") upol(1),upol(2),upol(3)
-
 !  --- End of information relative to polarization calculation ---
    WRITE( stdout,"(/,/,15X,50('=')/,/)")
 
@@ -923,8 +782,6 @@ SUBROUTINE c_phase_z2
 !  -------------------------------------------------------------------------   !
 
 !  --- Free memory ---
-   DEALLOCATE(mod_elec)
-   DEALLOCATE(pdl_elec)
    DEALLOCATE(wstring)
    DEALLOCATE(cphik)
    DEALLOCATE(loc_k)

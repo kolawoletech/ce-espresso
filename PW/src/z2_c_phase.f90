@@ -199,12 +199,12 @@ SUBROUTINE c_phase_z2
 !  -------------------------------------------------------------------------   !
 !                               Z2 variables
 !  -------------------------------------------------------------------------   !
-   real(dp), parameter :: m_threshold = 0.7d0
+   real(dp), parameter :: m_threshold = 0.8d0
    real(dp), parameter :: z_threshold = 0.05d0
    complex(dp), allocatable :: UU(:,:), VT(:,:), work(:), lambda(:,:), eig(:)
    real(dp), allocatable :: SV(:), rwork(:), zz(:), gaps(:), numbers(:,:)
    integer, allocatable :: ind(:)
-   real(dp) :: point, max_gap, center, counter, mid1, mid2, theta1, theta2, p
+   real(dp) :: point, max_gap, center, counter, mid1, mid2, theta1, theta2, p, den
    integer :: lwork, kk
 
 !  -------------------------------------------------------------------------   !
@@ -612,7 +612,7 @@ SUBROUTINE c_phase_z2
                write(stdout,'(''  '',8F9.4)') (SV(nb), nb=1,nbnd)
                ! test for Mmn threshold
                do nb = 1, nbnd
-                  if (SV(nb) < m_threshold) call errore('c_phase_z2', 'k-point string too coarse', -1)
+                  if (SV(nb) < m_threshold) call infomsg('c_phase_z2', 'k-point string too coarse')
                enddo
                mat = matmul(UU, VT)
                lambda = matmul(lambda, mat)
@@ -691,6 +691,7 @@ SUBROUTINE c_phase_z2
          numbers(kort,1:nbnd) = zz(1:nbnd)
          numbers(kort,nbnd+1) = zz(1) + 1.d0
          numbers(kort,nbnd+2) = point
+         write(73,*) kort, point
 
 !     --- End loop over orthogonal k-points ---
       END DO  ! kort
@@ -709,7 +710,7 @@ SUBROUTINE c_phase_z2
       theta2 = max(mid1, mid2)
       do nb = 1, nbnd
          if (dabs(numbers(kort,nb)-mid1) < z_threshold) &
-            call errore('z2_c_phase', 'strings are too coarse', -1)
+            call infomsg('z2_c_phase', 'strings are too coarse')
          if (numbers(kort,nb) > theta1 .and. numbers(kort,nb) < theta2) &
             counter = counter + 1
       enddo          
@@ -721,11 +722,11 @@ SUBROUTINE c_phase_z2
       mid2 = 2.d0*pi*numbers(kort, nbnd+2)
       do nb = 1, nbnd
          center = 2.d0*pi*numbers(kort,nb)
-         if (dabs(dsin(mid2-mid1) + dsin(center-mid2) + dsin(mid1-center)) < 1d-7) then
+         den = dsin(mid2-mid1) + dsin(center-mid2) + dsin(mid1-center)
+         if (dabs(den) < eps) then
             p = 1.d0
          else
-            p = (dsin(mid2-mid1) + dsin(center-mid2) + dsin(mid1-center)) / &
-                (dabs(dsin(mid2-mid1) + dsin(center-mid2) + dsin(mid1-center)))
+            p = den / dabs(den)
          endif
          counter = counter * p
        enddo
@@ -746,7 +747,14 @@ SUBROUTINE c_phase_z2
    WRITE( stdout,"(7X,'Number of k-points per string:',I4)") nppstr
    WRITE( stdout,"(7X,'Number of different strings  :',I4)") nkort
    WRITE( stdout,* )
-   WRITE( stdout,"(7X,'The Z2 invariant for the current TRS surface is:',F10.4)") counter
+   WRITE( stdout,"(7X,'The parity for the current TRS surface is:',F10.3)") counter
+   if (counter > 0.99d0) then
+      WRITE( stdout,"(7X,'The Z2 invariant for the current TRS surface is:  0')")
+   elseif (counter < -0.99d0) then
+      WRITE( stdout,"(7X,'The Z2 invariant for the current TRS surface is: -1')")
+   else
+      WRITE(stdout,"(7X,'Something is wrong with parity')")
+   endif
 
 !  --- End of information relative to polarization calculation ---
    WRITE( stdout,"(/,/,15X,50('=')/,/)")
@@ -770,7 +778,6 @@ SUBROUTINE c_phase_z2
       CALL deallocate_bec_type ( becp_bp )
       IF (lspinorb) DEALLOCATE(q_dk_so)
    END IF
-
 
 
 END SUBROUTINE c_phase_z2

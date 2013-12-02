@@ -115,7 +115,8 @@ SUBROUTINE c_phase_z2
    USE klist,                ONLY : nks, xk, wk
    USE wvfct,                ONLY : npwx, nbnd, ecutwfc
    USE wavefunctions_module, ONLY : evc
-   USE bp,                   ONLY : gdir, nppstr, mapgm_global
+   USE bp,                   ONLY : gdir, nppstr, mapgm_global, &
+                                    z2_m_threshold, z2_z_threshold
    USE becmod,               ONLY : calbec, bec_type, allocate_bec_type, &
                                     deallocate_bec_type
    USE noncollin_module,     ONLY : noncolin, npol, nspin_lsda
@@ -180,8 +181,6 @@ SUBROUTINE c_phase_z2
    REAL(DP) :: gtr(3)
    REAL(DP) :: gvec
    REAL(DP) :: qrad_dk(nbetam,nbetam,lmaxq,ntyp)
-   REAL(DP) :: weight
-   REAL(DP), ALLOCATABLE :: wstring(:)
    REAL(DP) :: ylm_dk(lmaxq*lmaxq)
    COMPLEX(DP), ALLOCATABLE :: aux(:)
    COMPLEX(DP), ALLOCATABLE :: aux_g(:)
@@ -199,8 +198,6 @@ SUBROUTINE c_phase_z2
 !  -------------------------------------------------------------------------   !
 !                               Z2 variables
 !  -------------------------------------------------------------------------   !
-   real(dp), parameter :: m_threshold = 0.8d0
-   real(dp), parameter :: z_threshold = 0.05d0
    complex(dp), allocatable :: UU(:,:), VT(:,:), work(:), lambda(:,:), eig(:)
    real(dp), allocatable :: SV(:), rwork(:), zz(:), gaps(:), numbers(:,:)
    integer, allocatable :: ind(:)
@@ -612,7 +609,7 @@ SUBROUTINE c_phase_z2
                write(stdout,'(''  '',8F9.4)') (SV(nb), nb=1,nbnd)
                ! test for Mmn threshold
                do nb = 1, nbnd
-                  if (SV(nb) < m_threshold) call infomsg('c_phase_z2', 'k-point string too coarse')
+                  if (SV(nb) < z2_m_threshold) call infomsg('c_phase_z2', 'k-point string too coarse')
                enddo
                mat = matmul(UU, VT)
                lambda = matmul(lambda, mat)
@@ -709,7 +706,7 @@ SUBROUTINE c_phase_z2
       theta1 = min(mid1, mid2)
       theta2 = max(mid1, mid2)
       do nb = 1, nbnd
-         if (dabs(numbers(kort,nb)-mid1) < z_threshold) &
+         if (dabs(numbers(kort,nb)-mid1) < z2_z_threshold) &
             call infomsg('z2_c_phase', 'strings are too coarse')
          if (numbers(kort,nb) > theta1 .and. numbers(kort,nb) < theta2) &
             counter = counter + 1

@@ -109,6 +109,8 @@ MODULE read_namelists_module
        dipfield = .FALSE.
        lberry   = .FALSE.
        lcalc_z2 = .FALSE.
+       z2_m_threshold = 0.8d0
+       z2_z_threshold = 0.05d0
        gdir     = 0
        nppstr   = 0
        wf_collect = .FALSE.
@@ -676,6 +678,8 @@ MODULE read_namelists_module
        CALL mp_bcast( dipfield,      ionode_id, intra_image_comm )
        CALL mp_bcast( lberry,        ionode_id, intra_image_comm )
        CALL mp_bcast( lcalc_z2,      ionode_id, intra_image_comm )
+       CALL mp_bcast( z2_m_threshold,ionode_id, intra_image_comm )
+       CALL mp_bcast( z2_z_threshold,ionode_id, intra_image_comm )
        CALL mp_bcast( gdir,          ionode_id, intra_image_comm )
        CALL mp_bcast( nppstr,        ionode_id, intra_image_comm )
        CALL mp_bcast( point_label_type,   ionode_id, intra_image_comm )

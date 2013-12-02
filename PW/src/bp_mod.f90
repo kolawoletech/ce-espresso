@@ -20,7 +20,7 @@ MODULE bp
            fact_hepsi, bec_evcel, mapgp_global, mapgm_global, nppstr_3d, &
            ion_pol, el_pol, fc_pol, l_el_pol_old, el_pol_old, el_pol_acc, &
            nx_el, l3dstring, efield, efield_cart, efield_cry, transform_el
-  PUBLIC :: lcalc_z2
+  PUBLIC :: lcalc_z2, z2_m_threshold, z2_z_threshold
   PUBLIC :: allocate_bp_efield, deallocate_bp_efield, bp_global_map
   !
   LOGICAL :: &
@@ -29,6 +29,7 @@ MODULE bp
        lorbm=.false.       ! if .TRUE. calculate orbital magnetization (Kubo terms)
   LOGICAL :: &
        lcalc_z2 =.false.   ! if .TRUE. calculate Z2 without inversion symmetry
+  REAL(DP) :: z2_m_threshold, z2_z_threshold
   INTEGER :: &
        gdir,        &! G-vector for polarization calculation
        nppstr,      &! number of k-points (parallel vector)

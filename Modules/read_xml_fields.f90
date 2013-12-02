@@ -449,6 +449,12 @@ CONTAINS
     CASE ( 'lcalc_z2' )
        CALL iotk_scan_dat_inside( xmlinputunit, lcalc_z2, ierr = ierr )
        !
+    CASE ( 'z2_m_threshold' )
+       CALL iotk_scan_dat_inside( xmlinputunit, z2_m_threshold, ierr = ierr )
+       !
+    CASE ( 'z2_z_threshold' )
+       CALL iotk_scan_dat_inside( xmlinputunit, z2_z_threshold, ierr = ierr )
+       !
     CASE ( 'lda_plus_u' ) 
        CALL iotk_scan_dat_inside( xmlinputunit, lda_plus_u, ierr = ierr )
        !

@@ -118,7 +118,7 @@ MODULE exx
   REAL(DP)  :: exx_dual = 4.0_DP! dual for the custom grid
  CONTAINS
 #define _CX(A)  CMPLX(A,0._dp,kind=DP)
-#define _CY(A)  CMPLX(0._dp,A,kind=DP)
+#define _CY(A)  CMPLX(0._dp,-A,kind=DP)
   !------------------------------------------------------------------------
   SUBROUTINE exx_grid_convert( psi, npw, fft, psi_t, sign, igkt )
     !------------------------------------------------------------------------
@@ -549,15 +549,12 @@ MODULE exx
 !     DO i = 1,nq
 !       qnorm = MAX(qnorm,  SQRT(SUM(xkq(:,i)**2))  )
 !     ENDDO
-!     print*,"qnorm1", qnorm
 
     DO i = 1,nq
     DO j = 1,nks
       qnorm = MAX(qnorm, SQRT( SUM((xk(:,j)-xkq(:,i))**2) ))
     ENDDO
     ENDDO
-!     print*,"qnorm2", qnorm
-
   
     RETURN
     !------------------------------------------------------------------------
@@ -1365,10 +1362,13 @@ MODULE exx
               ! calculate rho in real space. Gamma tricks are used. 
               ! temppsic is real; tempphic contains one band in the real part, 
               ! another one in the imaginary part; the same applies to rhoc
+              !
 !$omp parallel do default(shared), private(ir)
               DO ir = 1, nrxxs
                   tempphic(ir) = exxbuff(ir,h_ibnd,ikq)
-                  rhoc(ir)     = CONJG(tempphic(ir))*temppsic(ir) / omega
+                  rhoc(ir) = CMPLX( DBLE(tempphic(ir))*DBLE(temppsic(ir)),&
+                                   AIMAG(tempphic(ir))*DBLE(temppsic(ir)),&
+                                   KIND=dp) / omega
               ENDDO
 !$omp end parallel do
               !
@@ -1377,9 +1377,9 @@ MODULE exx
               !   >>>> add augmentation in REAL SPACE here
               IF(okvan .and. dovanxx .AND. TQR) THEN
                  IF(ibnd>=ibnd_start) &
-                 CALL addusxx_r(rhoc, _CX(becxx(ikq)%r(:,ibnd)),   _CX(becpsi%r(:,im)))
+                 CALL addusxx_r(rhoc, _CX(becxx(ikq)%r(:,ibnd)), _CX(becpsi%r(:,im)))
                  IF(ibnd<ibnd_end) &
-                 CALL addusxx_r(rhoc, _CY(becxx(ikq)%r(:,ibnd+1)), _CX(becpsi%r(:,im)))
+                 CALL addusxx_r(rhoc,_CY(becxx(ikq)%r(:,ibnd+1)),_CX(becpsi%r(:,im)))
               ENDIF
               !
               CALL fwfft ('Custom', rhoc, exx_fft_r2g%dfftt)
@@ -1387,11 +1387,11 @@ MODULE exx
               IF(okvan .and. dovanxx .AND. .NOT. TQR) THEN
                  ! contribution from one band added to real (in real space) part of rhoc
                  IF(ibnd>=ibnd_start) &
-                      CALL addusxx_g(rhoc, xkq,  xk_collect(:,current_ik), 'r', &
+                      CALL addusxx_g(rhoc, xkq,  xkp, 'r', &
                       becphi_r=becxx(ikq)%r(:,ibnd), becpsi_r=becpsi%r(:,im) )
                  ! contribution from following band added to imaginary (in real space) part of rhoc
                  IF(ibnd<ibnd_end) &
-                      CALL addusxx_g(rhoc, xkq,  xk_collect(:,current_ik), 'i', &
+                      CALL addusxx_g(rhoc, xkq,  xkp, 'i', &
                       becphi_r=becxx(ikq)%r(:,ibnd+1), becpsi_r=becpsi%r(:,im) )
               ENDIF
               !   >>>> charge density done
@@ -1410,11 +1410,11 @@ MODULE exx
               !   >>>>  compute <psi|H_fock G SPACE here
               IF(okvan .and. dovanxx .and. .not. TQR) THEN
                  IF(ibnd>=ibnd_start) &
-                 CALL newdxx_g(vc, xkq, _CX(becxx(ikq)%r(:,ibnd)), &
-                             xk_collect(:,current_ik), deexx)
+                 CALL newdxx_g(vc, xkq, xkp, &
+                               'r', deexx, becphi_r=x1*becxx(ikq)%r(:,ibnd))
                  IF(ibnd<ibnd_end) &
-                 CALL newdxx_g(vc, xkq, _CY(becxx(ikq)%r(:,ibnd+1)), &
-                             xk_collect(:,current_ik), deexx)
+                 CALL newdxx_g(vc, xkq, xkp, &
+                               'i', deexx,becphi_r=x2*becxx(ikq)%r(:,ibnd+1))
               ENDIF
               !
               !brings back v in real space
@@ -1423,9 +1423,11 @@ MODULE exx
               !   >>>>  compute <psi|H_fock REAL SPACE here
               IF(okvan .and. dovanxx .and. TQR) THEN
                  IF(ibnd>=ibnd_start) &
-                 CALL newdxx_r(vc, _CX(becxx(ikq)%r(:,ibnd)), deexx)
+                 CALL newdxx_r(vc, CMPLX(x1*becxx(ikq)%r(:,ibnd), 0.0_dp, &
+                                         KIND=dp), deexx)
                  IF(ibnd<ibnd_end) &
-                 CALL newdxx_r(vc, _CY(becxx(ikq)%r(:,ibnd+1)), deexx)
+                 CALL newdxx_r(vc, CMPLX(0.0_dp,-x2*becxx(ikq)%r(:,ibnd+1), &
+                                         KIND=dp), deexx)
               ENDIF
               !
               IF(okpaw .and. dopawxx) THEN
@@ -1437,16 +1439,12 @@ MODULE exx
                                          _CX(becpsi%r(:,im)), deexx)
               ENDIF
               !
-              !
-              !accumulates over bands and k points
+              ! accumulates over bands and k points
               !
 !$omp parallel do default(shared), private(ir)
               DO ir = 1, nrxxs
-                  !
-                  vc(ir) = CMPLX( x1 * DBLE (vc(ir)), x2 * AIMAG(vc(ir)) ,kind=DP)/ nqs
-                  !
-                  result(ir) = result(ir) + DBLE( vc(ir) * tempphic(ir) )
-                  !
+                  result(ir) = result(ir)+x1* DBLE(vc(ir))* DBLE(tempphic(ir))&
+                                         +x2*AIMAG(vc(ir))*AIMAG(tempphic(ir))
               ENDDO
 !$omp end parallel do
               !
@@ -1492,7 +1490,7 @@ MODULE exx
             !
             !   >>>> add augmentation in G space HERE
             IF(okvan .and. dovanxx .AND. .NOT. TQR) THEN
-              CALL addusxx_g(rhoc, xkq, xk_collect(:,current_ik), 'c', &
+              CALL addusxx_g(rhoc, xkq, xkp, 'c', &
                    becphi_c=becxx(ikq)%k(:,ibnd),becpsi_c=becpsi%k(:,im))
             ENDIF
             !   >>>> charge done
@@ -1509,8 +1507,8 @@ MODULE exx
             ! Add ultrasoft contribution (RECIPROCAL SPACE)
             ! compute alpha_I,j,k+q = \sum_J \int <beta_J|phi_j,k+q> V_i,j,k,q Q_I,J(r) d3r
             IF(okvan .and. dovanxx .AND. .NOT. TQR) THEN
-              CALL newdxx_g(vc, xkq, becxx(ikq)%k(:,ibnd), &
-                                xk_collect(:,current_ik), deexx)
+              CALL newdxx_g(vc, xkq, xkp, &
+                            'c', deexx, becphi_c=becxx(ikq)%k(:,ibnd))
             ENDIF
             !
             !brings back v in real space
@@ -1528,18 +1526,14 @@ MODULE exx
             !
             !accumulates over bands and k points
             IF (noncolin) THEN
-                !
                 DO ipol=1,npol
-                    !
 !$omp parallel do default(shared), private(ir)
                     DO ir = 1, nrxxs
                         result_nc(ir,ipol)= result_nc(ir,ipol) &
                                            +vc(ir) * tempphic_nc(ir,ipol)
                     ENDDO
 !$omp end parallel do
-                    !
                 ENDDO
-                !
             ELSE
 !$omp parallel do default(shared), private(ir)
                 DO ir = 1, nrxxs
@@ -1577,40 +1571,39 @@ MODULE exx
              hpsi(ig,im)=hpsi(ig,im) - exxalfa*result(exx_fft_g2r%nlt(ig))
          ENDDO
 !$omp end parallel do
-         IF(okvan .and. dovanxx) CALL add_nlxx_pot(lda, hpsi(:,im), xkp, npw, igk, deexx, exxalfa)
-         !
       ELSE
-          IF (noncolin) THEN
-              !brings back result in G-space
-              CALL fwfft ('Wave', result_nc(:,1), dffts)
-              CALL fwfft ('Wave', result_nc(:,2), dffts)
-              !
-              !adds it to hpsi
+         IF (noncolin) THEN
+            !brings back result in G-space
+            CALL fwfft ('Wave', result_nc(:,1), dffts)
+            CALL fwfft ('Wave', result_nc(:,2), dffts)
+            !
+            !adds it to hpsi
 !$omp parallel do default(shared), private(ig)
-              DO ig = 1, n
-                  hpsi(ig,im)       = hpsi(ig,im)       - exxalfa*result_nc(nls(igk(ig)),1)
-              ENDDO
+            DO ig = 1, n
+               hpsi(ig,im)     = hpsi(ig,im)     - exxalfa*result_nc(nls(igk(ig)),1)
+            ENDDO
 !$omp end parallel do
 !$omp parallel do default(shared), private(ig)
-              DO ig = 1, n
-                  hpsi(lda+ig,im)   = hpsi(lda+ig,im)   - exxalfa*result_nc(nls(igk(ig)),2)
-              ENDDO
+            DO ig = 1, n
+                hpsi(lda+ig,im) = hpsi(lda+ig,im) - exxalfa*result_nc(nls(igk(ig)),2)
+            ENDDO
 !$omp end parallel do
-              !
+            !
           ELSE
-              CALL fwfft ('Wave', result, dffts)
-              !
-              !adds it to hpsi
+            CALL fwfft ('Wave', result, dffts)
+            !
+            !adds it to hpsi
 !$omp parallel do default(shared), private(ig)
-              DO ig = 1, npw
-                  hpsi(ig,im)=hpsi(ig,im) - exxalfa*result(nls(igk(ig)))
-              ENDDO
+            DO ig = 1, npw
+                hpsi(ig,im)=hpsi(ig,im) - exxalfa*result(nls(igk(ig)))
+            ENDDO
 !$omp end parallel do
-            ! add non-local \sum_I |beta_I> \alpha_Ii (the sum on i is outside)
-            IF(okvan .and. dovanxx) CALL add_nlxx_pot(lda, hpsi(:,im), xkp, npw, igk, deexx, exxalfa)
           ENDIF
           !
       ENDIF
+      ! add non-local \sum_I |beta_I> \alpha_Ii (the sum on i is outside)
+      IF(okvan .and. dovanxx) CALL add_nlxx_pot(lda, hpsi(:,im), xkp, &
+                                                npw, igk, deexx, exxalfa)
       !
     END DO &
     LOOP_ON_PSI_BANDS
@@ -1838,7 +1831,7 @@ MODULE exx
     INTEGER  :: jbnd, ibnd, ik, ikk, ig, ikq, iq, ir
     INTEGER  :: h_ibnd, nrxxs, current_ik, ibnd_loop_start
     REAL(DP) :: x1, x2
-    REAL(DP) :: xkq(3), vc
+    REAL(DP) :: xkq(3), xkp(3), vc
     ! temp array for vcut_spheric
     INTEGER,        EXTERNAL :: find_current_k
 
@@ -1872,6 +1865,7 @@ MODULE exx
     IKK_LOOP : &
     DO ikk=1,nks
        current_ik=find_current_k(ikk,nkstot,nks)
+       xkp = xk_collect(:,current_ik)
        !
        IF ( lsda ) current_spin = isk(ikk)
        npw = ngk (ikk)
@@ -1897,10 +1891,8 @@ MODULE exx
              !
 !$omp parallel do default(shared), private(ig)
              DO ig = 1, exx_fft_g2r%npwt
-                 !
                  temppsic(exx_fft_g2r%nlt(ig))  = evc(ig,jbnd) 
                  temppsic(exx_fft_g2r%nltm(ig)) = CONJG(evc(ig,jbnd))
-                 !
              ENDDO
 !$omp end parallel do
              !
@@ -1951,10 +1943,8 @@ MODULE exx
 
             IF_GAMMA_ONLY : &
             IF (gamma_only) THEN
-              h_ibnd = 0
               !
               h_ibnd = ibnd_start/2
-              !
               IF(MOD(ibnd_start,2)==0) THEN
                  h_ibnd=h_ibnd-1
                  ibnd_loop_start=ibnd_start-1
@@ -1979,11 +1969,16 @@ MODULE exx
                     x2 = 0.0_dp
                 ENDIF
                 IF ( abs(x1) < eps_occ .and. abs(x2) < eps_occ ) CYCLE IBND_LOOP_GAM
-                !calculate rho in real space
+                ! calculate rho in real space. Gamma tricks are used. 
+                ! temppsic is real; tempphic contains band 1 in the real part, 
+                ! band 2 in the imaginary part; the same applies to rhoc
+                !
 !$omp parallel do default(shared), private(ir)
                 DO ir = 1, nrxxs
                     tempphic(ir) = exxbuff(ir,h_ibnd,ikq)
-                    rhoc(ir)=CONJG(tempphic(ir))*temppsic(ir) / omega
+                    rhoc(ir) = CMPLX( DBLE(tempphic(ir))*DBLE(temppsic(ir)),&
+                                     AIMAG(tempphic(ir))*DBLE(temppsic(ir)),&
+                                     KIND=dp) / omega
                 ENDDO
 !$omp end parallel do
                 !
@@ -1992,7 +1987,7 @@ MODULE exx
                   IF(ibnd>=ibnd_start) &
                   CALL addusxx_r(rhoc, _CX(becxx(ikq)%r(:,ibnd)), _CX(becpsi%r(:,jbnd)))
                   IF(ibnd<ibnd_end) &
-                  CALL addusxx_r(rhoc, _CY(becxx(ikq)%r(:,ibnd+1)), _CX(becpsi%r(:,jbnd)))
+                  CALL addusxx_r(rhoc,_CY(becxx(ikq)%r(:,ibnd+1)),_CX(becpsi%r(:,jbnd)))
                 ENDIF
                 !
                 ! bring rhoc to G-space
@@ -2000,10 +1995,10 @@ MODULE exx
                 !
                 IF(okvan .and. dovanxx .and..not.TQR) THEN
                   IF(ibnd>=ibnd_start ) &
-                       CALL addusxx_g( rhoc, xkq, xk_collect(:,current_ik), 'r', &
+                       CALL addusxx_g( rhoc, xkq, xkp, 'r', &
                        becphi_r=becxx(ikq)%r(:,ibnd), becpsi_r=becpsi%r(:,jbnd) )
                   IF(ibnd<ibnd_end) &
-                       CALL addusxx_g( rhoc, xkq, xk_collect(:,current_ik), 'i', &
+                       CALL addusxx_g( rhoc, xkq, xkp, 'i', &
                         becphi_r=becxx(ikq)%r(:,ibnd+1), becpsi_r=becpsi%r(:,jbnd) )
                 ENDIF
                 !
@@ -2067,11 +2062,11 @@ MODULE exx
                    IF(okvan .and. dovanxx .AND. TQR) & 
                       CALL addusxx_r(rhoc, becxx(ikq)%k(:,ibnd), becpsi%k(:,jbnd))
                    !
-                   ! bring it to G-space
+                   ! bring rhoc to G-space
                    CALL fwfft ('Smooth', rhoc, dffts)
                    ! augment the "charge" in G space
                    IF(okvan .and. dovanxx .AND. .NOT. TQR) & 
-                        CALL addusxx_g(rhoc, xkq, xk_collect(:,current_ik), 'c', &
+                        CALL addusxx_g(rhoc, xkq, xkp, 'c', &
                         becphi_c=becxx(ikq)%k(:,ibnd),becpsi_c=becpsi%k(:,jbnd))
                    !
                    vc = 0._dp

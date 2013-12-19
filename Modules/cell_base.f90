@@ -198,6 +198,9 @@
         celldm(1) = a / bohr_radius_angs
         celldm(2) = b / a
         celldm(3) = c / a
+        IF ( (ABS(cosab) > 1.0_dp) .OR. (ABS(cosac) > 1.0_dp) .OR. &
+             (ABS(cosbc) > 1.0_dp) ) CALL errore ('cell_base_init',&
+                         'incorrect values for cosab, cosac, cosbc',1)
         !
         IF ( ibrav == 14 ) THEN
            !
@@ -562,9 +565,9 @@
     !
     IMPLICIT NONE
     !
-    write(stdout,*) 'alat=',alat
-    write(stdout,*) 'at=',at
-    write(stdout,*) 'bg=',bg
+    !write(stdout,*) 'alat=',alat
+    !write(stdout,*) 'at=',at
+    !write(stdout,*) 'bg=',bg
     !
     h(:,:) = at(:,:)*alat
     !

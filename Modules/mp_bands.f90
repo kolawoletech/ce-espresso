@@ -106,7 +106,7 @@ CONTAINS
     IMPLICIT NONE
     INTEGER, INTENT(IN) :: comm, nbnd
 
-    INTEGER :: npe, myrank, ierror, rest, k
+    INTEGER :: npe, myrank, rest, k
 
     myrank = mp_rank(comm)
     npe = mp_size(comm)

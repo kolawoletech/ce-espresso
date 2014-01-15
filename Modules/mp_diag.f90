@@ -287,4 +287,20 @@ CONTAINS
     RETURN
   END SUBROUTINE init_ortho_group
   !
+  SUBROUTINE clean_ortho_group ( )
+    !  
+    !  free resources associated to the communicator
+    !
+    CALL mp_comm_free( ortho_comm )
+    IF(  ortho_comm_id > 0  ) THEN
+       CALL mp_comm_free( ortho_col_comm )
+       CALL mp_comm_free( ortho_row_comm )
+    ENDIF
+#if defined __SCALAPACK
+    IF(  ortho_comm_id > 0  ) CALL BLACS_GRIDEXIT( ortho_cntx )
+    ortho_cntx = -1
+#endif
+    !
+  END SUBROUTINE clean_ortho_group
+  !
 END MODULE mp_diag

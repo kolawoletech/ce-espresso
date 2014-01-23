@@ -9,8 +9,9 @@
 !
 ! What to mix:
 #undef MIX_MAGN
+#undef MIX_MAGN_G0
 #define MIX_HUBBARD
-#define MIX_PAW
+#undef  MIX_PAW
 
 MODULE scf
   !  
@@ -538,6 +539,7 @@ CONTAINS
      !
      ! ... G=0 term
      !
+#ifdef MIX_MAGN_G0
      IF ( gstart == 2 ) THEN
         !
         rho_ddot = rho_ddot + &
@@ -545,6 +547,7 @@ CONTAINS
                                     ( rho2%of_g(1,1) - rho2%of_g(1,2) ), DP )
         !
      END IF
+#endif
      !
      IF ( gamma_only ) fac = 2.D0 * fac
      !

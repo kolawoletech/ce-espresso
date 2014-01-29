@@ -112,7 +112,9 @@ funct.o : xc_vdW_DF.o
 generate_function.o : cell_base.o
 generate_function.o : constants.o
 generate_function.o : fft_base.o
+generate_function.o : io_global.o
 generate_function.o : kind.o
+generate_function.o : mp.o
 generate_function.o : mp_bands.o
 griddim.o : fft_scalar.o
 griddim.o : fft_types.o
@@ -248,7 +250,7 @@ read_pseudo.o : io_global.o
 read_pseudo.o : ions_base.o
 read_pseudo.o : kind.o
 read_pseudo.o : mp.o
-read_pseudo.o : mp_world.o
+read_pseudo.o : mp_images.o
 read_pseudo.o : pseudo_types.o
 read_pseudo.o : radial_grids.o
 read_pseudo.o : read_uspp.o

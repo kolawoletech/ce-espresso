@@ -274,9 +274,13 @@ CONTAINS
       END DO
    end if
 
+#ifdef MIX_HUBBARD
    if (lda_plus_u_nc) rho_s%ns_nc(:,:,:,:) = rho_m%ns_nc(:,:,:,:)
    if (lda_plus_u_co) rho_s%ns(:,:,:,:)    = rho_m%ns(:,:,:,:)
+#endif
+#ifdef MIX_PAW
    if (okpaw)      rho_s%bec(:,:,:)  = rho_m%bec(:,:,:)
+#endif
        
    return
  end subroutine assign_mix_to_scf_type
@@ -295,9 +299,13 @@ CONTAINS
      Y%kin_r = X%kin_r
      Y%kin_g = X%kin_g
   end if
+#ifdef MIX_HUBBARD
   if (lda_plus_u_nc) Y%ns_nc = X%ns_nc
   if (lda_plus_u_co) Y%ns    = X%ns
+#endif
+#ifdef MIX_PAW
   if (okpaw)      Y%bec = X%bec
+#endif
   !
   RETURN
  end subroutine scf_type_COPY
@@ -314,9 +322,13 @@ CONTAINS
   TYPE(mix_type), INTENT(INOUT) :: Y
   Y%of_g  = Y%of_g  + A * X%of_g
   if (dft_is_meta() .or. lxdm) Y%kin_g = Y%kin_g + A * X%kin_g
+#ifdef MIX_HUBBARD
   if (lda_plus_u_nc) Y%ns_nc = Y%ns_nc + A * X%ns_nc
   if (lda_plus_u_co) Y%ns = Y%ns + A * X%ns
+#endif
+#ifdef MIX_PAW
   if (okpaw)     Y%bec = Y%bec + A * X%bec
+#endif
   if (dipfield)  Y%el_dipole =  Y%el_dipole + A * X%el_dipole
   !
   RETURN
@@ -332,9 +344,13 @@ CONTAINS
   TYPE(mix_type), INTENT(INOUT) :: Y
   Y%of_g  = X%of_g
   if (dft_is_meta() .or. lxdm) Y%kin_g = X%kin_g
+#ifdef MIX_HUBBARD
   if (lda_plus_u_nc) Y%ns_nc  = X%ns_nc
   if (lda_plus_u_co) Y%ns  = X%ns
+#endif
+#ifdef MIX_PAW
   if (okpaw)      Y%bec = X%bec
+#endif
   if (dipfield)   Y%el_dipole =  X%el_dipole
   !
   RETURN
@@ -351,9 +367,13 @@ CONTAINS
   TYPE(mix_type), INTENT(INOUT) :: X
   X%of_g(:,:)  = A * X%of_g(:,:)
   if (dft_is_meta() .or. lxdm) X%kin_g = A * X%kin_g
+#ifdef MIX_HUBBARD
   if (lda_plus_u_nc) X%ns_nc = A * X%ns_nc
   if (lda_plus_u_co) X%ns    = A * X%ns
+#endif
+#ifdef MIX_PAW
   if (okpaw)      X%bec= A * X%bec
+#endif
   if (dipfield)   X%el_dipole =  A * X%el_dipole
   !
   RETURN
@@ -400,8 +420,10 @@ CONTAINS
          rhoin%kin_r(:,:)= 0.d0
       endif
    endif
+#ifdef MIX_HUBBARD
    if (lda_plus_u_nc) rhoin%ns_nc(:,:,:,:) = 0.d0
    if (lda_plus_u_co) rhoin%ns(:,:,:,:)    = 0.d0
+#endif
 
    return
  end subroutine high_frequency_mixing 

@@ -10,8 +10,8 @@
 ! What to mix:
 #undef MIX_MAGN
 #undef MIX_MAGN_G0
-#define MIX_HUBBARD
-#undef  MIX_PAW
+#undef MIX_HUBBARD
+#undef MIX_BECP
 
 MODULE scf
   !  
@@ -278,7 +278,7 @@ CONTAINS
    if (lda_plus_u_nc) rho_s%ns_nc(:,:,:,:) = rho_m%ns_nc(:,:,:,:)
    if (lda_plus_u_co) rho_s%ns(:,:,:,:)    = rho_m%ns(:,:,:,:)
 #endif
-#ifdef MIX_PAW
+#ifdef MIX_BECP
    if (okpaw)      rho_s%bec(:,:,:)  = rho_m%bec(:,:,:)
 #endif
        
@@ -303,7 +303,7 @@ CONTAINS
   if (lda_plus_u_nc) Y%ns_nc = X%ns_nc
   if (lda_plus_u_co) Y%ns    = X%ns
 #endif
-#ifdef MIX_PAW
+#ifdef MIX_BECP
   if (okpaw)      Y%bec = X%bec
 #endif
   !
@@ -326,7 +326,7 @@ CONTAINS
   if (lda_plus_u_nc) Y%ns_nc = Y%ns_nc + A * X%ns_nc
   if (lda_plus_u_co) Y%ns = Y%ns + A * X%ns
 #endif
-#ifdef MIX_PAW
+#ifdef MIX_BECP
   if (okpaw)     Y%bec = Y%bec + A * X%bec
 #endif
   if (dipfield)  Y%el_dipole =  Y%el_dipole + A * X%el_dipole
@@ -348,7 +348,7 @@ CONTAINS
   if (lda_plus_u_nc) Y%ns_nc  = X%ns_nc
   if (lda_plus_u_co) Y%ns  = X%ns
 #endif
-#ifdef MIX_PAW
+#ifdef MIX_BECP
   if (okpaw)      Y%bec = X%bec
 #endif
   if (dipfield)   Y%el_dipole =  X%el_dipole
@@ -371,7 +371,7 @@ CONTAINS
   if (lda_plus_u_nc) X%ns_nc = A * X%ns_nc
   if (lda_plus_u_co) X%ns    = A * X%ns
 #endif
-#ifdef MIX_PAW
+#ifdef MIX_BECP
   if (okpaw)      X%bec= A * X%bec
 #endif
   if (dipfield)   X%el_dipole =  A * X%el_dipole
@@ -636,8 +636,8 @@ CONTAINS
   ! Beware: paw_ddot has a hidden parallelization on all processors
   !         it must be called on all processors or else it will hang
   ! Beware: commented out because it yields too often negative values
-#ifdef MIX_PAW
-  IF (okpaw)         rho_ddot = rho_ddot + paw_ddot(rho1%bec, rho2%bec)
+#ifdef MIX_BECP
+  !IF (okpaw)         rho_ddot = rho_ddot + paw_ddot(rho1%bec, rho2%bec)
 #endif
   IF (dipfield)      rho_ddot = rho_ddot + (e2/2.0_DP)* &
                                     (rho1%el_dipole * rho2%el_dipole)*omega/fpi

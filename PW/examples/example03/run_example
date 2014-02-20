@@ -206,6 +206,11 @@ $PW_COMMAND < si.md2_G3X.in > si.md2_G3X.out
 check_failure $?
 $ECHO " done"
 
+# clean TMP_DIR
+$ECHO "  cleaning $TMP_DIR...\c"
+rm -rf $TMP_DIR/pwscf*
+$ECHO " done"
+
 awk '/Ekin/{ek=$3;et=$11; print it,time,ek,u,et} \
      /Dynamics/{it=$5;time=$8}/^\!/{u=$5}' si.md2_G3X.out > MD2_G3X
 

@@ -230,9 +230,13 @@ CONTAINS
    rho_m%of_g(1:ngms,:) = rho_s%of_g(1:ngms,:)
    
    if (dft_is_meta() .or. lxdm) rho_m%kin_g(1:ngms,:) = rho_s%kin_g(1:ngms,:)
+#ifdef MIX_HUBBARD
    if (lda_plus_u_nc) rho_m%ns_nc  = rho_s%ns_nc
    if (lda_plus_u_co) rho_m%ns     = rho_s%ns
+#endif
+#ifdef MIX_BECP
    if (okpaw)         rho_m%bec = rho_s%bec
+#endif
    
    if (dipfield) then
       CALL compute_el_dip(emaxpos, eopreg, edir, rho_s%of_r,e_dipole)

@@ -11,7 +11,8 @@
 #undef MIX_MAGN
 #undef MIX_MAGN_G0
 #undef MIX_HUBBARD
-#undef MIX_BECP
+#define MIX_BECP
+#define MIX_HIGHFREQ
 
 MODULE scf
   !  
@@ -392,6 +393,7 @@ CONTAINS
    TYPE (scf_type), INTENT(IN)  :: input_rhout
    REAL(DP), INTENT(IN) :: alphamix
    INTEGER :: is
+#ifdef MIX_HIGHFREQ
    if (ngms < ngm ) then
       rhoin%of_g = rhoin%of_g + alphamix * ( input_rhout%of_g-rhoin%of_g)
       rhoin%of_g(1:ngms,1:nspin) = (0.d0,0.d0)
@@ -417,13 +419,16 @@ CONTAINS
          END DO
       end if
    else
+#endif
       rhoin%of_g(:,:)= (0.d0,0.d0)
       rhoin%of_r(:,:)= 0.d0
       if (dft_is_meta() .or. lxdm) then
          rhoin%kin_g(:,:)= (0.d0,0.d0)
          rhoin%kin_r(:,:)= 0.d0
       endif
+#ifdef MIX_HIGHFREQ
    endif
+#endif
 #ifdef MIX_HUBBARD
    if (lda_plus_u_nc) rhoin%ns_nc(:,:,:,:) = 0.d0
    if (lda_plus_u_co) rhoin%ns(:,:,:,:)    = 0.d0

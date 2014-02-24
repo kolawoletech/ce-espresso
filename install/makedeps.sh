@@ -121,6 +121,18 @@ for dir in $dirs; do
             sed '/@environ_base@/d' make.depend.tmp > make.depend
         fi
 
+        if test "$DIR" = "TDDFPT/src"
+        then
+            mv make.depend make.depend.tmp
+            sed '/@environ_base@/d' make.depend.tmp > make.depend
+        fi
+
+        if test "$DIR" = "TDDFPT/src"
+        then
+            mv make.depend make.depend.tmp
+            sed '/@solvent_tddfpt@/d' make.depend.tmp > make.depend
+        fi
+
         rm -f make.depend.tmp
 
         # check for missing dependencies 

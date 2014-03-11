@@ -63,6 +63,7 @@ parser.o \
 paw_variables.o \
 plugin_flags.o \
 plugin_arguments.o \
+plugin_variables.o \
 pseudo_types.o \
 ptoolkit.o \
 qexml.o \
@@ -94,6 +95,7 @@ upf.o \
 upf_to_internal.o \
 uspp.o \
 version.o \
+wannier_gw.o\
 wannier_new.o \
 wave_base.o \
 wavefunctions.o \

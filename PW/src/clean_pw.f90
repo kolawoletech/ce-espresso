@@ -61,6 +61,7 @@ SUBROUTINE clean_pw( lflag )
   USE exx,                  ONLY : deallocate_exx
 #ifdef __ENVIRON
   USE environ_base,         ONLY : do_environ
+  USE environ_init,         ONLY : environ_clean
 #endif
   !
   IMPLICIT NONE
@@ -192,6 +193,8 @@ SUBROUTINE clean_pw( lflag )
   if (use_wannier) CALL wannier_clean()
   !
   CALL deallocate_exx ( ) 
+  !
+  CALL plugin_clean( lflag )
 #ifdef __ENVIRON
   ! ... additional arrays for external environment 
   !

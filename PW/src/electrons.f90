@@ -49,6 +49,7 @@ SUBROUTINE electrons()
   USE environ_base,         ONLY : do_environ, vltot_zero
   USE cell_base,            ONLY : at, alat, omega
   USE ions_base,            ONLY : zv, nat, nsp, ityp, tau
+  USE environ_init,         ONLY : environ_initions, environ_initcell
 #endif
   !
   !
@@ -78,11 +79,17 @@ SUBROUTINE electrons()
   fock0 = 0.D0
   fock1 = 0.D0
   IF (.NOT. exx_is_active () ) fock2 = 0.D0
+  !
+  ! these routines can be used to patch quantities that are dependent
+  ! on the ions and cell parameters
+  !
+  CALL plugin_init_ions()
+  CALL plugin_init_cell()
+  !
 #ifdef __ENVIRON
   IF ( do_environ ) THEN
-    vltot_zero = vltot
     CALL environ_initions( dfftp%nnr, nat, nsp, ityp, zv, tau, alat ) 
-    CALL environ_initcell( dfftp%nnr, dfftp%nr1*dfftp%nr2*dfftp%nr3, &
+    CALL environ_initcell( dfftp%nnr, dfftp%nr1, dfftp%nr2, dfftp%nr3, &
                            omega, alat, at ) 
   END IF
 #endif
@@ -330,14 +337,17 @@ SUBROUTINE electrons_scf ( no_printout )
                                    vltot_zero, environ_thr,                 &
                                    env_static_permittivity,                 & 
                                    env_surface_tension, env_pressure,       &
-                                   env_periodicity, env_ioncc_concentration,&
+                                   env_periodicity, env_ioncc_level,        &
                                    env_extcharge_n, deenviron, esolvent,    &
                                    ecavity, epressure, eperiodic, eioncc,   &
                                    eextcharge
+ USE environ_main,          ONLY : calc_eenviron, calc_venviron
 #endif
   USE dfunct,               ONLY : newd
   USE esm,                  ONLY : do_comp_esm, esm_printpot
   USE iso_c_binding,        ONLY : c_int
+  !
+  USE plugin_variables,     ONLY : plugin_etot
   !
   IMPLICIT NONE
   !
@@ -639,28 +649,42 @@ SUBROUTINE electrons_scf ( no_printout )
         !
      END DO scf_step
      !
+     ! ... define the total local potential (external + scf)
+     !
+     CALL sum_vrs( dfftp%nnr, nspin, vltot, v%of_r, vrs )
+     !
+     plugin_etot = 0.0_dp
+     !
+     CALL plugin_scf_energy()
+     !
+     CALL plugin_scf_potential()
+     !
 #ifdef __ENVIRON
      ! ... computes the external environment contribution to energy and potential
      !
      IF ( do_environ  )  THEN
         !
-        vltot = vltot_zero
+        vltot_zero = 0.0_dp
         !
         CALL calc_eenviron( dfftp%nnr, nspin, rhoin%of_r, deenviron, esolvent, &
                             ecavity, epressure, eperiodic, eioncc, eextcharge )
+        !
+        plugin_etot = plugin_etot + deenviron + esolvent + ecavity + epressure + eperiodic + eioncc + eextcharge
         !
         update_venviron = .NOT. conv_elec .AND. dr2 .LT. environ_thr
         !
         IF ( update_venviron ) WRITE( stdout, 9200 )
         !
-        CALL calc_venviron( update_venviron, dfftp%nnr, nspin, dr2, rhoin%of_r, vltot )
+        CALL calc_venviron( update_venviron, dfftp%nnr, nspin, dr2, rhoin%of_r, vltot_zero )
+        ! 
+        CALL sum_vrs( dfftp%nnr, nspin, vltot_zero, vrs, vrs)
         ! 
      END IF
 #endif
      !
-     ! ... define the total local potential (external + scf)
+     ! ... interpolate the total local potential
      !
-     CALL set_vrs( vrs, vltot, v%of_r, kedtau, v%kin_r, dfftp%nnr, nspin, doublegrid )
+     CALL interpolate_vrs( dfftp%nnr, nspin, doublegrid, kedtau, v%kin_r, vrs )
      !
      ! ... in the US case we have to recompute the self-consistent
      ! ... term in the nonlocal potential
@@ -736,13 +760,9 @@ SUBROUTINE electrons_scf ( no_printout )
         hwf_energy = hwf_energy + etotefield
      END IF
      !
-#ifdef __ENVIRON
+     ! ... adds possible external contribution from plugins to the energy
      !
-     ! ... adds the external environment contribution to the energy
-     !
-     IF ( do_environ ) etot = etot + deenviron + esolvent + ecavity + & 
-                              epressure + eperiodic + eioncc + eextcharge
-#endif
+     etot = etot + plugin_etot 
      !
      IF ( .NOT. no_printout ) CALL print_energies ( )
      !
@@ -1061,6 +1081,9 @@ SUBROUTINE electrons_scf ( no_printout )
        !
        USE constants, ONLY : eps8
        USE control_flags, ONLY : lmd
+#ifdef __ENVIRON
+       USE environ_info, ONLY : environ_print_energies
+#endif      
        !
        IF ( ( conv_elec .OR. MOD( iter, iprint ) == 0 ) .AND. .NOT. lmd ) THEN
           !
@@ -1107,18 +1130,10 @@ SUBROUTINE electrons_scf ( no_printout )
           END IF
        END IF
        !
+       CALL plugin_print_energies()
+       !
 #ifdef __ENVIRON
-       IF ( do_environ )  THEN
-          IF ( env_static_permittivity .GT. 1.D0 ) WRITE( stdout, 9201 ) esolvent
-          IF ( env_surface_tension .GT. 0.D0 ) WRITE( stdout, 9202 ) ecavity
-          IF ( env_pressure .NE. 0.D0 ) WRITE( stdout, 9203 ) epressure
-          IF ( env_ioncc_concentration .GT. 0.D0 ) THEN 
-             WRITE( stdout, 9205 ) eioncc
-          ELSE IF ( env_periodicity .NE. 3 ) THEN
-             WRITE( stdout, 9204 ) eperiodic
-          ENDIF
-          IF ( env_extcharge_n .GT. 0 ) WRITE( stdout, 9206 ) eextcharge
-       ENDIF
+       IF ( do_environ ) CALL environ_print_energies()
        !
 #endif
        !
@@ -1168,14 +1183,6 @@ SUBROUTINE electrons_scf ( no_printout )
             /'     Harris-Foulkes estimate   =',0PF17.8,' Ry' &
             /'     estimated scf accuracy    <',1PE17.1,' Ry' )
 9085 FORMAT(/'     total all-electron energy =',0PF17.6,' Ry' )
-#ifdef __ENVIRON
-9201 FORMAT( '     solvation energy          =',F17.8,' Ry' ) 
-9202 FORMAT( '     cavitation energy         =',F17.8,' Ry' ) 
-9203 FORMAT( '     PV energy                 =',F17.8,' Ry' ) 
-9204 FORMAT( '     periodic energy correct.  =',F17.8,' Ry' )
-9205 FORMAT( '     ionic charge energy       =',F17.8,' Ry' )
-9206 FORMAT( '     external charges energy   =',F17.8,' Ry' ) 
-#endif
 
   END SUBROUTINE print_energies
   !

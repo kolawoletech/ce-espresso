@@ -21,6 +21,7 @@ SUBROUTINE print_clock_pw()
    USE funct,              ONLY : dft_is_hybrid
 #ifdef __ENVIRON
    USE environ_base,       ONLY : do_environ
+   USE environ_info,       ONLY : environ_clock
 #endif
    !
    IMPLICIT NONE
@@ -223,6 +224,7 @@ SUBROUTINE print_clock_pw()
       ENDIF
    END IF
    !
+   CALL plugin_clock()
 #ifdef __ENVIRON
    IF ( do_environ ) call environ_clock( stdout )
 #endif

@@ -105,6 +105,7 @@ SUBROUTINE iosys()
   USE martyna_tuckerman, ONLY: do_comp_mt
 #ifdef __ENVIRON
   USE environ_base, ONLY : environ_base_init
+  USE environ_init, ONLY : environ_initions_allocate
 #endif
   !
   USE esm,           ONLY: do_comp_esm, &
@@ -250,7 +251,7 @@ SUBROUTINE iosys()
                                mixtype, ndiis, mixrhopol, tolrhopol,    &
                                env_surface_tension, delta,              &
                                env_pressure,                            &
-                               env_ioncc_concentration, zion, rhopb,    &
+                               env_ioncc_level, nrep, cion, zion, rhopb,&
                                solvent_temperature,                     &
                                env_extcharge_n, extcharge_origin,       &
                                extcharge_dim, extcharge_axis,           &
@@ -1290,7 +1291,7 @@ SUBROUTINE iosys()
                            mixtype, ndiis, mixrhopol, tolrhopol,       &
                            env_surface_tension, delta,                 &
                            env_pressure,                               &
-                           env_ioncc_concentration, zion, rhopb,       &
+                           env_ioncc_level, nrep, cion, zion, rhopb,   &
                            solvent_temperature,                        &
                            env_extcharge_n, extcharge_origin,          & 
                            extcharge_dim, extcharge_axis,              &

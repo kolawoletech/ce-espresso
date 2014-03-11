@@ -6,11 +6,11 @@
 ! or http://www.gnu.org/copyleft/gpl.txt .
 !
 !=----------------------------------------------------------------------------=!
-MODULE plugin_flags
+MODULE plugin_variables
   !=--------------------------------------------------------------------------=!
   !
-  ! ... this module contains all basic variables that controls
-  ! ... the use or not of plugins.
+  ! ... this module contains all basic variables possibly
+  ! ... used by plug ins
   !----------------------------------------------
   !
   USE kinds
@@ -22,12 +22,8 @@ MODULE plugin_flags
   !
   PRIVATE
   !
+  PUBLIC :: plugin_etot
   !
-  ! ...   declare execution control variables
+  REAL(DP) :: plugin_etot
   !
-  CHARACTER(LEN=256), PUBLIC :: plugin_name
-  LOGICAL, PUBLIC :: use_plumed
-  LOGICAL, PUBLIC :: use_pw2casino
-  LOGICAL, PUBLIC :: use_environ 
-  !
-END MODULE plugin_flags
+END MODULE plugin_variables

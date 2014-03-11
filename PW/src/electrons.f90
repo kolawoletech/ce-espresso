@@ -47,7 +47,7 @@ SUBROUTINE electrons()
   USE uspp_param,           ONLY : nh, nhm ! used for PAW
 #ifdef __ENVIRON
   USE environ_base,         ONLY : do_environ, vltot_zero
-  USE cell_base,            ONLY : at, alat, omega
+  USE cell_base,            ONLY : at, alat, omega, ibrav
   USE ions_base,            ONLY : zv, nat, nsp, ityp, tau
   USE environ_init,         ONLY : environ_initions, environ_initcell
 #endif
@@ -88,9 +88,10 @@ SUBROUTINE electrons()
   !
 #ifdef __ENVIRON
   IF ( do_environ ) THEN
+    vltot_zero = vltot
     CALL environ_initions( dfftp%nnr, nat, nsp, ityp, zv, tau, alat ) 
     CALL environ_initcell( dfftp%nnr, dfftp%nr1, dfftp%nr2, dfftp%nr3, &
-                           omega, alat, at ) 
+                           ibrav, omega, alat, at ) 
   END IF
 #endif
   !
@@ -649,10 +650,6 @@ SUBROUTINE electrons_scf ( no_printout )
         !
      END DO scf_step
      !
-     ! ... define the total local potential (external + scf)
-     !
-     CALL sum_vrs( dfftp%nnr, nspin, vltot, v%of_r, vrs )
-     !
      plugin_etot = 0.0_dp
      !
      CALL plugin_scf_energy()
@@ -664,7 +661,8 @@ SUBROUTINE electrons_scf ( no_printout )
      !
      IF ( do_environ  )  THEN
         !
-        vltot_zero = 0.0_dp
+        vltot = vltot_zero
+        !vltot_zero = 0.0_dp
         !
         CALL calc_eenviron( dfftp%nnr, nspin, rhoin%of_r, deenviron, esolvent, &
                             ecavity, epressure, eperiodic, eioncc, eextcharge )
@@ -675,12 +673,16 @@ SUBROUTINE electrons_scf ( no_printout )
         !
         IF ( update_venviron ) WRITE( stdout, 9200 )
         !
-        CALL calc_venviron( update_venviron, dfftp%nnr, nspin, dr2, rhoin%of_r, vltot_zero )
+        CALL calc_venviron( update_venviron, dfftp%nnr, nspin, dr2, rhoin%of_r, vltot )
         ! 
-        CALL sum_vrs( dfftp%nnr, nspin, vltot_zero, vrs, vrs)
+        !CALL sum_vrs( dfftp%nnr, nspin, vltot, vrs, vrs)
         ! 
      END IF
 #endif
+     !
+     ! ... define the total local potential (external + scf)
+     !
+     CALL sum_vrs( dfftp%nnr, nspin, vltot, v%of_r, vrs )
      !
      ! ... interpolate the total local potential
      !
@@ -802,10 +804,10 @@ SUBROUTINE electrons_scf ( no_printout )
   !
 10  CALL flush_unit( stdout )
   !
-  ! ... exiting: write the charge density to file
+  ! ... exiting: write (unless disables) the charge density to file
   ! ... (also write ldaU ns coefficients and PAW becsum)
   !
-  CALL write_rho( rho, nspin )
+  IF ( io_level > -1 ) CALL write_rho( rho, nspin )
   !
   ! ... delete mixing info if converged, keep it if not
   !

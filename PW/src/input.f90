@@ -1489,12 +1489,12 @@ SUBROUTINE read_cards_pw ( psfile, tau_format )
   USE input_parameters,   ONLY : atom_label, atom_pfile, atom_mass, taspc, &
                                  tapos, rd_pos, atomic_positions, if_pos,  &
                                  sp_pos, f_inp, rd_for, tavel, sp_vel, rd_vel
-  USE dynamics_module,    ONLY : tavel_ => tavel, vel
+  USE dynamics_module,    ONLY : vel
   USE cell_base,          ONLY : at, ibrav
   USE ions_base,          ONLY : nat, ntyp => nsp, ityp, tau, atm, extfor
   USE fixed_occ,          ONLY : tfixed_occ, f_inp_ => f_inp
   USE ions_base,          ONLY : if_pos_ =>  if_pos, amass, fixatom
-  USE control_flags,      ONLY : lfixatom, textfor
+  USE control_flags,      ONLY : textfor, tv0rd
   !
   IMPLICIT NONE
   !
@@ -1542,8 +1542,8 @@ SUBROUTINE read_cards_pw ( psfile, tau_format )
   IF ( tavel .AND. ANY ( sp_pos(:) /= sp_vel(:) ) ) &
       CALL errore("cards","list of species in block ATOMIC_VELOCITIES &
                  & must be identical to those in ATOMIC_POSITIONS",1)
-  tavel_ = tavel
-  IF ( tavel_ ) THEN
+  tv0rd = tavel
+  IF ( tv0rd ) THEN
      ALLOCATE( vel(3, nat) )
      DO ia = 1, nat
         vel(:,ia) = rd_vel(:,ia)
@@ -1556,7 +1556,6 @@ SUBROUTINE read_cards_pw ( psfile, tau_format )
   !
   if_pos_(:,:) = if_pos(:,1:nat)
   fixatom = COUNT( if_pos_(1,:)==0 .AND. if_pos_(2,:)==0 .AND. if_pos_(3,:)==0 )
-  lfixatom = ANY ( if_pos_ == 0 )
   !
   tau_format = trim( atomic_positions )
   !

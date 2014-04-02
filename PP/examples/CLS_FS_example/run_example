@@ -74,11 +74,6 @@ $ECHO
 $ECHO "  running pw.x as: $PW_COMMAND"
 $ECHO
 
-# clean TMP_DIR
-$ECHO "  cleaning $TMP_DIR...\c"
-rm -rf $TMP_DIR/pwscf*
-$ECHO " done"
-
 #
 # In this run the atom with the core-excited PP is the bulk atom (bulk is 
 # intended as the atom in the middle of the slab). This calculation will 

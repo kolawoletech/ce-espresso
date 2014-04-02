@@ -3321,7 +3321,7 @@ CONTAINS
          CALL iotk_scan_dat( iunit, "HUBBARD_LMAX", Hubbard_lmax_, IERR=ierr )
          IF ( ierr/=0 ) RETURN
          !
-         ALLOCATE( Hubbard_l_(1:Hubbard_lmax_) )
+         ALLOCATE( Hubbard_l_(1:nsp_) )
          ALLOCATE( Hubbard_U_(nsp_) )
          !
          CALL iotk_scan_dat( iunit, "HUBBARD_L", Hubbard_l_, IERR=ierr )
@@ -3395,7 +3395,7 @@ CONTAINS
          IF ( present( lda_plus_u_kind ) ) lda_plus_u_kind       = lda_plus_u_kind_
          IF ( present( U_projection ) )    U_projection          = U_projection_
          IF ( present( Hubbard_lmax ) )    Hubbard_lmax          = Hubbard_lmax_
-         IF ( present( Hubbard_l ) )       Hubbard_l(1:Hubbard_lmax_)   = Hubbard_l_(:)
+         IF ( present( Hubbard_l ) )       Hubbard_l(1:nsp_)     = Hubbard_l_(:)
          IF ( present( Hubbard_U ) )       Hubbard_U(1:nsp_)     = Hubbard_U_(1:nsp_)
          IF ( present( Hubbard_J ) )       Hubbard_J(1:3,1:nsp_) = Hubbard_J_(1:3,1:nsp_)
          IF ( present( Hubbard_J0 ) )      Hubbard_J0(1:nsp_)    = Hubbard_J0_(1:nsp_)
@@ -3555,7 +3555,7 @@ CONTAINS
       IF ( present( tfixed_occ ))       tfixed_occ  = tfixed_occ_
       IF ( present( ngauss ))           ngauss      = ngauss_
       IF ( present( ntetra ))           ntetra      = ntetra_
-      IF ( present( degauss ))          degauss     = degauss
+      IF ( present( degauss ))          degauss     = degauss_
       IF ( present( degauss_units ))    degauss_units  = trim(degauss_units_)
       IF ( present( nstates_up ))       nstates_up  = nstates_up_
       IF ( present( nstates_dw ))       nstates_dw  = nstates_dw_
@@ -3967,7 +3967,7 @@ CONTAINS
       !
       INTEGER,   INTENT(in) :: num_k_points, nbnd, nkstot
       LOGICAL,   INTENT(in) :: lsda, lkpoint_dir
-      CHARACTER, INTENT(in) :: filename
+      CHARACTER(LEN=*), INTENT(in) :: filename
       INTEGER,   INTENT(out), OPTIONAL :: isk(:)
       REAL(DP),  INTENT(out), OPTIONAL :: et(:,:), wg(:,:)
       INTEGER,   INTENT(out):: ierr

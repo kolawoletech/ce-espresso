@@ -471,4 +471,9 @@ check_failure $?
 $ECHO " done"
 fi
 $ECHO
+
+$ECHO "  cleaning $TMP_DIR...\c"
+rm -rf $TMP_DIR/si.*
+
+$ECHO
 $ECHO "$EXAMPLE_DIR: done"

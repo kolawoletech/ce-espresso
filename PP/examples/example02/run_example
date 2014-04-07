@@ -690,5 +690,8 @@ $ECHO
 $ECHO "  Fermi surface plot: use 'xcrysden --bxsf ni.fs_NSP.bxsf' to plot ...\c"
 $ECHO " done"
 
+$ECHO "  cleaning $TMP_DIR...\c"
+rm -rf $TMP_DIR/ni.*
+
 $ECHO
 $ECHO "$EXAMPLE_DIR: done"

@@ -373,6 +373,8 @@ $ECHO " done"
 rm water.gnuplot
 fi
 
+$ECHO "  cleaning $TMP_DIR...\c"
+rm -rf $TMP_DIR/ni+co.* $TMP_DIR/water.*
 
 $ECHO "Calculations done."
 $ECHO ""

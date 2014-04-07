@@ -52,7 +52,8 @@ SUBROUTINE readpp ( input_dft, printout )
   CHARACTER(len=*), INTENT(INOUT) :: input_dft
   LOGICAL, OPTIONAL, INTENT(IN) :: printout
   !
-  REAL(DP), parameter :: rcut = 10.d0
+  !!!REAL(DP), parameter :: rcut = 10.d0
+  REAL(DP), parameter :: rcut = 500.d0
   CHARACTER(len=256) :: file_pseudo ! file name complete with path
   LOGICAL :: printout_ = .FALSE.
   INTEGER :: iunps, isupf, nt, nb, ir, ios

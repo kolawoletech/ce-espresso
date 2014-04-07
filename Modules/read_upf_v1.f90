@@ -580,7 +580,7 @@ subroutine read_pseudo_rhoatom (upf, iunps)
   !
   return  
 
-100 call errore ('read_pseudo_rhoatom','Reading pseudo file', 1)
+100 call errore ('read_pseudo_rhoatom','Reading pseudo file', -1)
 end subroutine read_pseudo_rhoatom
 !
 !---------------------------------------------------------------------

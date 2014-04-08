@@ -223,7 +223,11 @@ SUBROUTINE print_clock_pw()
         CALL print_clock('PAW_keeq')
       ENDIF
    END IF
-   !
+
+   call print_clock('h_epsi_set')
+   call print_clock('h_epsi_apply')
+   call print_clock('c_phase_field')
+  !
    CALL plugin_clock()
 #ifdef __ENVIRON
    IF ( do_environ ) call environ_clock( stdout )

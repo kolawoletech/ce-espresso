@@ -58,7 +58,7 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
    USE ions_base,            ONLY : nat, ntyp => nsp, ityp, tau, zv, atm
    USE cell_base,            ONLY : at, alat, tpiba, omega, tpiba2
    USE constants,            ONLY : pi, tpi
-   USE gvect,                ONLY : ngm,  g, gcutm, ngm_g
+   USE gvect,                ONLY : ngm,  g, gcutm, ngm_g,ngmx
    USE fft_base,             ONLY : dfftp
    USE uspp,                 ONLY : nkb, vkb, okvan
    USE uspp_param,           ONLY : upf, lmaxq, nbetam, nh, nhm
@@ -66,15 +66,17 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
    USE klist,                ONLY : nelec, degauss, nks, xk, wk
    USE wvfct,                ONLY : npwx, npw, nbnd, ecutwfc
    USE wavefunctions_module, ONLY : evc
-   USE bp,                   ONLY : nppstr_3d, mapgm_global, nx_el
+   USE bp,                   ONLY : nppstr_3d, mapgm_global, nx_el,mapg_owner
    USE fixed_occ
    USE gvect,   ONLY : ig_l2g
-   USE mp,                   ONLY : mp_sum
-   USE mp_world,             ONLY : world_comm
+   USE mp,                   ONLY : mp_sum,mp_barrier
+   USE mp_world,             ONLY : world_comm,mpime,nproc
    USE mp_bands,             ONLY : intra_bgrp_comm
    USE becmod,    ONLY : bec_type, becp, calbec,allocate_bec_type, deallocate_bec_type
    USE noncollin_module,     ONLY : noncolin, npol
    USE spin_orb, ONLY: lspinorb
+   USE mytime
+   USE parallel_include
 
 !  --- Avoid implicit definitions ---
    IMPLICIT NONE
@@ -166,9 +168,8 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
    REAL(dp) :: dkfact
    COMPLEX(dp) :: zeta_tot
 
-   LOGICAL :: l_para! if true new parallel treatment
    COMPLEX(kind=DP) :: sca
-   COMPLEX(kind=DP), ALLOCATABLE :: aux_g(:)
+   COMPLEX(kind=DP), ALLOCATABLE :: aux_g(:),aux_g_mpi(:,:),aux_proc(:,:),aux_rcv(:,:)
    COMPLEX(DP), ALLOCATABLE :: dbecp0(:,:,:), dbecp_bp(:,:,:),vkb1(:,:)
    INTEGER :: ipol
    COMPLEX(DP) :: forces_tmp(3,nat)
@@ -177,9 +178,23 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
    INTEGER :: nspin_eff
    COMPLEX(DP), ALLOCATABLE :: q_dk_so(:,:,:,:)
 
+   COMPLEX(kind=DP), ALLOCATABLE :: fbmata_1(:,:,:),fbmatb_1(:,:,:,:)
+   COMPLEX(kind=DP), ALLOCATABLE :: fbmata_2(:,:,:,:),fbmatb_2(:,:,:,:,:)
+   COMPLEX(kind=DP), ALLOCATABLE :: fbmata_3(:,:,:),fbmatb_3(:,:,:,:,:)
+   COMPLEX(kind=DP), ALLOCATABLE :: dbecp0_ord(:,:,:,:), dbecp_bp_ord(:,:,:,:)
+   
+   INTEGER :: igg,max_aux,max_aux_proc,iproc
+   INTEGER, ALLOCATABLE :: aux_g_mpi_ind(:,:),ind_g(:),aux_proc_ind(:,:),aux_rcv_ind(:,:)
+   INTEGER :: req, ierr
+
 !  -------------------------------------------------------------------------   !
 !                               INITIALIZATIONS
 !  -------------------------------------------------------------------------   !
+
+
+
+
+   allocate(ind_g(nproc))
 
    nspin_eff=nspin
    if(noncolin) then
@@ -193,18 +208,14 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
    ALLOCATE (map_g(npwx))
    ALLOCATE (mat(nbnd,nbnd))
    ALLOCATE (dbecp0( nkb, nbnd*npol, 3 ) ,dbecp_bp( nkb, nbnd*npol, 3 ))
+   ALLOCATE (dbecp0_ord( nkb,npol,3, nbnd) ,dbecp_bp_ord( nkb, npol,3,nbnd))
+
    ALLOCATE( vkb1( npwx, nkb ) )
    ALLOCATE( l_cal(nbnd) )
    if(okvan) then
       CALL allocate_bec_type (nkb,nbnd,becp0)
       CALL allocate_bec_type (nkb,nbnd,becp_bp)
       IF (lspinorb) ALLOCATE(q_dk_so(nhm,nhm,4,ntyp))
-   endif
-
-   if(pdir==3) then
-      l_para=.false.
-   else
-      l_para=.true.
    endif
 
 
@@ -220,13 +231,14 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
 
 !  --- Recalculate FFT correspondence (see ggen.f90) ---
    ALLOCATE (ln (-dfftp%nr1:dfftp%nr1, -dfftp%nr2:dfftp%nr2, -dfftp%nr3:dfftp%nr3) )
+   ln=0
    DO ng=1,ngm
       mk1=nint(g(1,ng)*at(1,1)+g(2,ng)*at(2,1)+g(3,ng)*at(3,1))
       mk2=nint(g(1,ng)*at(1,2)+g(2,ng)*at(2,2)+g(3,ng)*at(3,2))
       mk3=nint(g(1,ng)*at(1,3)+g(2,ng)*at(2,3)+g(3,ng)*at(3,3))
       ln(mk1,mk2,mk3) = ng
    END DO
-
+   call mp_sum(ln,world_comm)
    if (okvan) then
 !  --- Initialize arrays ---
       jkb_bp=0
@@ -404,7 +416,7 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
 
 !           --- Calculate dot products between wavefunctions and betas ---
             IF (kpar /= 1 ) THEN
-               
+
 !              --- Dot wavefunctions and betas for PREVIOUS k-point ---
                CALL gk_sort(xk(1,nx_el(kpoint-1,pdir)),ngm,g,ecutwfc/tpiba2, &
                             npw0,igk0,g2kin_bp) 
@@ -425,8 +437,11 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
                           call mp_sum(dbecp0(1:nkb,1:nbnd*npol,ipol),world_comm)
                   ENDDO
                endif
+
+           
 !              --- Dot wavefunctions and betas for CURRENT k-point ---
                IF (kpar /= (nppstr_3d(pdir)+1)) THEN
+
                   CALL gk_sort(xk(1,nx_el(kpoint,pdir)),ngm,g,ecutwfc/tpiba2, &
                                npw1,igk1,g2kin_bp)        
                   CALL get_buffer (psi1,nwordwfc,iunwfc,nx_el(kpoint,pdir))
@@ -446,7 +461,9 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
                              call mp_sum(dbecp_bp(1:nkb,1:nbnd*npol,ipol),world_comm)
                      ENDDO
                   endif
+
                ELSE
+
                   kstart = kpoint-(nppstr_3d(pdir)+1)+1
                   CALL gk_sort(xk(1,nx_el(kstart,pdir)),ngm,g,ecutwfc/tpiba2, &
                                npw1,igk1,g2kin_bp)  
@@ -467,77 +484,33 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
                              call mp_sum(dbecp_bp(1:nkb,1:nbnd*npol,ipol),world_comm)
                      ENDDO
                   endif
+
                ENDIF
            
 !              --- Matrix elements calculation ---
 
-               IF (kpar == (nppstr_3d(pdir)+1) .and. .not.l_para) THEN
-                  map_g(:) = 0
-                  do ig=1,npw1
-!                          --- If k'=k+G_o, the relation psi_k+G_o (G-G_o) ---
-!                          --- = psi_k(G) is used, gpar=G_o, gtr = G-G_o ---
-                           
-                     gtr(1)=g(1,igk1(ig)) - gpar(1)
-                     gtr(2)=g(2,igk1(ig)) - gpar(2) 
-                     gtr(3)=g(3,igk1(ig)) - gpar(3) 
-!                          --- Find crystal coordinates of gtr, n1,n2,n3 ---
-!                          --- and the position ng in the ngm array ---
-                     IF (gtr(1)**2+gtr(2)**2+gtr(3)**2 <= gcutm) THEN
-                        n1=NINT(gtr(1)*at(1,1)+gtr(2)*at(2,1) &
-                             +gtr(3)*at(3,1))
-                        n2=NINT(gtr(1)*at(1,2)+gtr(2)*at(2,2) &
-                             +gtr(3)*at(3,2))
-                        n3=NINT(gtr(1)*at(1,3)+gtr(2)*at(2,3) &
-                             +gtr(3)*at(3,3))
-                        ng=ln(n1,n2,n3) 
-                        IF ( (ABS(g(1,ng)-gtr(1)) > eps) .OR. &
-                             (ABS(g(2,ng)-gtr(2)) > eps) .OR. &
-                             (ABS(g(3,ng)-gtr(3)) > eps) ) THEN
-                           WRITE(6,*) ' error: translated G=', &
-                                gtr(1),gtr(2),gtr(3), &
-                                &     ' with crystal coordinates',n1,n2,n3, &
-                                &     ' corresponds to ng=',ng,' but G(ng)=', &
-                                &     g(1,ng),g(2,ng),g(3,ng)
-                           WRITE(6,*) ' probably because G_par is NOT', &
-                                &    ' a reciprocal lattice vector '
-                           WRITE(6,*) ' Possible choices as smallest ', &
-                                ' G_par:'
-                           DO i=1,50
-                              WRITE(6,*) ' i=',i,'   G=', &
-                                   g(1,i),g(2,i),g(3,i)
-                           ENDDO
-                           STOP
-                        ENDIF
-                     ELSE 
-                        WRITE(6,*) ' |gtr| > gcutm  for gtr=', &
-                             gtr(1),gtr(2),gtr(3) 
-                        STOP
-                     END IF
-                     map_g(ig)=ng
-                  enddo                           
-               ENDIF
-
                mat=(0.d0,0.d0)
                DO nb=1,nbnd
-                  DO mb=1,nbnd
-                     IF ( .NOT. l_cal(nb) .OR. .NOT. l_cal(mb) ) THEN
-                        IF ( nb == mb )  mat(nb,mb)=1.d0
-                     ELSE
-                        aux=(0.d0,0.d0)
-                        aux0=(0.d0,0.d0)
-                        IF(noncolin) THEN
-                           aux_2=(0.d0,0.d0)
-                           aux0_2=(0.d0,0.d0)
-                        ENDIF
-                        DO ig=1,npw0
-                           aux0(igk0(ig))=psi(ig,nb)
-                        END DO
-                        if(noncolin) then
-                           DO ig=1,npw0
-                              aux0_2(igk0(ig))=psi(ig+npwx,nb)
-                           END DO
-                        endif
-                        IF (kpar /= (nppstr_3d(pdir)+1)) THEN
+                  aux=(0.d0,0.d0)
+                  aux0=(0.d0,0.d0)
+                  IF(noncolin) THEN
+                     aux_2=(0.d0,0.d0)
+                     aux0_2=(0.d0,0.d0)
+                  ENDIF
+                  DO ig=1,npw0
+                     aux0(igk0(ig))=psi(ig,nb)
+                  END DO
+                  if(noncolin) then
+                     DO ig=1,npw0
+                        aux0_2(igk0(ig))=psi(ig+npwx,nb)
+                     END DO
+                  endif
+                  IF (kpar /= (nppstr_3d(pdir)+1)) THEN
+                     DO mb=1,nbnd
+                        IF ( .NOT. l_cal(nb) .OR. .NOT. l_cal(mb) ) THEN
+                           IF ( nb == mb )  mat(nb,mb)=1.d0
+                        ELSE
+                           
                            do ig=1,npw1
                               aux(igk1(ig))=psi1(ig,mb)
                            enddo
@@ -546,56 +519,159 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
                                  aux_2(igk1(ig))=psi1(ig+npwx,mb)
                               enddo
                            END IF
-                        ELSE IF( .not. l_para) THEN
-                           do ig=1,npw1
-                              aux(map_g(ig))=psi1(ig,mb)
-                           enddo
-                           IF(noncolin) THEN
-                              do ig=1,npw1
-                                 aux_2(map_g(ig))=psi1(ig+npwx,mb)
-                              enddo
-                           END IF
-                        ELSE
-! allocate global array
-                           allocate(aux_g(ngm_g))
-                           aux_g=(0.d0,0.d0)
-! put psi1 on global array
-                           do ig=1,npw1
-                              aux_g(mapgm_global(ig_l2g(igk1(ig)),pdir))=psi1(ig,mb)
-                           enddo
-                           call mp_sum(aux_g(:),world_comm)
-                           sca=(0.d0,0.d0)
-! do scalar product
-                           do ig=1,ngm
-                              sca=sca+conjg(aux0(ig))*aux_g(ig_l2g(ig))
-                           enddo
-                           if(noncolin) then
-                              aux_g=(0.d0,0.d0)
-! put psi1 on global array
-                              do ig=1,npw1
-                                 aux_g(mapgm_global(ig_l2g(igk1(ig)),pdir))=psi1(ig+npwx,mb)
-                              enddo
-                              call mp_sum(aux_g(:),world_comm)
-                             
-! do scalar product 
-                              do ig=1,ngm
-                                 sca=sca+conjg(aux0_2(ig))*aux_g(ig_l2g(ig))
-                              enddo
-
-                           endif
-! do mp_sum
-                           call mp_sum(sca,world_comm)
-                           mat(nb,mb)=sca
-                           deallocate(aux_g)
-                        ENDIF
-                        
-                        if(kpar /= (nppstr_3d(pdir)+1).or..not. l_para) then
-                           mat(nb,mb) = zdotc(ngm,aux0,1,aux,1)  
+                           
+                           mat(nb,mb) = zdotc(ngm,aux0,1,aux,1)
+                           
                            if(noncolin) then
                               mat(nb,mb) = mat(nb,mb) + zdotc(ngm,aux0_2,1,aux_2,1)
                            endif
                            call mp_sum( mat(nb,mb), intra_bgrp_comm )
+                        END IF
+                     END DO
+                  END IF
+               END DO
+           
+               IF (kpar == (nppstr_3d(pdir)+1) ) THEN
+                     
+! allocate global array
+                  
+                  allocate(aux_g(ngm_g),aux_g_mpi(ngmx,nproc),aux_g_mpi_ind(ngmx,nproc))
+                  do ipol=0,npol-1
+                     do mb=1,nbnd
+                        
+                        aux_g_mpi=0.d0
+                        aux_g_mpi_ind=0
+                        ind_g=0
+
+                        do ig=1,npw1
+                           igg=mapgm_global(ig_l2g(igk1(ig)),pdir)
+                           ind_g(mapg_owner(1,igg))=ind_g(mapg_owner(1,igg))+1
+                           aux_g_mpi(ind_g(mapg_owner(1,igg)),mapg_owner(1,igg))=psi1(ig+npwx*ipol,mb)
+                           aux_g_mpi_ind(ind_g(mapg_owner(1,igg)),mapg_owner(1,igg))=mapg_owner(2,igg)
+                        enddo
+                        max_aux=0
+
+                        do iproc=1,nproc
+                           if(iproc/=mpime+1) then
+                              max_aux_proc=0
+                              do ig=1,ngmx
+                                 if(aux_g_mpi_ind(ig,iproc) > 0) then
+                                    max_aux_proc=max_aux_proc+1
+                                 else
+                                    exit
+                                 endif
+                              enddo
+                              if(max_aux_proc>max_aux) max_aux=max_aux_proc
+                           endif
+                        enddo
+                        max_aux_proc=max_aux
+
+#if defined (__MPI)                        
+                        CALL MPI_ALLREDUCE( max_aux_proc,max_aux,1,MPI_INTEGER, MPI_MAX,world_comm, req,IERR )
+#endif
+                        allocate(aux_proc(max_aux,nproc),aux_proc_ind(max_aux,nproc))
+                        allocate(aux_rcv(max_aux,nproc),aux_rcv_ind(max_aux,nproc))
+                        aux_proc=(0.d0,0.d0)
+                        aux_proc_ind=0
+                        do iproc=1,nproc
+                           if(iproc/=mpime+1) then
+                              do ig=1,max_aux
+                                 if(aux_g_mpi_ind(ig,iproc) > 0) then
+                                    aux_proc(ig,iproc)=aux_g_mpi(ig,iproc)
+                                    aux_proc_ind(ig,iproc)=aux_g_mpi_ind(ig,iproc)
+                                 else
+                                    exit
+                                 end if
+                              enddo
+                           endif
+                        enddo
+
+                        
+#if defined (__MPI)
+                        CALL MPI_ALLTOALL( aux_proc, max_aux, MPI_DOUBLE_COMPLEX,  &
+                             aux_rcv, max_aux, MPI_DOUBLE_COMPLEX, world_comm, ierr )
+                        CALL MPI_ALLTOALL( aux_proc_ind, max_aux, MPI_INTEGER,  &
+                             aux_rcv_ind, max_aux, MPI_INTEGER, world_comm, ierr )
+#else
+                        aux_rcv(1:max_aux)=aux_proc(1:max_aux)
+                        aux_rcv_ind(1:max_aux)=aux_proc_ind(1:max_aux)
+#endif
+
+                        
+                        do nb=1,nbnd
+                           IF ( .NOT. l_cal(nb) .OR. .NOT. l_cal(mb) ) THEN
+                              IF ( nb == mb )  mat(nb,mb)=1.d0
+                           ELSE
+
+                              aux=(0.d0,0.d0)
+                              aux0=(0.d0,0.d0)
+                              IF(noncolin) THEN
+                                 aux_2=(0.d0,0.d0)
+                                 aux0_2=(0.d0,0.d0)
+                              ENDIF
+                              DO ig=1,npw0
+                                 aux0(igk0(ig))=psi(ig,nb)
+                              END DO
+                              if(noncolin) then
+                              DO ig=1,npw0
+                                 aux0_2(igk0(ig))=psi(ig+npwx,nb)
+                              END DO
+                           endif
+                           sca=0.d0
+                           do iproc=1,nproc
+                              if(iproc/=mpime+1) then
+                                 do ig=1,max_aux
+                                    if(aux_rcv_ind(ig,iproc)/=0) then
+                                       if(aux_rcv_ind(ig,iproc)<0.or.aux_rcv_ind(ig,iproc)> ngm) then
+                                          write(stdout,*) 'OH BOY', aux_rcv_ind(ig,iproc)
+                                       else
+                                          if(ipol==0) then
+                                             sca=sca+conjg(aux0(aux_rcv_ind(ig,iproc)))*aux_rcv(ig,iproc)
+                                          else
+                                             sca=sca+conjg(aux0_2(aux_rcv_ind(ig,iproc)))*aux_rcv(ig,iproc)
+                                          endif
+                                       endif
+                                    else
+                                       exit
+                                    endif
+                                 enddo
+                              endif
+                           enddo
+                              
+                           do ig=1,ngmx
+                              if(aux_g_mpi_ind(ig,mpime+1)/=0) then
+                                 if(aux_g_mpi_ind(ig,mpime+1)<0.or.aux_g_mpi_ind(ig,mpime+1)>ngm) then 
+                                    write(stdout,*) 'OH BOY',aux_g_mpi_ind(ig,mpime+1)
+                                 else
+                                    if(ipol==0) then
+                                       sca=sca+conjg(aux0(aux_g_mpi_ind(ig,mpime+1)))*aux_g_mpi(ig,mpime+1)
+                                    else
+                                       sca=sca+conjg(aux0_2(aux_g_mpi_ind(ig,mpime+1)))*aux_g_mpi(ig,mpime+1)
+                                    endif
+                                 endif
+                              else
+                                 exit
+                              endif
+                           enddo
+                                 
+                           call mp_sum(sca,world_comm)
+                           mat(nb,mb)=mat(nb,mb)+sca
                         endif
+                        enddo
+                        deallocate(aux_proc,aux_proc_ind)
+                        deallocate(aux_rcv,aux_rcv_ind)
+                           
+                     enddo
+                  enddo
+                  deallocate(aux_g,aux_g_mpi,aux_g_mpi_ind)
+                  
+                         
+               ENDIF
+               DO nb=1,nbnd
+                  do mb=1,nbnd 
+                     IF ( l_cal(nb) .AND. l_cal(mb) ) THEN
+                      
+
 !                    --- Calculate the augmented part: ij=KB projectors, ---
 !                    --- R=atom index: SUM_{ijR} q(ijR) <u_nk|beta_iR>   ---
 !                    --- <beta_jR|u_mk'> e^i(k-k')*R =                   ---
@@ -631,20 +707,89 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
                      endif !on l_cal
                   ENDDO
                ENDDO
-
+               
 !              --- Calculate matrix determinant ---
 
 ! calculate inverse
-
+!              
 
                CALL zgefa(mat,nbnd,nbnd,ivpt,info)
                CALL errore('forces_us_efield','error in zgefa',abs(info))
                CALL zgedi(mat,nbnd,nbnd,ivpt,cdet,cdwork,1)
 
-
+               
 !calculate terms
+
                forces_tmp(:,:)=(0.d0,0.d0)
+
                if(okvan) then
+                  allocate(fbmatb_1(nkb,npol,nkb,npol),fbmata_1(nbnd,nkb,npol))
+                  allocate(fbmatb_2(nkb,npol,nkb,npol,3),fbmata_2(nbnd,nkb,npol,3))
+                  allocate(fbmatb_3(nkb,npol,3,nkb,npol),fbmata_3(nbnd,nkb,npol))
+
+                  if(lspinorb) then
+                     call ZGEMM('N','C',nbnd,nkb*npol,nbnd,(1.d0,0.d0),&
+                          &mat,nbnd,becp0%nc(1,1,1),nkb*npol,(0.d0,0.d0),fbmata_1,nbnd)
+                     call ZGEMM('N','N',nkb*npol,nkb*npol,nbnd,(1.d0,0.d0),&
+                          &becp_bp%nc(1,1,1),nkb*npol,fbmata_1,nbnd,(0.d0,0.d0),fbmatb_1,nkb*npol)
+                     do ipol=1,npol
+                        do nb=1,nbnd
+                           dbecp0_ord(1:nkb,ipol,1:3,nb)=dbecp0(1:nkb,(nb-1)*npol+ipol,1:3)
+                           dbecp_bp_ord(1:nkb,ipol,1:3,nb)=dbecp_bp(1:nkb,(nb-1)*npol+ipol,1:3)
+                        enddo
+                     enddo
+
+                     call ZGEMM('N','C',nbnd,nkb*npol*3,nbnd,(1.d0,0.d0),&
+                          &mat,nbnd,dbecp0_ord,nkb*npol*3,(0.d0,0.d0),fbmata_2,nbnd)
+                     call ZGEMM('N','N',nkb*npol,nkb*npol*3,nbnd,(1.d0,0.d0),&
+                          &becp_bp%nc(1,1,1),nkb*npol,fbmata_2,nbnd,(0.d0,0.d0),fbmatb_2,nkb*npol)
+
+                     call ZGEMM('N','C',nbnd,nkb*npol,nbnd,(1.d0,0.d0),&
+                          &mat,nbnd,becp0%nc(1,1,1),nkb*npol,(0.d0,0.d0),fbmata_3,nbnd)
+                     call ZGEMM('N','N',nkb*npol*3,nkb*npol,nbnd,(1.d0,0.d0),&
+                          &dbecp_bp_ord,nkb*npol*3,fbmata_3,nbnd,(0.d0,0.d0),fbmatb_3,nkb*npol*3)
+
+
+                     do jkb=1,nkb
+                        nhjkb = nkbtonh(jkb)
+                        na = nkbtona(jkb)
+                        np = ityp(na)
+                        nhjkbm = nh(np)
+                        jkb1 = jkb - nhjkb
+                        do j = 1,nhjkbm
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                     & q_dk_so(nhjkb,j,1,np)*struc_r(1:3,na)*fbmatb_1(jkb1+j,1,jkb,1)
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   q_dk_so(nhjkb,j,1,np)*struc(na)*fbmatb_2(jkb1+j,1,jkb,1,1:3)
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   q_dk_so(nhjkb,j,1,np)*struc(na)*fbmatb_3(jkb1+j,1,1:3,jkb,1)
+
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   & q_dk_so(nhjkb,j,2,np)*struc_r(1:3,na)*fbmatb_1(jkb1+j,2,jkb,1)
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   q_dk_so(nhjkb,j,2,np)*struc(na)*fbmatb_2(jkb1+j,2,jkb,1,1:3)
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   q_dk_so(nhjkb,j,2,np)*struc(na)*fbmatb_3(jkb1+j,2,1:3,jkb,1)
+
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   & q_dk_so(nhjkb,j,3,np)*struc_r(1:3,na)*fbmatb_1(jkb1+j,1,jkb,2)
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   q_dk_so(nhjkb,j,3,np)*struc(na)*fbmatb_2(jkb1+j,1,jkb,2,1:3)
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   q_dk_so(nhjkb,j,3,np)*struc(na)*fbmatb_3(jkb1+j,1,1:3,jkb,2)
+                              
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   & q_dk_so(nhjkb,j,4,np)*struc_r(1:3,na)*fbmatb_1(jkb1+j,2,jkb,2)
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   q_dk_so(nhjkb,j,4,np)*struc(na)*fbmatb_2(jkb1+j,2,jkb,2,1:3)
+                              forces_tmp(1:3,na)= forces_tmp(1:3,na)+ &
+                                   q_dk_so(nhjkb,j,4,np)*struc(na)*fbmatb_3(jkb1+j,2,1:3,jkb,2)
+
+
+                        enddo
+                     enddo
+                  endif
+                  if(.not.lspinorb) then
                   do jkb=1,nkb
                      nhjkb = nkbtonh(jkb)
                      na = nkbtona(jkb)
@@ -655,34 +800,34 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
                         do nb=1,nbnd
                            do mb=1,nbnd
                               if(lspinorb) then
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,1,nb))*becp_bp%nc(jkb1+j,1,mb) &
-                                      *q_dk_so(nhjkb,j,1,np)*struc_r(1:3,na)*mat(mb,nb)
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(dbecp0(jkb,(nb-1)*npol+1,1:3)) &
-                                      *becp_bp%nc(jkb1+j,1,mb)*q_dk_so(nhjkb,j,1,np)*struc(na)*mat(mb,nb)
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,1,nb)) &
-                                 *dbecp_bp(jkb1+j,(mb-1)*npol+1,1:3)*q_dk_so(nhjkb,j,1,np)*struc(na)*mat(mb,nb)
+                                ! forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,1,nb))*becp_bp%nc(jkb1+j,1,mb) &
+                                !      *q_dk_so(nhjkb,j,1,np)*struc_r(1:3,na)*mat(mb,nb)
+                                ! forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(dbecp0(jkb,(nb-1)*npol+1,1:3)) &
+                                !      *becp_bp%nc(jkb1+j,1,mb)*q_dk_so(nhjkb,j,1,np)*struc(na)*mat(mb,nb)
+                                ! forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,1,nb)) &
+                                ! *dbecp_bp(jkb1+j,(mb-1)*npol+1,1:3)*q_dk_so(nhjkb,j,1,np)*struc(na)*mat(mb,nb)
 
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,1,nb))*becp_bp%nc(jkb1+j,2,mb) &
-                                      *q_dk_so(nhjkb,j,2,np)*struc_r(1:3,na)*mat(mb,nb)
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(dbecp0(jkb,(nb-1)*npol+1,1:3))&
-                                      *becp_bp%nc(jkb1+j,2,mb)*q_dk_so(nhjkb,j,2,np)*struc(na)*mat(mb,nb)
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,1,nb))&
-                                      *dbecp_bp(jkb1+j,(mb-1)*npol+2,1:3)*q_dk_so(nhjkb,j,2,np)*struc(na)*mat(mb,nb)
+                                ! forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,1,nb))*becp_bp%nc(jkb1+j,2,mb) &
+                                !      *q_dk_so(nhjkb,j,2,np)*struc_r(1:3,na)*mat(mb,nb)
+                                ! forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(dbecp0(jkb,(nb-1)*npol+1,1:3))&
+                                !      *becp_bp%nc(jkb1+j,2,mb)*q_dk_so(nhjkb,j,2,np)*struc(na)*mat(mb,nb)
+                                ! forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,1,nb))&
+                                !      *dbecp_bp(jkb1+j,(mb-1)*npol+2,1:3)*q_dk_so(nhjkb,j,2,np)*struc(na)*mat(mb,nb)
 
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,2,nb))*becp_bp%nc(jkb1+j,1,mb) &
-                                      *q_dk_so(nhjkb,j,3,np)*struc_r(1:3,na)*mat(mb,nb)
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(dbecp0(jkb,(nb-1)*npol+2,1:3))&
-                                      *becp_bp%nc(jkb1+j,1,mb)*q_dk_so(nhjkb,j,3,np)*struc(na)*mat(mb,nb)
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,2,nb)) &
-                                      *dbecp_bp(jkb1+j,(mb-1)*npol+1,1:3)*q_dk_so(nhjkb,j,3,np)*struc(na)*mat(mb,nb)
+                                ! forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,2,nb))*becp_bp%nc(jkb1+j,1,mb) &
+                                !      *q_dk_so(nhjkb,j,3,np)*struc_r(1:3,na)*mat(mb,nb)
+                                ! forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(dbecp0(jkb,(nb-1)*npol+2,1:3))&
+                                !      *becp_bp%nc(jkb1+j,1,mb)*q_dk_so(nhjkb,j,3,np)*struc(na)*mat(mb,nb)
+                                ! forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,2,nb)) &
+                                !      *dbecp_bp(jkb1+j,(mb-1)*npol+1,1:3)*q_dk_so(nhjkb,j,3,np)*struc(na)*mat(mb,nb)
 
                                  
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,2,nb))*becp_bp%nc(jkb1+j,2,mb) &
-                                      *q_dk_so(nhjkb,j,4,np)*struc_r(1:3,na)*mat(mb,nb)
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(dbecp0(jkb,(nb-1)*npol+2,1:3))&
-                                      *becp_bp%nc(jkb1+j,2,mb)*q_dk_so(nhjkb,j,4,np)*struc(na)*mat(mb,nb)
-                                 forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,2,nb))&
-                                      *dbecp_bp(jkb1+j,(mb-1)*npol+2,1:3)*q_dk_so(nhjkb,j,4,np)*struc(na)*mat(mb,nb)
+                                 !forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,2,nb))*becp_bp%nc(jkb1+j,2,mb) &
+                                 !     *q_dk_so(nhjkb,j,4,np)*struc_r(1:3,na)*mat(mb,nb)
+                                 !forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(dbecp0(jkb,(nb-1)*npol+2,1:3))&
+                                 !     *becp_bp%nc(jkb1+j,2,mb)*q_dk_so(nhjkb,j,4,np)*struc(na)*mat(mb,nb)
+                                 !forces_tmp(1:3,na)= forces_tmp(1:3,na)+CONJG(becp0%nc(jkb,2,nb))&
+                                 !     *dbecp_bp(jkb1+j,(mb-1)*npol+2,1:3)*q_dk_so(nhjkb,j,4,np)*struc(na)*mat(mb,nb)
 
                               else
                                  forces_tmp(:,na)= forces_tmp(:,na)+CONJG(becp0%k(jkb,nb))*becp_bp%k(jkb1+j,mb) &
@@ -694,11 +839,14 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
                               endif
                            enddo
                         enddo
-                        
+                     
                                             
                      enddo
-                  
-                  enddo
+                  end do
+               end if
+                  deallocate(fbmata_1,fbmatb_1)
+                  deallocate(fbmata_2,fbmatb_2)
+                  deallocate(fbmata_3,fbmatb_3)
                endif
 
                forces_bp(:,:)=forces_bp(:,:)+fact*aimag(forces_tmp(:,:))*wstring(istring)
@@ -707,6 +855,7 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
             ENDIF
 
 !        --- End loop over parallel k-points ---
+          
          END DO
          kpoint=kpoint-1
 !     --- End loop over orthogonal k-points ---
@@ -737,6 +886,11 @@ SUBROUTINE forces_us_efield(forces_bp, pdir, e_field)
       call deallocate_bec_type(becp_bp)
       if(lspinorb) deallocate(q_dk_so)
    endif
+   DEALLOCATE(dbecp0,dbecp0_ord,dbecp_bp,dbecp_bp_ord)
+
+   DEALLOCATE(ind_g)
+
+
 !------------------------------------------------------------------------------!
 
  END SUBROUTINE forces_us_efield

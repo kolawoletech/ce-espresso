@@ -12,7 +12,7 @@
 !#define __NORMALIZE_BETAMIX
 !
 #if defined(__GFORTRAN) && ((__GNUC__<4) || ((__GNUC__==4) && (__GNUC_MINOR__<8)))
-  #define __GFORTRAN_HACK
+#define __GFORTRAN_HACK
 #endif
 
 #ifdef __GFORTRAN_HACK   

@@ -412,7 +412,8 @@ subroutine ld1_readin(input_file)
 !
 !  gipaw reconstruction is not implemented in the fully relativistic case
 !
-     if (rel==2.OR..NOT.lpaw) then
+     !if (rel==2.OR..NOT.lpaw) then
+     if (rel==2) then
         lgipaw_reconstruction = .false.
         use_paw_as_gipaw = .false. 
      endif

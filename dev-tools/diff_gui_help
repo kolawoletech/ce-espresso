@@ -3,14 +3,12 @@
 exec tclsh "$0" "$@"
 
 #
-# Usage:   update_gui_help module
-#          ( module = pw, ph, pp, neb, projwfc, dos, bands, atomic, or d3 )
+# Usage:   diff_gui_help module
+#          ( module = pw, ph, pp, neb,  projwfc, bands, dos, atomic, or d3 )
 #
 # Requirements: execute the check_gui first !!!
 #             
-# Purpose: updates the PWgui help file, i.e., moves the
-#          module-help.tcl file that has been created by prior
-#          execution of check_gui to $topdir/GUI/PWgui/modules/$module/
+# Purpose: compares the current PWgui help file with the one in $topdir/GUI/PWgui/modules/$module/
 #
 
 proc Usage {} {
@@ -52,13 +50,5 @@ if { ! [file exists $module-help.tcl] } {
     exit 1
 }
 
-puts "* moving $module-help.tcl --> [file join $moduledir $module $module-help.tcl]"
+catch {exec tkdiff $module-help.tcl [file join $moduledir $module $module-help.tcl]}
 
-file rename -force $module-help.tcl [file join $moduledir $module $module-help.tcl]
-
-if { [file exists [file join $moduledir $module $module-help.tcl.bak]] } {
-    puts "* removing backup file: [file join $moduledir $module $module-help.tcl.bak]"
-}
-
-# ok, we are done; since we loaded Tk, we need an explicit exit !!!
-exit 0

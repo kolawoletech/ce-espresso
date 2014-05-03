@@ -163,5 +163,9 @@ $ECHO "IS shift layer(-1): $clslay1ev (eV)" >> initial-state.txt
 $ECHO
 $ECHO "  Results written in results/initial-state.txt !"
 $ECHO
+$ECHO "  cleaning $TMP_DIR...\c"
+rm -rf $TMP_DIR/Rh011.*
+
+$ECHO
 $ECHO "$EXAMPLE_DIR: done"
 

@@ -465,7 +465,9 @@ SUBROUTINE punch_band (filband, spin_component, lsigma, no_overlap)
            ENDDO
         ENDIF
         WRITE (iunpun, '(10x,3f10.6)') xk(1,ik),xk(2,ik),xk(3,ik)
-        WRITE (iunpun, '(10f8.3)') (et (il(ibnd,ik), ik)             &
+        !!WRITE (iunpun, '(10f8.3)') (et (il(ibnd,ik), ik)             &
+        !!     * rytoev, ibnd = 1, nbnd)
+        WRITE (iunpun, '(10f12.5)') (et (il(ibnd,ik), ik)             &
              * rytoev, ibnd = 1, nbnd)
         DO ipol=1,4
            IF (lsigma(ipol)) THEN

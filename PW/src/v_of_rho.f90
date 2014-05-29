@@ -545,6 +545,7 @@ SUBROUTINE v_h( rhog, ehart, charge, v )
   USE mp,        ONLY: mp_sum
   USE martyna_tuckerman, ONLY : wg_corr_h, do_comp_mt
   USE esm,       ONLY: do_comp_esm, esm_hartree, esm_bc
+  USE input_parameters, ONLY : do_hartree
   !
   IMPLICIT NONE
   !
@@ -573,6 +574,10 @@ SUBROUTINE v_h( rhog, ehart, charge, v )
   END IF
   !
   CALL mp_sum(  charge , intra_bgrp_comm )
+  if (.not. do_hartree) then
+     ehart = 0.d0
+     return
+  endif
   !
   ! ... calculate hartree potential in G-space (NB: V(G=0)=0 )
   !

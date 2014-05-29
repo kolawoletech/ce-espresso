@@ -225,7 +225,7 @@ SUBROUTINE iosys()
                                x_gamma_extrapolation, nqx1, nqx2, nqx3,     &
                                exxdiv_treatment, yukawa, ecutvcut,          &
                                exx_fraction, screening_parameter, ecutfock, &
-                               gau_parameter,                               &
+                               gau_parameter, do_hartree,                   &
 #ifdef __ENVIRON
                                do_environ,                                  &
 #endif

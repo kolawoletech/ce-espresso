@@ -12,7 +12,7 @@
 #undef MIX_MAGN_G0
 #undef MIX_HUBBARD
 #define MIX_BECP
-#define MIX_HIGHFREQ
+#undef MIX_HIGHFREQ
 
 MODULE scf
   !  

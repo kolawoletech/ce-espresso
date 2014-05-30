@@ -14,6 +14,8 @@ MODULE ldaU
   !
   USE kinds,      ONLY : DP
   USE parameters, ONLY : lqmax, ntypx
+  USE basis,      ONLY : natomwfc
+  USE ions_base,  ONLY : nat, ntyp => nsp, ityp
   !
   SAVE
   !
@@ -53,8 +55,6 @@ MODULE ldaU
 CONTAINS
   !
   SUBROUTINE init_lda_plus_u ( psd, noncolin )
-    !
-    USE ions_base, ONLY: nat, ntyp => nsp, ityp
     !
     IMPLICIT NONE
     CHARACTER (LEN=2), INTENT(IN) :: psd(:)
@@ -138,20 +138,18 @@ CONTAINS
     ! compute index of atomic wfcs used as projectors
 
     IF ( .NOT.allocated(oatwfc)) ALLOCATE ( oatwfc(nat) )
-    CALL offset_atom_wfc ( nat, oatwfc, nwfcU )
+    CALL offset_atom_wfc ( .false., oatwfc, nwfcU )
     ! nwfcU is set to natomwfc by the routine above
+    IF ( nwfcU .NE.natomwfc ) &
+         CALL errore ('offset_atom_wfc', 'wrong number of wavefunctions', 1)
+   !
     IF ( .NOT.allocated(offsetU)) ALLOCATE ( offsetU(nat) )
+    ! If reading from file, dimensions and offsets for wfcU and wfcatom 
+    ! coincide; otherwise, they differ
     IF ( U_projection == 'file' ) THEN
-       ! If reading from file, dims and offsets for wfcU and wfcatom coincide
        offsetU(:) = oatwfc(:)
     ELSE
-       ! If not reading from file, dims and offset for wfcU and wfcatom differ
-       nwfcU = 0
-       DO na=1,nat
-          offsetU(na) = nwfcU
-          nt = ityp(na)
-          IF ( is_hubbard(nt) ) nwfcU = nwfcU + 2*hubbard_l(nt)+1
-       END DO
+       CALL offset_atom_wfc ( .true., offsetU, nwfcU )
     END IF
     !
   END SUBROUTINE init_lda_plus_u
@@ -170,22 +168,28 @@ CONTAINS
   !
   END SUBROUTINE deallocate_ldaU
   !
-  SUBROUTINE copy_U_wfc ( swfcatom )
+  SUBROUTINE copy_U_wfc ( swfcatom, noncolin )
   !
   !  Copy (orthogonalized) atomic wavefunctions "swfcatom"
   !  having a Hubbard U correction to array "wfcU"
   !
-  USE ions_base, ONLY: nat, ntyp => nsp, ityp
-  !
   IMPLICIT NONE
   COMPLEX (KIND=dp), INTENT (IN) :: swfcatom(:,:)
+  LOGICAL, INTENT(IN), OPTIONAL :: noncolin
+  LOGICAL :: twice
   INTEGER :: na, nt, m1, m2
 
+  IF ( PRESENT (noncolin) ) THEN
+     twice = noncolin
+  ELSE
+     twice = .FALSE.
+  END IF
   DO na=1,nat
      nt = ityp(na)
      if ( is_hubbard(nt) ) then
         m1 = 1
         m2 = 2*hubbard_l(nt)+1
+        IF ( twice ) m2 = 2*m2
         wfcU(:,offsetU(na)+m1:offsetU(na)+m2) = swfcatom(:,oatwfc(na)+m1:oatwfc(na)+m2)
      end if
   END DO

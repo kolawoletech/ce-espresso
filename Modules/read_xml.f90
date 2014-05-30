@@ -12,7 +12,7 @@ MODULE read_xml_module
   !
   USE io_global, ONLY : ionode, ionode_id, xmlinputunit => qestdin
   USE mp,        ONLY : mp_bcast
-  USE mp_world,  ONLY : world_comm
+  USE mp_images, ONLY : intra_image_comm
   USE iotk_module, ONLY : iotk_attlenx
   !
   ! ...default and checkin of fields
@@ -62,15 +62,8 @@ CONTAINS
     CASE ('PW')
        !
        CALL read_xml_common( attr, 'PW' )
-       !
-       !
        CALL read_xml_pw()
        !
-       !
-!    CASE ('NEB')
-!       !
-!       CALL read_xml_common( attr, 'PW' )
-!       !
     CASE ('CP')
        !
        CALL read_xml_common( attr, 'CP' )
@@ -145,9 +138,9 @@ CONTAINS
     !
     !  ... bcast the read attributes
     !
-    CALL mp_bcast( calculation, ionode_id, world_comm )
-    CALL mp_bcast( prefix, ionode_id, world_comm )
-    CALL mp_bcast( title, ionode_id, world_comm )
+    CALL mp_bcast( calculation, ionode_id, intra_image_comm )
+    CALL mp_bcast( prefix, ionode_id, intra_image_comm )
+    CALL mp_bcast( title, ionode_id, intra_image_comm )
     
     !
     ! ... fixing some default values using the calculation variable
@@ -246,7 +239,7 @@ CONTAINS
        ENDIF
     ENDIF
     !
-    CALL mp_bcast( found_al, ionode_id, world_comm)
+    CALL mp_bcast( found_al, ionode_id, intra_image_comm)
     !
     IF (found_al) THEN
        CALL card_bcast( 'ATOMIC_LIST' )
@@ -348,7 +341,7 @@ CONTAINS
        !
     END IF
     !
-    CALL mp_bcast ( found, ionode_id, world_comm )
+    CALL mp_bcast ( found, ionode_id, intra_image_comm )
     !
     IF ( found ) CALL card_bcast( 'CONSTRAINTS' )
     !
@@ -408,7 +401,7 @@ CONTAINS
        !
     END IF
     !
-    CALL mp_bcast ( found, ionode_id, world_comm )
+    CALL mp_bcast ( found, ionode_id, intra_image_comm )
     !
     IF ( found ) CALL card_bcast( 'OCCUPATIONS' )
     !
@@ -439,7 +432,7 @@ CONTAINS
        !
     END IF
     !
-    CALL mp_bcast ( found, ionode_id, world_comm )
+    CALL mp_bcast ( found, ionode_id, intra_image_comm )
     !
     IF ( found ) CALL card_bcast( 'CLIMBING_IMAGES' )
     !
@@ -559,7 +552,7 @@ CONTAINS
        !
     END IF
     !
-    CALL mp_bcast ( found, ionode_id, world_comm )
+    CALL mp_bcast ( found, ionode_id, intra_image_comm )
     !
     IF ( found ) CALL card_bcast( 'CONSTRAINTS' )
     !
@@ -589,7 +582,7 @@ CONTAINS
        !
     END IF
     !
-    CALL mp_bcast ( found, ionode_id, world_comm )
+    CALL mp_bcast ( found, ionode_id, intra_image_comm )
     !
     IF ( found ) CALL card_bcast( 'OCCUPATIONS' )
     !
@@ -620,7 +613,7 @@ CONTAINS
        !
     END IF
     !
-    CALL mp_bcast ( found, ionode_id, world_comm )
+    CALL mp_bcast ( found, ionode_id, intra_image_comm )
     !
     IF ( found ) CALL card_bcast( 'CLIMBING_IMAGES' )
     !
@@ -651,7 +644,7 @@ CONTAINS
        !
     END IF
     !
-    CALL mp_bcast ( found, ionode_id, world_comm )
+    CALL mp_bcast ( found, ionode_id, intra_image_comm )
     !
     IF ( found ) CALL card_bcast( 'PLOT_WANNIER' )
     !

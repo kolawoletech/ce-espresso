@@ -58,11 +58,6 @@ dspev_drv.o : mp_diag.o
 electrons_base.o : constants.o
 electrons_base.o : io_global.o
 electrons_base.o : kind.o
-environ_input.o : io_global.o
-environ_input.o : kind.o
-environ_input.o : mp.o
-environ_input.o : mp_images.o
-environ_input.o : parameters.o
 environment.o : io_files.o
 environment.o : io_global.o
 environment.o : kind.o
@@ -144,7 +139,6 @@ mm_dispersion.o : ions_base.o
 mm_dispersion.o : kind.o
 mm_dispersion.o : mp.o
 mm_dispersion.o : mp_images.o
-mm_dispersion.o : mp_world.o
 mp.o : io_global.o
 mp.o : kind.o
 mp.o : parallel_include.o
@@ -238,7 +232,6 @@ read_input.o : read_namelists.o
 read_input.o : read_xml.o
 read_input.o : xml_input.o
 read_namelists.o : constants.o
-read_namelists.o : environ_input.o
 read_namelists.o : input_parameters.o
 read_namelists.o : io_global.o
 read_namelists.o : kind.o
@@ -284,7 +277,7 @@ read_xml.o : ../iotk/src/iotk_unit_interf.o
 read_xml.o : input_parameters.o
 read_xml.o : io_global.o
 read_xml.o : mp.o
-read_xml.o : mp_world.o
+read_xml.o : mp_images.o
 read_xml.o : read_namelists.o
 read_xml.o : read_xml_cards.o
 read_xml.o : read_xml_fields.o
@@ -294,7 +287,7 @@ read_xml_cards.o : input_parameters.o
 read_xml_cards.o : io_global.o
 read_xml_cards.o : kind.o
 read_xml_cards.o : mp.o
-read_xml_cards.o : mp_world.o
+read_xml_cards.o : mp_images.o
 read_xml_cards.o : read_namelists.o
 read_xml_cards.o : read_xml_fields.o
 read_xml_fields.o : ../iotk/src/iotk_module.o
@@ -408,6 +401,7 @@ xml_io_base.o : mp_images.o
 xml_io_base.o : mp_wave.o
 xml_io_base.o : parser.o
 xml_io_base.o : wrappers.o
+zdotc_wrapper.o : kind.o
 zhpev_drv.o : io_global.o
 zhpev_drv.o : kind.o
 zhpev_drv.o : mp.o

@@ -35,7 +35,6 @@ acfdt_in_pw.o \
 newd.o \
 bp_mod.o \
 bp_c_phase.o \
-z2_c_phase.o \
 bp_calc_btq.o \
 bp_qvan3.o \
 bp_strings.o \
@@ -148,11 +147,15 @@ plugin_scf_energy.o \
 plugin_scf_potential.o \
 plugin_init_ions.o \
 plugin_init_cell.o \
+plugin_init_potential.o \
+plugin_initbase.o \
 plugin_clean.o \
 plugin_clock.o \
 plugin_summary.o \
 plugin_initialization.o \
-plugin_forces.o \
+plugin_ext_forces.o \
+plugin_int_forces.o \
+plugin_read_input.o \
 plus_u_full.o \
 potinit.o \
 print_clock_pw.o \

@@ -45,12 +45,6 @@ SUBROUTINE electrons()
   USE paw_onecenter,        ONLY : PAW_potential
   USE paw_symmetry,         ONLY : PAW_symmetrize_ddd
   USE uspp_param,           ONLY : nh, nhm ! used for PAW
-#ifdef __ENVIRON
-  USE environ_base,         ONLY : do_environ, vltot_zero
-  USE cell_base,            ONLY : at, alat, omega, ibrav
-  USE ions_base,            ONLY : zv, nat, nsp, ityp, tau
-  USE environ_init,         ONLY : environ_initions, environ_initcell
-#endif
   !
   !
   IMPLICIT NONE
@@ -86,14 +80,7 @@ SUBROUTINE electrons()
   CALL plugin_init_ions()
   CALL plugin_init_cell()
   !
-#ifdef __ENVIRON
-  IF ( do_environ ) THEN
-    vltot_zero = vltot
-    CALL environ_initions( dfftp%nnr, nat, nsp, ityp, zv, tau, alat ) 
-    CALL environ_initcell( dfftp%nnr, dfftp%nr1, dfftp%nr2, dfftp%nr3, &
-                           ibrav, omega, alat, at ) 
-  END IF
-#endif
+  CALL plugin_init_potential()
   !
   !%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
   !%%%%%%%%%%%%%%%%%%%%  Iterate hybrid functional  %%%%%%%%%%%%%%%%%%%%%
@@ -333,17 +320,6 @@ SUBROUTINE electrons_scf ( no_printout )
   USE paw_onecenter,        ONLY : PAW_potential
   USE paw_symmetry,         ONLY : PAW_symmetrize_ddd
   USE uspp_param,           ONLY : nh, nhm ! used for PAW
-#ifdef __ENVIRON
-  USE environ_base,         ONLY : do_environ, update_venviron,             &
-                                   vltot_zero, environ_thr,                 &
-                                   env_static_permittivity,                 & 
-                                   env_surface_tension, env_pressure,       &
-                                   env_periodicity, env_ioncc_level,        &
-                                   env_extcharge_n, deenviron, esolvent,    &
-                                   ecavity, epressure, eperiodic, eioncc,   &
-                                   eextcharge
- USE environ_main,          ONLY : calc_eenviron, calc_venviron
-#endif
   USE dfunct,               ONLY : newd
   USE esm,                  ONLY : do_comp_esm, esm_printpot
   USE iso_c_binding,        ONLY : c_int
@@ -393,7 +369,7 @@ SUBROUTINE electrons_scf ( no_printout )
   !
   IF ( istep > 0 ) ethr = 1.D-6
   !
-  IF ( restart ) CALL restart_in_electrons (iter, dr2, et )
+  IF ( restart ) CALL restart_in_electrons (iter, dr2, ethr, et )
   !
   WRITE( stdout, 9000 ) get_clock( 'PWSCF' )
   !
@@ -430,7 +406,7 @@ SUBROUTINE electrons_scf ( no_printout )
      !
      IF ( check_stop_now() ) THEN
         conv_elec=.FALSE.
-        CALL save_in_electrons (iter, dr2, et )
+        CALL save_in_electrons (iter, dr2, ethr, et )
         GO TO 10
      END IF
      iter = iter + 1
@@ -485,7 +461,7 @@ SUBROUTINE electrons_scf ( no_printout )
         !
         IF ( stopped_by_user ) THEN
            conv_elec=.FALSE.
-           CALL save_in_electrons (iter-1, dr2, et )
+           CALL save_in_electrons (iter-1, dr2, ethr, et )
            GO TO 10
         END IF
         !
@@ -652,33 +628,9 @@ SUBROUTINE electrons_scf ( no_printout )
      !
      plugin_etot = 0.0_dp
      !
-     CALL plugin_scf_energy()
+     CALL plugin_scf_energy(plugin_etot,rhoin)
      !
-     CALL plugin_scf_potential()
-     !
-#ifdef __ENVIRON
-     ! ... computes the external environment contribution to energy and potential
-     !
-     IF ( do_environ  )  THEN
-        !
-        vltot = vltot_zero
-        !vltot_zero = 0.0_dp
-        !
-        CALL calc_eenviron( dfftp%nnr, nspin, rhoin%of_r, deenviron, esolvent, &
-                            ecavity, epressure, eperiodic, eioncc, eextcharge )
-        !
-        plugin_etot = plugin_etot + deenviron + esolvent + ecavity + epressure + eperiodic + eioncc + eextcharge
-        !
-        update_venviron = .NOT. conv_elec .AND. dr2 .LT. environ_thr
-        !
-        IF ( update_venviron ) WRITE( stdout, 9200 )
-        !
-        CALL calc_venviron( update_venviron, dfftp%nnr, nspin, dr2, rhoin%of_r, vltot )
-        ! 
-        !CALL sum_vrs( dfftp%nnr, nspin, vltot, vrs, vrs)
-        ! 
-     END IF
-#endif
+     CALL plugin_scf_potential(rhoin,conv_elec,dr2)
      !
      ! ... define the total local potential (external + scf)
      !
@@ -833,9 +785,6 @@ SUBROUTINE electrons_scf ( no_printout )
 9101 FORMAT(/'     End of self-consistent calculation' )
 9110 FORMAT(/'     convergence has been achieved in ',i3,' iterations' )
 9120 FORMAT(/'     convergence NOT achieved after ',i3,' iterations: stopping' )
-#ifdef __ENVIRON
-9200 FORMAT(/'     add environment contribution to local potential')
-#endif
   !
   CONTAINS
      !
@@ -1083,9 +1032,6 @@ SUBROUTINE electrons_scf ( no_printout )
        !
        USE constants, ONLY : eps8
        USE control_flags, ONLY : lmd
-#ifdef __ENVIRON
-       USE environ_info, ONLY : environ_print_energies
-#endif      
        !
        IF ( ( conv_elec .OR. MOD( iter, iprint ) == 0 ) .AND. .NOT. lmd ) THEN
           !
@@ -1133,11 +1079,6 @@ SUBROUTINE electrons_scf ( no_printout )
        END IF
        !
        CALL plugin_print_energies()
-       !
-#ifdef __ENVIRON
-       IF ( do_environ ) CALL environ_print_energies()
-       !
-#endif
        !
        IF ( lsda ) WRITE( stdout, 9017 ) magtot, absmag
        !

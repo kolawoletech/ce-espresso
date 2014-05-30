@@ -760,10 +760,11 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 
 		'fixed' :       for insulators with a gap
 
-		'from_input' :  The occupation are read from input file.
-                                Requires "nbnd" to be set in input.
-                                Occupations should be consistent with the
-                                value of "tot_charge". 
+		'from_input' :  The occupation are read from input file,
+                                card OCCUPATIONS. Option valid only for a
+                                single k-point, requires "nbnd" to be set 
+                                in input. Occupations should be consistent 
+                                with the value of "tot_charge".
 	    }
 	}
 
@@ -957,8 +958,8 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 	    default { .FALSE. }
 	    status {
 		DFT+U (formerly known as LDA+U) currently works only for 
-                a few selected elements. Modify PW/set_hubbard_l.f90 and 
-                PW/tabd.f90 if you plan to use DFT+U with an element that 
+                a few selected elements. Modify flib/set_hubbard_l.f90 and 
+                PW/src/tabd.f90 if you plan to use DFT+U with an element that 
                 is not configured there.
 	    }
 	    info { 
@@ -1060,7 +1061,7 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 
 		'file':         use the information from file "prefix".atwfc that must
                                 have been generated previously, for instance by pmw.x
-                                (see PP/poormanwannier.f90 for details).
+                                (see PP/src/poormanwannier.f90 for details).
 
                 'pseudo':       use the pseudopotential projectors. The charge density
                                 outside the atomic core radii is excluded.
@@ -1236,21 +1237,8 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
                          "Periodic boundary conditions in ab initio
                          calculations" , Phys.Rev.B 51, 4014 (1995)
 
-                'dcc' :  density counter charge correction CURRENTLY DISABLED
-                         The electrostatic problem is solved in open boundary
-                         conditions (OBC). This approach provides the correct
-                         scf potential and energies (not just a correction to
-                         energies as 'mp'). BEWARE: the molecule should be 
-                         centered around the middle of the cell, not around 
-                         the origin (0,0,0).
-                         Theory described in:
-                         I.Dabo, B.Kozinsky, N.E.Singh-Miller and N.Marzari,
-                         "Electrostatic periodic boundary conditions and
-                         real-space corrections", Phys.Rev.B 77, 115139 (2008)
-
-                'martyna-tuckerman', 'm-t', 'mt' : Martyna-Tuckerman correction.
-                         As for the dcc correction the scf potential is also
-                         corrected. Implementation adapted from:
+                'martyna-tuckerman', 'm-t', 'mt' : Martyna-Tuckerman correction
+                         to both total energy and scf potential. Adapted from:
                          G.J. Martyna, and M.E. Tuckerman,
                          "A reciprocal space based method for treating long
                          range interactions in ab-initio and force-field-based

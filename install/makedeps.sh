@@ -18,8 +18,8 @@ then
 elif
     test $1 = "-addson" 
 then
-    echo "The script for adding new dependencies is runing"
-    echo "USAGE $0 -addson DIR DEPENDENCY_DIRS"
+    echo "The script for adding new dependencies is running"
+    echo "Usage: $0 -addson DIR DEPENDENCY_DIRS"
     echo "$0 assumes that the new dependencies are in $TOPDIR/../"
 #    ninput=$#
 #    echo "number of input arguments: $ninput"
@@ -53,13 +53,9 @@ for dir in $dirs; do
 	PP/src  )
              DEPENDS="$LEVEL2/include $LEVEL2/iotk/src $LEVEL2/Modules \
                       $LEVEL2/PW/src" ;;
-	VdW/src ) 
-	     DEPENDS="$LEVEL2/include $LEVEL2/iotk/src $LEVEL2/Modules \
-	              $LEVEL2/PW/src $LEVEL2/PHonon/PH" ;;
 	ACFDT ) 
              DEPENDS="$LEVEL1/include $LEVEL1/iotk/src $LEVEL1/Modules \
                       $LEVEL1/PW/src $LEVEL1/PHonon/PH" ;;
-
 	PW/src )
 	     DEPENDS="$LEVEL2/include $LEVEL2/iotk/src $LEVEL2/Modules" ;;
 	PW/tools | PWCOND/src | PHonon/FD )
@@ -73,14 +69,13 @@ for dir in $dirs; do
 	     DEPENDS="$LEVEL2/include $LEVEL2/iotk/src $LEVEL2/Modules \
 	              $LEVEL2/PW/src $LEVEL2/PHonon/PH" ;;	
         GWW/pw4gww )
-            DEPENDS="$LEVEL2/include $LEVEL2/iotk/src $LEVEL2/Modules \           
+            DEPENDS="$LEVEL2/include $LEVEL2/iotk/src $LEVEL2/Modules \
                        $LEVEL2/PW/src  " ;;
 	GWW/gww )
             DEPENDS="$LEVEL2/include $LEVEL2/iotk/src $LEVEL2/Modules " ;;
         GWW/head )
              DEPENDS="$LEVEL2/include $LEVEL2/iotk/src $LEVEL2/Modules \
                       $LEVEL2/PW/src $LEVEL2/PHonon/PH " ;;
-
 	TDDFPT/src )
              DEPENDS="$LEVEL2/include $LEVEL2/iotk/src $LEVEL2/Modules \
                       $LEVEL2/PW/src $LEVEL2/PHonon/PH" ;;
@@ -117,12 +112,14 @@ for dir in $dirs; do
 
         if test "$DIR" = "PW/src" || test "$DIR" = "TDDFPT/src"
         then
-            sed '/@environ_base@/d' make.depend > make.depend.tmp
-            sed '/@environ_info@/d' make.depend.tmp > make.depend
-            sed '/@environ_init@/d' make.depend > make.depend.tmp
-            sed '/@environ_main@/d' make.depend.tmp > make.depend
-            sed '/@environ_mp@/d'   make.depend > make.depend.tmp
-            sed '/@solvent_tddfpt@/d' make.depend.tmp > make.depend
+            sed '/@environ_base@/d'  make.depend > make.depend.tmp
+            sed '/@environ_input@/d' make.depend.tmp > make.depend
+            sed '/@environ_info@/d'  make.depend > make.depend.tmp
+            sed '/@environ_init@/d'  make.depend.tmp > make.depend
+            sed '/@environ_main@/d'  make.depend > make.depend.tmp
+            sed '/@environ_mp@/d'    make.depend.tmp > make.depend
+            sed '/@solvent_tddfpt@/d' make.depend > make.depend.tmp
+            mv make.depend.tmp make.depend
         fi
 
         rm -f make.depend.tmp
@@ -136,7 +133,7 @@ for dir in $dirs; do
            echo directory $DIR : ok
        fi
     else
-       echo WARNING: $DIR not present in $TOPDIR 
+       echo directory $DIR : not present in $TOPDIR 
     fi
 done
 if test "$notfound" = ""

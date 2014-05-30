@@ -86,6 +86,7 @@ CONTAINS
     CASE ('ATOMIC_SPECIES')
        atom_mass = 0.0_DP
        hubbard_u = 0.0_DP
+       hubbard_j = 0.0_DP
        hubbard_j0 = 0.0_DP
        hubbard_alpha = 0.0_DP
        hubbard_beta = 0.0_DP
@@ -162,7 +163,7 @@ CONTAINS
     USE io_global, ONLY : ionode, ionode_id                                                           
     !
     USE mp,        ONLY : mp_bcast
-    USE mp_world,  ONLY : world_comm
+    USE mp_images, ONLY : intra_image_comm
     !
     IMPLICIT NONE
     !
@@ -175,94 +176,75 @@ CONTAINS
        !
        !
     CASE ( 'CELL' )
-       CALL mp_bcast( ibrav, ionode_id, world_comm )
-       CALL mp_bcast( celldm, ionode_id, world_comm )
-       CALL mp_bcast( A, ionode_id, world_comm )
-       CALL mp_bcast( B, ionode_id, world_comm )
-       CALL mp_bcast( C, ionode_id, world_comm )
-       CALL mp_bcast( cosAB, ionode_id, world_comm )
-       CALL mp_bcast( cosAC, ionode_id, world_comm )
-       CALL mp_bcast( cosBC, ionode_id, world_comm )
-       CALL mp_bcast( cell_units, ionode_id, world_comm )
-       CALL mp_bcast( rd_ht, ionode_id, world_comm )
-       CALL mp_bcast( trd_ht, ionode_id, world_comm )
+       CALL mp_bcast( ibrav, ionode_id, intra_image_comm )
+       CALL mp_bcast( celldm, ionode_id, intra_image_comm )
+       CALL mp_bcast( A, ionode_id, intra_image_comm )
+       CALL mp_bcast( B, ionode_id, intra_image_comm )
+       CALL mp_bcast( C, ionode_id, intra_image_comm )
+       CALL mp_bcast( cosAB, ionode_id, intra_image_comm )
+       CALL mp_bcast( cosAC, ionode_id, intra_image_comm )
+       CALL mp_bcast( cosBC, ionode_id, intra_image_comm )
+       CALL mp_bcast( cell_units, ionode_id, intra_image_comm )
+       CALL mp_bcast( rd_ht, ionode_id, intra_image_comm )
+       CALL mp_bcast( trd_ht, ionode_id, intra_image_comm )
        !
     CASE ( 'ATOMIC_SPECIES' )
-       CALL mp_bcast( ntyp, ionode_id, world_comm )
-       CALL mp_bcast( atom_mass, ionode_id, world_comm )
-       CALL mp_bcast( atom_pfile, ionode_id, world_comm )
-       CALL mp_bcast( atom_label, ionode_id, world_comm )
-       CALL mp_bcast( taspc, ionode_id, world_comm )
-       CALL mp_bcast( hubbard_u, ionode_id, world_comm )
-       CALL mp_bcast( hubbard_j0, ionode_id, world_comm )
-       CALL mp_bcast( hubbard_alpha, ionode_id, world_comm )
-       CALL mp_bcast( hubbard_beta, ionode_id, world_comm )
-       CALL mp_bcast( starting_magnetization, ionode_id, world_comm )
-       CALL mp_bcast( starting_ns_eigenvalue, ionode_id, world_comm )
-       CALL mp_bcast( angle1, ionode_id, world_comm )
-       CALL mp_bcast( angle2, ionode_id, world_comm )
-       CALL mp_bcast( ion_radius, ionode_id, world_comm )
-       CALL mp_bcast( nhgrp, ionode_id, world_comm )
-       CALL mp_bcast( fnhscl, ionode_id, world_comm )
-       CALL mp_bcast( tranp, ionode_id, world_comm )
-       CALL mp_bcast( amprp, ionode_id, world_comm )
+       CALL mp_bcast( ntyp, ionode_id, intra_image_comm )
+       CALL mp_bcast( atom_mass, ionode_id, intra_image_comm )
+       CALL mp_bcast( atom_pfile, ionode_id, intra_image_comm )
+       CALL mp_bcast( atom_label, ionode_id, intra_image_comm )
+       CALL mp_bcast( taspc, ionode_id, intra_image_comm )
+       CALL mp_bcast( hubbard_u, ionode_id, intra_image_comm )
+       CALL mp_bcast( hubbard_j, ionode_id, intra_image_comm )
+       CALL mp_bcast( hubbard_j0, ionode_id, intra_image_comm )
+       CALL mp_bcast( hubbard_alpha, ionode_id, intra_image_comm )
+       CALL mp_bcast( hubbard_beta, ionode_id, intra_image_comm )
+       CALL mp_bcast( starting_magnetization, ionode_id, intra_image_comm )
+       CALL mp_bcast( starting_ns_eigenvalue, ionode_id, intra_image_comm )
+       CALL mp_bcast( angle1, ionode_id, intra_image_comm )
+       CALL mp_bcast( angle2, ionode_id, intra_image_comm )
+       CALL mp_bcast( ion_radius, ionode_id, intra_image_comm )
+       CALL mp_bcast( nhgrp, ionode_id, intra_image_comm )
+       CALL mp_bcast( fnhscl, ionode_id, intra_image_comm )
+       CALL mp_bcast( tranp, ionode_id, intra_image_comm )
+       CALL mp_bcast( amprp, ionode_id, intra_image_comm )
        !
     CASE ( 'ATOMIC_LIST' )
-       CALL mp_bcast( atomic_positions, ionode_id, world_comm )
-       CALL mp_bcast( nat, ionode_id, world_comm )
-!       CALL mp_bcast( num_of_images, ionode_id, world_comm )
+       CALL mp_bcast( atomic_positions, ionode_id, intra_image_comm )
+       CALL mp_bcast( nat, ionode_id, intra_image_comm )
        ! ... ionode has already done it inside card_xml_atomic_list
        IF (.not.ionode) THEN
           CALL allocate_input_ions( ntyp, nat )
        END IF
-!       CALL mp_bcast( pos, ionode_id )
-       CALL mp_bcast( if_pos, ionode_id, world_comm )
-       CALL mp_bcast( na_inp, ionode_id, world_comm )
-       CALL mp_bcast( sp_pos, ionode_id, world_comm )
-       CALL mp_bcast( rd_pos, ionode_id, world_comm )
-       CALL mp_bcast( sp_vel, ionode_id, world_comm )
-       CALL mp_bcast( rd_vel, ionode_id, world_comm )
-       CALL mp_bcast( tapos, ionode_id, world_comm )
-       !
-!    CASE ( 'CHAIN' )
-!       CALL mp_bcast( atomic_positions, ionode_id, world_comm )
-!       CALL mp_bcast( nat, ionode_id, world_comm )
-!       CALL mp_bcast( num_of_images, ionode_id, world_comm )
-!       ! ... ionode has already done it inside card_xml_atomic_list
-!       IF (.not.ionode) THEN
-!          CALL allocate_input_ions( ntyp, nat )
-!          IF (num_of_images>1) THEN
-!             IF ( allocated( pos ) ) deallocate( pos )
-!             allocate( pos( 3*nat,  num_of_images ) )
-!          END IF
-!       END IF
-!       CALL mp_bcast( pos, ionode_id, world_comm )
-!       CALL mp_bcast( if_pos, ionode_id, world_comm )
-!       CALL mp_bcast( sp_pos, ionode_id, world_comm )
-!       CALL mp_bcast( rd_pos, ionode_id, world_comm )
-!       CALL mp_bcast( na_inp, ionode_id, world_comm )
-!       CALL mp_bcast( tapos, ionode_id, world_comm )
+       CALL mp_bcast( if_pos, ionode_id, intra_image_comm )
+       CALL mp_bcast( na_inp, ionode_id, intra_image_comm )
+       CALL mp_bcast( sp_pos, ionode_id, intra_image_comm )
+       CALL mp_bcast( rd_pos, ionode_id, intra_image_comm )
+       CALL mp_bcast( sp_vel, ionode_id, intra_image_comm )
+       CALL mp_bcast( rd_vel, ionode_id, intra_image_comm )
+       CALL mp_bcast( tapos, ionode_id, intra_image_comm )
        !
     CASE ( 'CONSTRAINTS' )
-       CALL mp_bcast( nconstr_inp, ionode_id, world_comm )
-       CALL mp_bcast( constr_tol_inp, ionode_id, world_comm )
+       CALL mp_bcast( nconstr_inp, ionode_id, intra_image_comm )
+       CALL mp_bcast( constr_tol_inp, ionode_id, intra_image_comm )
        IF ( .not.ionode ) CALL allocate_input_constr()
-       CALL mp_bcast( constr_type_inp, ionode_id, world_comm )
-       CALL mp_bcast( constr_target_inp, ionode_id, world_comm )
-       CALL mp_bcast( constr_target_set, ionode_id, world_comm )
-       CALL mp_bcast( constr_inp, ionode_id, world_comm )
+       CALL mp_bcast( constr_type_inp, ionode_id, intra_image_comm )
+       CALL mp_bcast( constr_target_inp, ionode_id, intra_image_comm )
+       CALL mp_bcast( constr_target_set, ionode_id, intra_image_comm )
+       CALL mp_bcast( constr_inp, ionode_id, intra_image_comm )
        !
     CASE ( 'K_POINTS' )
-       CALL mp_bcast( k_points, ionode_id, world_comm )
-       CALL mp_bcast( nkstot, ionode_id, world_comm )
-       CALL mp_bcast( nk1, ionode_id, world_comm )
-       CALL mp_bcast( nk2, ionode_id, world_comm )
-       CALL mp_bcast( nk3, ionode_id, world_comm )
-       CALL mp_bcast( k1, ionode_id, world_comm )
-       CALL mp_bcast( k2, ionode_id, world_comm )
-       CALL mp_bcast( k3, ionode_id, world_comm )
-       CALL mp_bcast( xk, ionode_id, world_comm )
-       CALL mp_bcast( wk, ionode_id, world_comm )
+       CALL mp_bcast( k_points, ionode_id, intra_image_comm )
+       CALL mp_bcast( nkstot, ionode_id, intra_image_comm )
+       CALL mp_bcast( nk1, ionode_id, intra_image_comm )
+       CALL mp_bcast( nk2, ionode_id, intra_image_comm )
+       CALL mp_bcast( nk3, ionode_id, intra_image_comm )
+       CALL mp_bcast( k1, ionode_id, intra_image_comm )
+       CALL mp_bcast( k2, ionode_id, intra_image_comm )
+       CALL mp_bcast( k3, ionode_id, intra_image_comm )
+       IF ( .not.ionode ) ALLOCATE( xk(3,MAX(1,nkstot)), wk(MAX(1,nkstot)) ) 
+       CALL mp_bcast( xk, ionode_id, intra_image_comm )
+       CALL mp_bcast( wk, ionode_id, intra_image_comm )
        !
     CASE ( 'OCCUPATIONS' )
        IF ( .not.ionode ) THEN
@@ -270,14 +252,10 @@ CONTAINS
           if ( nspin == 4 ) nspin0 = 1
           ALLOCATE( f_inp (nbnd, nspin0 ) )
        END IF
-       CALL mp_bcast( f_inp, ionode_id, world_comm )
-       !
-!    CASE ( 'CLIMBING_IMAGES' )
-!       IF ( .not.ionode ) ALLOCATE( climbing( num_of_images ) )
-!       CALL mp_bcast( climbing, ionode_id, world_comm )
+       CALL mp_bcast( f_inp, ionode_id, intra_image_comm )
        !
     CASE ( 'PLOT_WANNIER' )
-       CALL mp_bcast( wannier_index, ionode_id, world_comm )
+       CALL mp_bcast( wannier_index, ionode_id, intra_image_comm )
        !
     CASE DEFAULT
        CALL errore ( 'card_bcast', 'You want to broadcast a card that does &
@@ -732,6 +710,10 @@ CONTAINS
          CALL iotk_scan_dat_inside( xmlinputunit, hubbard_u( is ),&
               ierr = ierr)
          !
+      CASE ( 'hubbard_j' )
+         CALL iotk_scan_dat_inside( xmlinputunit, hubbard_j( :, is ),&
+              ierr = ierr)
+         !
       CASE ( 'hubbard_j0' )
          CALL iotk_scan_dat_inside( xmlinputunit, hubbard_j0( is ),&
               ierr = ierr)
@@ -903,7 +885,7 @@ CONTAINS
   !_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-!
   !                                                                            !
   !                                                                            !
-  ! CHAIN  (used in neb and smd calculation)                                   !
+  ! CHAIN  (used in neb and smd calculation) OBSOLETE, NOT IMPLEMENTED         !
   !                                                                            !
   !   set the atomic positions for a chian                                     !
   !                                                                            !
@@ -949,165 +931,12 @@ CONTAINS
     !
     end_of_chain = .false.
 
-!    CALL iotk_scan_begin( xmlinputunit, 'chain', attr, ierr = ierr )
-!    IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error scanning begin &
-!         &of chain node', abs(ierr) )
-!    !
-!    !
-!    CALL iotk_scan_attr( attr, 'num_of_images', num_of_images, ierr = ierr )
-!    IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error reading &
-!         &num_of_images attribute of chain node', abs(ierr) )
-!    !
-!    IF ( num_of_images < 1 )  CALL errore ( 'card_xml_chain', 'null &
-!         &or negative num_of_images', 1 )
-!    !
-!    CALL find_image( 1 )
-!    IF (end_of_chain) CALL errore( 'card_xml_chain', 'first image not found', 1 )
-!    !
-!    CALL iotk_scan_attr( attr, 'units', atomic_positions, found = found, ierr = ierr )
-!    IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error reading units attribute &
-!         &of atomic_list node', abs(ierr) )
-!    !
-!    IF ( found ) THEN
-!       IF ( (trim( atomic_positions ) == 'crystal') .or. &
-!            (trim( atomic_positions ) == 'bohr') .or. &
-!            (trim( atomic_positions ) == 'angstrom').or. &
-!            (trim( atomic_positions ) == 'alat') ) THEN
-!          atomic_positions = trim( atomic_positions )
-!       ELSE
-!          CALL errore( 'car_xml_chain',  &
-!               'error in units attribute of atomic_list node, unknow '&
-!               & //trim(atomic_positions)//' units', 1 )
-!       ENDIF
-!    ELSE
-!       ! ... default value
-!       atomic_positions = 'alat'
-!    ENDIF
-!    !
-!    CALL iotk_scan_attr( attr, 'nat', nat, ierr = ierr )
-!    IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error reading nat attribute &
-!         &of atomic_list node', abs(ierr) )
-!    !
-!    IF ( nat < 1 ) THEN
-!       CALL errore( 'card_xml_chain',  'nat out of range',  abs(nat) )
-!    END IF
-!    
-!    ! ... allocation of needed arrays
-!    CALL allocate_input_ions( ntyp, nat )
-!    !
-!    if_pos = 1
-!    sp_pos = 0
-!    rd_pos = 0.0_DP
-!    na_inp = 0
-!    !
-!    !
-!    IF ( allocated( pos ) ) deallocate( pos )
-!    allocate( pos( 3*nat,  num_of_images ) )
-    !
-!    allocate( tmp_image( 3, nat ) )
-    !
-!    pos(:, :) = 0.0_DP
-    !
-!    CALL read_image( 1, tmp_image )
-!    ! ...  transfer of tmp_image data in pos array (to mantain compatibility)
-!    CALL reshaffle_indexes( 1 )
-    !
-!    input_images = 1
-    !
-!    DO
-!       !
-!       ! ... a trick to move the cursor at the beginning of chain node
-!       !
-!       CALL iotk_scan_end( xmlinputunit, 'atomic_list', ierr = ierr )
-!       IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error scanning end of &
-!            &atomic_list node', input_images )
-!       !
-!       CALL iotk_scan_end( xmlinputunit, 'chain', ierr = ierr )
-!       IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error scanning end of chain &
-!            &node', abs(ierr) )
-!       !
-!       CALL iotk_scan_begin( xmlinputunit, 'chain', ierr = ierr )
-!       IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error scanning begin &
-!            &of chain node', abs( ierr ) )
-!       ! ... end of the trick
-!       !
-!       CALL find_image( input_images + 1 )
-!       !
-!       IF (end_of_chain) EXIT
-!       !
-!       input_images = input_images + 1
-!       !
-!       IF ( input_images > num_of_images ) CALL errore( 'card_xml_chain',&
-!            'too many images in chain node', 1 )
-!       !           
-!       CALL read_image( input_images, tmp_image )
-!       ! ... transfer tmp_image data in pos array (to mantain compatibility)
-!       CALL reshaffle_indexes( input_images )
-!       !
-!    ENDDO
-!    !
-!    CALL iotk_scan_end( xmlinputunit, 'atomic_list', ierr = ierr )
-!    IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error scanning end of &
-!         &atomic_list node', abs(ierr) )
-!    !
-!    !
-!    tapos = .true.
-    !
-!    DEALLOCATE(tmp_image)
     RETURN
     !
-!  CONTAINS
-    !
-    ! ... does a scan to find the image with attribute num="iimage"
-!    SUBROUTINE find_image( iimage )
-!      !
-!      INTEGER, INTENT( in ) :: iimage
-!      INTEGER :: direction, rii
-!      !
-!      DO
-!         CALL  iotk_scan_begin( xmlinputunit, 'atomic_list', attr, &
-!              direction = direction, ierr = ierr )
-!         IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error scanning begin &
-!              &of atomic_list node', abs(ierr) )
-!         !
-!         CALL iotk_scan_attr( attr, 'num', rii, ierr = ierr )
-!         IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error reading num &
-!              &attribute of atomic_list node', abs(ierr) )
-!         !
-!         IF ( rii == iimage ) EXIT
-!         !
-!         IF ( direction == -1 ) THEN
-!            end_of_chain = .true.
-!            EXIT
-!         END IF
-!         !
-!         CALL  iotk_scan_end( xmlinputunit, 'atomic_list', ierr = ierr )
-!         IF ( ierr /= 0 ) CALL errore( 'card_xml_chain', 'error scanning end &
-!              &of atomic_list node', abs(iimage) )
-!         !
-!      END DO
-!      !
-!    END SUBROUTINE find_image
-!    !
-!    ! ... copy the data from tmp_image to pos, necessary to mantain the notation
-!    ! ... of old input
-!    SUBROUTINE reshaffle_indexes( iimage )
-!      !
-!      INTEGER, INTENT( in ) :: iimage
-!      INTEGER :: ia_tmp, idx_tmp
-!      
-!      DO ia_tmp = 1,nat
-!         idx_tmp = 3*(ia_tmp -1 )
-!         pos(idx_tmp+1:idx_tmp+3, iimage) = tmp_image( 1:3, ia_tmp )
-!      END DO
-!    END SUBROUTINE reshaffle_indexes
-!    !
   END SUBROUTINE card_xml_chain
   !
+  ! ... Subroutine that reads a single image inside chain node
   !
-  !
-!  ! ... Subroutine that reads a single image inside chain node
-!  !
   SUBROUTINE read_image( image, image_pos, image_vel )
     !
     IMPLICIT NONE
@@ -1303,10 +1132,9 @@ CONTAINS
     LOGICAL :: kband = .FALSE.
     CHARACTER( len = 20 ) :: type
     CHARACTER( len = iotk_attlenx ) :: attr2
-    INTEGER :: i,j, nkaux, ierr
+    INTEGER :: i,j, nk, ndiv, nkaux, ierr
     INTEGER, DIMENSION( 6 ) :: tmp
-    INTEGER, DIMENSION( : ), ALLOCATABLE :: wkaux
-    REAL( DP ), DIMENSION( : , : ), ALLOCATABLE :: points_tmp, xkaux
+    REAL( DP ), DIMENSION( : , : ), ALLOCATABLE :: points_tmp
     REAL( DP ) :: delta
     !
     !
@@ -1351,6 +1179,7 @@ CONTAINS
        ! ... automatic generation of k-points
        !
        nkstot = 0
+       ALLOCATE ( xk(3,1), wk(1) )
        CALL iotk_scan_dat( xmlinputunit, 'mesh', tmp, ierr = ierr )
        IF ( ierr /= 0 ) CALL errore( 'card_xml_kpoints', 'error reading data inside mesh &
             &node', abs( ierr ) )
@@ -1384,63 +1213,64 @@ CONTAINS
        IF ( ierr /= 0 ) CALL errore( 'card_xml_kpoints', 'error reading attribute npoints of mesh &
             &node', abs( ierr ) )
        !
-       !
-       !IF ( nkstot > size( xk, 2 )  ) CALL errore &
-       !     ('card_xml_kpoints', 'too many k-points', nkstot)
-       !
        allocate( points_tmp(4,nkstot) )
        !
        CALL iotk_scan_dat_inside( xmlinputunit, points_tmp, ierr = ierr )
        IF ( ierr /= 0 ) CALL errore( 'card_xml_kpoints', 'error reading data inside mesh &
             &node', abs( ierr ) )
        !
-       ALLOCATE ( xk(3,nkstot), wk(nkstot) )
-       !
-       xk( :, 1:nkstot ) = points_tmp( 1:3, : )
-       wk( 1:nkstot ) = points_tmp( 4, : )
-       !
-       deallocate( points_tmp )
-       !
-       CALL iotk_scan_end( xmlinputunit, 'mesh', ierr = ierr )
-       IF ( ierr /= 0 ) CALL errore( 'card_xml_kpoints', 'error scanning end of mesh &
-            &node', abs( ierr ) )
-       !
-       !
        IF ( kband ) THEN
           !
           nkaux=nkstot
-          !
-          allocate( xkaux( 3, nkstot ) )
-          allocate( wkaux( nkstot ) )
-          !
-          xkaux( :, 1:nkstot ) = xk( :, 1:nkstot )
-          wkaux( 1:nkstot ) = nint( wk(1:nkstot) )
           nkstot = 0
-          !
           DO i = 1, nkaux-1
+             nkstot = nkstot + NINT ( points_tmp(4,i) )
+          END DO
+          nkstot = nkstot + 1
+          !
+          ALLOCATE ( xk(3,nkstot), wk(nkstot) )
+          !
+          nk = 1
+          wk(nk) = 0.0_dp
+          xk(:, nk) = points_tmp(1:3, 1 )
+          !
+          DO i = 2, nkaux
              !
-             delta = 1.0_DP/wkaux(i)
+             ndiv = NINT(points_tmp(4,i-1))
+             delta = 1.0_DP/ndiv
              !
-             DO j=0, wkaux(i)-1
+             DO j=1, ndiv
                 !
-                nkstot=nkstot+1
-                IF ( nkstot > SIZE (xk,2)  ) CALL errore &
+                nk = nk+1
+                IF ( nk > SIZE (xk,2)  ) CALL errore &
                      ('card_xml_kpoints', 'too many k-points',nkstot)
                 !
-                xk( :, nkstot ) = xkaux( :, i ) + delta*j*( xkaux(:,i+1) - xkaux(:,i) ) 
-                wk(nkstot)=1.0_DP
+                xk( :, nk ) = points_tmp(1:3, i-1 ) + &
+                              delta*j*( points_tmp(1:3,i)-points_tmp(1:3,i-1) ) 
+                wk(nk) = wk(nk-1) + &
+                           SQRT( (xk(1,nk)-xk(1,nk-1))**2 +   &
+                                 (xk(2,nk)-xk(2,nk-1))**2 +   &
+                                 (xk(3,nk)-xk(3,nk-1))**2 )
                 !
              ENDDO
              !
           ENDDO
           !
-          nkstot = nkstot + 1
-          xk( :, nkstot ) = xkaux( :, nkaux )
-          wk( nkstot ) = 1.0_DP
+          IF ( nk /= SIZE (xk,2)  ) CALL errore &
+               ('card_xml_kpoints', 'internal error in k-point computation',nk)
           !
-          deallocate(xkaux)
-          deallocate(wkaux)
-       ENDIF
+       ELSE
+          !
+          ALLOCATE ( xk(3,nkstot), wk(nkstot) )
+          xk( :, 1:nkstot ) = points_tmp( 1:3, : )
+          wk( 1:nkstot ) = points_tmp( 4, : )
+          !
+       END IF
+       deallocate( points_tmp )
+       !
+       CALL iotk_scan_end( xmlinputunit, 'mesh', ierr = ierr )
+       IF ( ierr /= 0 ) CALL errore( 'card_xml_kpoints', 'error scanning end of mesh &
+            &node', abs( ierr ) )
        !
     ELSE IF ( k_points == 'gamma' ) THEN
        !
@@ -1778,7 +1608,7 @@ CONTAINS
   !
   !_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_!
   !                                                                         !
-  ! CLIMBING_IMAGES (optional)                                              !
+  ! CLIMBING_IMAGES (optional) OBSOLETE, NOT IMPLEMENTED                    !
   !                                                                         !
   !   Needed to explicitly specify which images have to climb               !
   !                                                                         !
@@ -1804,65 +1634,8 @@ CONTAINS
   !_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_-_!
   !
   SUBROUTINE card_xml_climbing_images( )
-!    !
-!    IMPLICIT NONE
-!    ! 
-!    ! 
-!    INTEGER          :: i, num_climb_images, ierr
-!    INTEGER, DIMENSION(:), ALLOCATABLE :: tmp
-!    CHARACTER (LEN=iotk_attlenx)  :: attr
-!    !
-!    !
-!    IF ( CI_scheme == 'manual' ) THEN
-!       !
-!       IF ( allocated( climbing ) ) deallocate( climbing )
-!       !
-!       allocate( climbing( num_of_images ) )   
-!       !
-!       climbing( : ) = .FALSE.
-!       !
-!       CALL iotk_scan_begin( xmlinputunit, 'images', ierr = ierr )
-!       IF ( ierr /= 0 ) CALL errore( 'card_xml_climbing_images', 'error scanning begin of &
-!            &images node', abs( ierr ) )
-!       !
-!       CALL iotk_scan_begin( xmlinputunit, 'integer', attr, ierr = ierr )
-!       IF ( ierr /= 0 ) CALL errore( 'card_xml_climbing_images', 'error scanning begin of &
-!            &integer node', abs( ierr ) )
-!       !
-!       CALL iotk_scan_end( xmlinputunit, 'integer', ierr = ierr )
-!       IF ( ierr /= 0 ) CALL errore( 'card_xml_climbing_images', 'error scanning end of &
-!            &integer node', abs( ierr ) )
-!       !
-!       CALL iotk_scan_attr( attr, 'n1', num_climb_images, ierr = ierr )
-!       IF ( ierr /= 0 ) CALL errore( 'card_xml_climbing_images', 'error reading n1 attribute of &
-!            &integer node', abs( ierr ) )
-!       !
-!       IF ( num_climb_images < 1 ) CALL errore( 'card_xml_climbing_images', 'non positive value &
-!            &of num_climb_images', abs( num_climb_images ) )
-!       !
-!       allocate( tmp( num_climb_images ) )
-!       !
-!       CALL iotk_scan_dat_inside( xmlinputunit, tmp, ierr = ierr )
-!       IF ( ierr /= 0 ) CALL errore( 'card_xml_climbing_images', 'error reading data inside &
-!            &images node', abs( ierr ) )
-!       !
-!       CALL iotk_scan_end( xmlinputunit, 'images', ierr = ierr )
-!       IF ( ierr /= 0 ) CALL errore( 'card_xml_climbing_images', 'error scanning end of &
-!            &images node', abs( ierr ) )
-!       !
-!       DO i = 1, num_climb_images
-!          !
-!          IF ( ( tmp(i) > num_of_images ) .or. ( tmp(i)<0 ) ) CALL errore('card_xml_climbing_images',&
-!               "image that doesn't exist", 1 )
-!          !
-!          climbing(tmp(i)) = .true.
-!          !
-!       ENDDO
-!       !
-!    ENDIF
-!    !
-    RETURN
     !
+    RETURN
     !
   END SUBROUTINE card_xml_climbing_images
   !

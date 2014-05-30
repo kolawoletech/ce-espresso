@@ -459,9 +459,17 @@ CONTAINS
  
     do i_grid = 1, dfftp%nnr
        
-       vtxc = vtxc + e2*grid_cell_volume*total_rho(i_grid)*potential(i_grid)
+       vtxc = vtxc + e2*grid_cell_volume*rho_valence(i_grid,1)*potential(i_grid)
     
     end do
+    if (nspin==2) then
+       do i_grid = 1, dfftp%nnr
+       
+          vtxc = vtxc + e2*grid_cell_volume*rho_valence(i_grid,2)*potential(i_grid)
+    
+       end do
+    endif 
+       
 
     deallocate(potential)  
 

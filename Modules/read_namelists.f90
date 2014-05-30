@@ -252,12 +252,6 @@ MODULE read_namelists_module
        xdm_a1 = 0.6836_DP
        xdm_a2 = 1.5045_DP
        !
-#ifdef __ENVIRON
-       ! ... Environ
-       !
-       do_environ = .false. 
-       !
-#endif
        ! ... ESM
        !
        esm_bc='pbc'
@@ -815,9 +809,6 @@ MODULE read_namelists_module
        CALL mp_bcast( xdm_a2,                    ionode_id, intra_image_comm )
        !
        CALL mp_bcast( no_t_rev,                  ionode_id, intra_image_comm )
-#ifdef __ENVIRON
-       CALL mp_bcast( do_environ,                ionode_id, intra_image_comm )
-#endif
        !
        ! ... ESM method broadcast
        !
@@ -1307,12 +1298,8 @@ MODULE read_namelists_module
           IF( ANY(starting_magnetization /= SM_NOT_SET ) ) &
              CALL infomsg( sub_name ,&
                           & ' starting_magnetization is not used in CP ')
-!          IF( lda_plus_U ) &
-!             CALL infomsg( sub_name ,' lda_plus_U is not used in CP ')
           IF( la2F ) &
              CALL infomsg( sub_name ,' la2F is not used in CP ')
-!          IF( ANY(Hubbard_U /= 0.0_DP) ) &
-!             CALL infomsg( sub_name ,' Hubbard_U is not used in CP ')
           IF( ANY(Hubbard_alpha /= 0.0_DP) ) &
              CALL infomsg( sub_name ,' Hubbard_alpha is not used in CP ')
           IF( nosym ) &
@@ -1706,9 +1693,6 @@ MODULE read_namelists_module
        USE io_global, ONLY : ionode, ionode_id
        USE mp,        ONLY : mp_bcast
        USE mp_images, ONLY : intra_image_comm
-#ifdef __ENVIRON
-       USE environ_input, ONLY : environ, environ_defaults, environ_bcast
-#endif
        !
        IMPLICIT NONE
        !
@@ -1860,20 +1844,6 @@ MODULE read_namelists_module
        END IF
        !
        CALL press_ai_bcast()
-#ifdef __ENVIRON
-       !
-       ! ... ENVIRON namelist
-       !
-       IF ( do_environ ) THEN
-          CALL environ_defaults( prog )
-          ios = 0
-          IF( ionode ) READ( unit_loc, environ, iostat = ios )
-          CALL mp_bcast( ios, ionode_id, intra_image_comm )
-          IF( ios /= 0 ) CALL errore( ' read_namelists ', &
-                                    & ' reading namelist environ ', ABS(ios) )
-       END IF
-       CALL environ_bcast()
-#endif
        !
        ! ... WANNIER NAMELIST
        !

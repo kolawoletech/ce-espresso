@@ -68,7 +68,7 @@ MODULE kernel_table
   !                                                    !! kernel matrix at each of the q points.  Stored as  
   !                                                    !! d2phi_dk2(k_point, q1_value, q2_value)
   !
-  character(len=256) :: vdw_table_name                 !! If present from input use this name
+  character(len=256) :: vdw_table_name = ' '           !! If present from input use this name
   CHARACTER(LEN=30)  :: double_format = "(1p4e23.14)"
   CHARACTER(len=32)  :: vdw_kernel_md5_cksum = 'NOT SET'
   !
@@ -150,22 +150,8 @@ CONTAINS
        kernel_file_name = trim(pseudo_dir)//'/'//vdw_table_name
        inquire(file=kernel_file_name, exist=file_exists)
 
-       if (.not. file_exists) then
-
-          !! Finally, try the default pw_dir/PW/vdW_kernel_table file
-          !! --------------------------------------------------------------------------------------
-  
-          kernel_file_name = 'DEFAULT_KERNEL_TABLE_FILE'
-          inquire(file=kernel_file_name, exist=file_exists)
-          
-          if (.not. file_exists) then
-
-             !! No "vdW_kernel_table" file could be found.  Time to die.
-             call errore('read_kernel_table', 'No \"vdW_kernel_table\" file could be found',1)
-
-          end if
-
-       end if
+       if (.not. file_exists) call errore('read_kernel_table', &
+                         TRIM(vdw_table_name)//' file could be found',1)
 
     end if
 

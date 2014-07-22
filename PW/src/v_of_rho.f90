@@ -113,8 +113,7 @@ SUBROUTINE v_xc_meta( rho, rho_core, rhog_core, etxc, vtxc, v, kedtaur )
   USE lsda_mod,         ONLY : nspin
   USE cell_base,        ONLY : omega, alat
   USE spin_orb,         ONLY : domag
-  USE funct,            ONLY : xc, xc_spin, tau_xc, tau_xc_spin, &
-                               get_igcx, get_igcc
+  USE funct,            ONLY : xc, xc_spin, tau_xc, tau_xc_spin, get_meta
   USE scf,              ONLY : scf_type
   USE mp,               ONLY : mp_sum
   USE mp_bands,         ONLY : intra_bgrp_comm
@@ -138,12 +137,12 @@ SUBROUTINE v_xc_meta( rho, rho_core, rhog_core, etxc, vtxc, v, kedtaur )
   REAL(DP) :: zeta, rh
   INTEGER  :: k, ipol, is
   REAL(DP) :: ex, ec, v1x, v2x, v3x,v1c, v2c, v3c,                     &
-  &           v1xup, v1xdw, v2xup, v2xdw, v1cup, v1cdw, v2cup, v2cdw , &
+  &           v1xup, v1xdw, v2xup, v2xdw, v1cup, v1cdw,                &
   &           v3xup, v3xdw,v3cup, v3cdw,                               &
   &           arho, atau, fac, rhoup, rhodw, ggrho2, tauup,taudw          
        
   REAL(DP), DIMENSION(2)   ::    grho2, rhoneg
-  REAL(DP), DIMENSION(3)   ::    grhoup, grhodw, v2cup_vec, v2cdw_vec
+  REAL(DP), DIMENSION(3)   ::    grhoup, grhodw, v2cup, v2cdw
   
   !
   REAL(DP),    ALLOCATABLE :: grho(:,:,:), h(:,:,:), dh(:)
@@ -243,7 +242,7 @@ SUBROUTINE v_xc_meta( rho, rho_core, rhog_core, etxc, vtxc, v, kedtaur )
                 
         call tau_xc_spin (rhoup, rhodw, grhoup, grhodw, tauup, taudw, ex, ec, &
                       v1xup, v1xdw, v2xup, v2xdw, v3xup, v3xdw, v1cup, v1cdw, &
-                      v2cup, v2cdw, v2cup_vec, v2cdw_vec, v3cup, v3cdw ) 
+                      v2cup, v2cdw, v3cup, v3cdw ) 
           !
           ! first term of the gradient correction : D(rho*Exc)/D(rho)
           !
@@ -252,15 +251,15 @@ SUBROUTINE v_xc_meta( rho, rho_core, rhog_core, etxc, vtxc, v, kedtaur )
           !
           ! h contains D(rho*Exc)/D(|grad rho|) * (grad rho) / |grad rho|
           !
-          if (get_igcx()==7.AND.get_igcc()==6) then  ! tpss functional
+          if (get_meta()==1) then  ! tpss functional
             !
-            h(:,k,1) = (v2xup * grhoup(:) + v2cup_vec(:)) * e2
-            h(:,k,2) = (v2xdw * grhodw(:) + v2cdw_vec(:)) * e2
+            h(:,k,1) = (v2xup * grhoup(:) + v2cup(:)) * e2
+            h(:,k,2) = (v2xdw * grhodw(:) + v2cdw(:)) * e2
             !
           else
             !
-            h(:,k,1) = (v2xup + v2cup) * grhoup(:) * e2
-            h(:,k,2) = (v2xdw + v2cdw) * grhodw(:) * e2
+            h(:,k,1) = (v2xup + v2cup(1)) * grhoup(:) * e2
+            h(:,k,2) = (v2xdw + v2cdw(1)) * grhodw(:) * e2
             !
           end if
           !
@@ -325,6 +324,7 @@ SUBROUTINE v_xc_meta( rho, rho_core, rhog_core, etxc, vtxc, v, kedtaur )
   RETURN
   !
 END SUBROUTINE v_xc_meta
+!
 SUBROUTINE v_xc( rho, rho_core, rhog_core, etxc, vtxc, v )
   !----------------------------------------------------------------------------
   !

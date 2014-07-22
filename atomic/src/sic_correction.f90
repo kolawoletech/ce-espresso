@@ -16,7 +16,7 @@ subroutine sic_correction(n,vhn1,vhn2,egc)
   use radial_grids, only : ndmx
   use constants, only: e2, fpi
   use ld1inc, only : nspin, lsd, rel, nlcc, rhoc, grid, psi
-  use funct, only: dft_is_gradient, exc_t, vxc_t
+  use funct, only: dft_is_gradient
   use radial_grids, only: hartree
   implicit none
   integer :: n
@@ -25,7 +25,7 @@ subroutine sic_correction(n,vhn1,vhn2,egc)
        tau(ndmx) = 0.0_dp, vtau(ndmx) = 0.0_dp
   !
   integer :: i
-  real(DP):: rh(2), rhc, vxcp(2)
+  real(DP):: rh(2), rhc, vxcp(2), excp
   real(DP):: vgc(ndmx,2),  egc0(ndmx), rhotot(ndmx,2)
   logical :: gga
 
@@ -58,9 +58,9 @@ subroutine sic_correction(n,vhn1,vhn2,egc)
      vhn1(i) = e2*vhn1(i)
      rh(1) = rhotot(i,1)/grid%r2(i)/fpi
      if (nlcc) rhc = rhoc(i)/grid%r2(i)/fpi
-     call vxc_t(rh,rhc,lsd,vxcp)
+     call vxc_t(lsd,rh,rhc,excp,vxcp)
      vhn2(i)= vhn1(i)+vxcp(1)
-     egc(i)= exc_t(rh,rhc,lsd)*rhotot(i,1)
+     egc(i)= excp*rhotot(i,1)
   end do
 
   if (.not.gga) return

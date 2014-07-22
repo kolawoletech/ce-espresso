@@ -14,7 +14,7 @@ subroutine v_of_rho_at (rho,rhoc,vh,vxc,exc,excgga,vnew,nlcc,iflag)
   use kinds, only : DP
   use constants, only: fpi, e2
   use radial_grids, only: ndmx, hartree
-  use funct, only : get_iexch, dft_is_gradient, exc_t, vxc_t
+  use funct, only : get_iexch, dft_is_gradient
   use ld1inc, only : nwf, grid, vx, vxt, lsd, zed, enne, latt, nspin
   implicit none
   integer, intent(in) :: iflag
@@ -24,14 +24,13 @@ subroutine v_of_rho_at (rho,rhoc,vh,vxc,exc,excgga,vnew,nlcc,iflag)
   logical, intent(in) :: nlcc
   REAL(dp) :: & ! compatibility with metaGGA - not yet used
        tau(ndmx) = 0.0_dp, vtau(ndmx) = 0.0_dp
-
   ! Hartree potential, exchange and correlation potential and energy
   ! gga exchange and correlation energy, 
   ! vnew is in output potential vnew = vh+vxc+vxc
   !
   logical :: gga, oep
   integer :: i,is,nu,ierr
-  real(DP):: vxcp(2),rh(2),rhc
+  real(DP):: vxcp(2),rh(2),rhc, excp
   real(DP),allocatable:: vgc(:,:), egc(:), rhotot(:)
   real(DP),allocatable:: dchi0(:,:)
 
@@ -60,11 +59,11 @@ subroutine v_of_rho_at (rho,rhoc,vh,vxc,exc,excgga,vnew,nlcc,iflag)
         rh(is) = rho(i,is)/grid%r2(i)/fpi
      end do
      if (nlcc) rhc = rhoc(i)/grid%r2(i)/fpi
-     call vxc_t(rh,rhc,lsd,vxcp)
+     call vxc_t(lsd,rh,rhc,excp,vxcp)
      do is=1,nspin
         vxc(i,is)=vxcp(is)
      end do
-     exc(i)=exc_t(rh,rhc,lsd)
+     exc(i)=excp
   end do
   !
   ! if gga add gga exchange and correlation potential

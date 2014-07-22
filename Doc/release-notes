@@ -1,5 +1,6 @@
 New in svn version:
 
+   * PW: TB09 meta-GGA functional (requires libxc)
    * PW: the code can capture "signals". typically sent by batch queues
      when allowed time is close to expire, and terminate gracefully.
      Experimental, to be enabled at compile time (see the user guide)
@@ -13,7 +14,7 @@ Fixed in svn version:
    * Kernel table for rVV10 nonlocal functional was not written to file,
      breaking restart and postprocessing (no problem for scf)
    * Strange compilation bug on some IBM machines
-   * Minor bug in ESM implementation
+   * Minor bug plus OpenMP bug in ESM implementation
 
 New in 5.1 version:
 

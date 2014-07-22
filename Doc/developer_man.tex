@@ -210,13 +210,9 @@ Currently \qe\ uses the following development tools:
 \item Upload space (with download counter)
 \item Mailing lists, currently
 \begin{itemize}
-\item \texttt{pw\_users} (low traffic): for announcements.
-Restricted: only a few developers can post messages here.
 \item \texttt{pw\_forum} (high traffic): for ordinary users, 
 requests for help, problems, discussions, etc.. Only
 registered users can post.
-\item \texttt{q-e-gpgpu} (low traffic): specific to GPU-based 
-architectures. Only registered users can post.
 \item \texttt{q-e-developers} (low traffic):
 for communications among developers and people interested
 in the development of \qe. Only registered users can post
@@ -2027,14 +2023,14 @@ The following web page may be useful:
 \subsection{Including a repository into the trunk}
 \label{SubSec:propedit}
 It is possible to download other repositories into the main \qe\ repository. 
-Currently, this is possible for GIPAW, GPU, EPW (you need to be authorized
-by the authors of these packages, though). From the trunk/ subdirectory
+Currently, this possibility works only for GIPAW (and EPW, which
+however is not aligned to the svn version); you need to be authorized
+to access the GIPAW svn, though. From the trunk/ subdirectory
 (the one containing espresso/), type ``svn propedit svn:externals espresso''.
 An editor will open. Type the name of the subdirectory of ``espresso/''
 where you want the repository to be downloaded, followed by the address of
 the repository, exit (not quit!) the editor. Example:
 \begin{verbatim}
-GPU http://qeforge.qe-forge.org/svn/q-e-gpu/trunk/GPU
 GIPAW http://qeforge.qe-forge.org/svn/qe-gipaw/trunk
 EPW http://qeforge.qe-forge.org/svn/epw-public/trunk/EPW
 \end{verbatim}

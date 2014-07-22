@@ -167,7 +167,8 @@ CONTAINS
        phis, betas,  qvan, kindiff,                                  &
        nlcc, aerhoc, psrhoc, aevtot, psvtot, which_paw_augfun,rel     )
 
-    USE funct,        ONLY : dft_name, get_iexch, get_icorr, get_igcx, get_igcc, get_inlc
+    USE funct,        ONLY : dft_name, get_iexch, get_icorr, get_igcx, &
+                             get_igcc, get_inlc, get_meta
     USE ld1inc,       ONLY : zed, file_screen
     USE paw_type,     ONLY : nullify_pseudo_paw, allocate_pseudo_paw
     USE io_global,    ONLY : stdout, ionode, ionode_id
@@ -548,12 +549,13 @@ CONTAINS
     endif
     !
     write(pawset_%dft,'(80x)') !fill it with spaces
-    CALL dft_name (get_iexch(), get_icorr(), get_igcx(), get_igcc(), get_inlc(), pawset_%dft, shortname)
-    !
+    CALL dft_name (get_iexch(), get_icorr(), get_igcx(), get_igcc(), &
+                   get_inlc(), get_meta(), pawset_%dft, shortname)
     !
     ! Generate the paw hamiltonian for test (should be equal to the US one)
     CALL new_paw_hamiltonian (vps, ddd, etot, &
-       pawset_, pawset_%nwfc, pawset_%l, pawset_%jj, nspin, spin, pawset_%oc, pawset_%pswfc, pawset_%enl, energy, dddion)
+       pawset_, pawset_%nwfc, pawset_%l, pawset_%jj, nspin, spin, pawset_%oc, &
+       pawset_%pswfc, pawset_%enl, energy, dddion)
     pawset_%dion(1:nbeta,1:nbeta)=dddion(1:nbeta,1:nbeta)
     WRITE(stdout,'(/5x,A,f12.6,A)') 'Estimated PAW energy =',etot,' Ryd'
     WRITE(stdout,'(/5x,A)') 'The PAW screened D coefficients'
@@ -771,7 +773,7 @@ CONTAINS
   !
   SUBROUTINE compute_onecenter_energy ( totenergy_, veff_, &
        pawset_, vcharge_, nlcc_, ccharge_, nspin_, iint, vloc, energies_ , unit_)
-    USE funct, ONLY: dft_is_gradient, exc_t, vxc_t !igcx, igcc
+    USE funct, ONLY: dft_is_gradient
     USE radial_grids, ONLY: hartree
     USE io_global, ONLY : stdout, ionode
     IMPLICIT NONE
@@ -789,7 +791,7 @@ CONTAINS
     !
     REAL(dp), PARAMETER :: rho_eq_0(ndmx) = ZERO ! ccharge=0 when nlcc=.f.
     !
-    REAL(dp) :: &
+    REAL(dp) ::        &
          eh, exc, edc, & ! hartree, xc and double counting energies
          eloc,         & ! local energy
          rhovtot(ndmx), & ! total valence charge
@@ -848,12 +850,12 @@ CONTAINS
           rh(is) = vcharge_(i,is)/pawset_%grid%r2(i)/FPI
        ENDDO
        IF (nlcc_) rhc = ccharge_(i)/pawset_%grid%r2(i)/FPI
-       CALL vxc_t(rh,rhc,lsd,vxcr)
+       CALL vxc_t(lsd,rh,rhc,exc,vxcr)
        vxc(i,1:nspin_)=vxcr(1:nspin_)
        IF (nlcc_) THEN
-          aux(i)=exc_t(rh,rhc,lsd) * (rhovtot(i)+ccharge_(i))
+          aux(i)=exc * (rhovtot(i)+ccharge_(i))
        ELSE
-          aux(i)=exc_t(rh,rhc,lsd) *  rhovtot(i)
+          aux(i)=exc *  rhovtot(i)
        END IF
     END DO
     IF (dft_is_gradient()) THEN

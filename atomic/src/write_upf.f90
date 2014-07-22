@@ -103,7 +103,7 @@ end subroutine write_upf_v1
     use ld1inc, only : zed, pseudotype, lpaw, zval, etots, nwfts, nbeta, &
                       ecutwfc, ecutrho, lmax, grid, elts, llts, octs, &
                       pawsetup, nlcc
-    use funct, only : get_iexch, get_icorr, get_igcx, get_igcc,get_inlc, dft_name
+    use funct, only : get_iexch, get_icorr, get_igcx, get_igcc,get_inlc, get_meta, dft_name
     use kinds, only : DP
     implicit none
     integer :: ounps  
@@ -112,7 +112,7 @@ end subroutine write_upf_v1
     character (len=2), external :: atom_name
     character (len=25) :: dft
     integer :: nb, ios, nv  
-    integer :: iexch, icorr, igcx, igcc, inlc
+    integer :: iexch, icorr, igcx, igcc, inlc, imeta
     !
     !
     write (ounps, '(//a11)', err = 100, iostat = ios) "<PP_HEADER>"  
@@ -147,8 +147,9 @@ end subroutine write_upf_v1
     igcx  = get_igcx()
     igcc  = get_igcc()
     inlc  = get_inlc()
+    imeta = get_meta()
 
-    call dft_name (iexch, icorr, igcx, igcc, inlc, dft, shortname)
+    call dft_name (iexch, icorr, igcx, igcc, inlc, imeta, dft, shortname)
 
 
     write (ounps, '(a,t24,a6,a)', err = 100, iostat = ios) &

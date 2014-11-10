@@ -34,7 +34,7 @@ subroutine ewald_dipole (tens,dipole)
   complex(DP), allocatable:: ewaldg(:,:,:), ewaldr(:,:,:)
   integer :: alpha, beta, na, ng, nt, ipol, nb, nrm, nr
 
-  integer, parameter :: mxr = 50
+  integer, parameter :: mxr = 500
   real (DP) :: r(3,mxr), r2(mxr), rmax, rr, dtau(3)
   real (DP) :: expcoeff
   complex(DP) :: carg, recarg, recarg_dgg

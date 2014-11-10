@@ -94,11 +94,39 @@ SUBROUTINE v_of_rho( rho, rho_core, rhog_core, &
      END DO
   END IF
   !
+  !!!!call write_v_on_file(v%of_r(:,1))
   CALL stop_clock( 'v_of_rho' )
   !
   RETURN
   !
 END SUBROUTINE v_of_rho
+
+
+!----------------------------------------------------------------------------
+SUBROUTINE write_v_on_file(v)
+!----------------------------------------------------------------------------
+  USE kinds,           ONLY : DP
+  USE fft_base,        ONLY : dfftp
+  USE gvect,           ONLY : gcutm
+  USE wvfct,           ONLY : ecutwfc
+  USE gvecs,           ONLY : dual
+  USE cell_base,       ONLY : at, alat, tpiba2, omega, ibrav, celldm
+  USE ions_base,       ONLY : zv, ntyp => nsp, nat, ityp, atm, tau
+  implicit none
+  REAL(DP), intent(in) :: v(dfftp%nnr)
+  CHARACTER(LEN=25), PARAMETER :: title = 'v_of_rho'
+  INTEGER :: plot_num=0, iflag=+1
+  INTEGER, SAVE :: iter = 0
+  CHARACTER(LEN=25) :: filplot
+
+  iter = iter + 1
+  write(filplot,'(''v_of_rho_'',I0,''.pp'')') iter
+  CALL plot_io (trim(filplot), title, dfftp%nr1x, dfftp%nr2x, dfftp%nr3x, dfftp%nr1, dfftp%nr2, &
+     dfftp%nr3, nat, ntyp, ibrav, celldm, at, gcutm, dual, ecutwfc, plot_num, atm, &
+     ityp, zv, tau, v, iflag)
+  RETURN
+END SUBROUTINE write_v_on_file
+
 !----------------------------------------------------------------------------
 SUBROUTINE v_xc_meta( rho, rho_core, rhog_core, etxc, vtxc, v, kedtaur )
   !----------------------------------------------------------------------------

@@ -53,7 +53,7 @@ function ewald (alat, nat, ntyp, ityp, zv, at, bg, tau, omega, g, &
   !
   !    here the local variables
   !
-  integer, parameter :: mxr = 50
+  integer, parameter :: mxr = 500
   ! the maximum number of R vectors included in r
   integer :: ng, nr, na, nb, nt, nrm
   ! counter over reciprocal G vectors

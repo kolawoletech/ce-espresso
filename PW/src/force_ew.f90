@@ -50,7 +50,7 @@ subroutine force_ew (alat, nat, ntyp, ityp, zv, at, bg, tau, &
   real(DP) :: forceion (3, nat)
   ! output: the ewald part of the forces
   !
-  integer, parameter :: mxr=50
+  integer, parameter :: mxr=500
   ! the maximum number of R vectors
 
   integer :: ig, n, na, nb, nt, nrm, ipol

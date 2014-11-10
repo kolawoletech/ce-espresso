@@ -47,7 +47,7 @@ subroutine stres_ewa (alat, nat, ntyp, ityp, zv, at, bg, tau, &
   !
   !    here the local variables
   !
-  integer, parameter :: mxr = 50
+  integer, parameter :: mxr = 500
   ! the maximum number of R vectors included in r sum
   integer :: ng,  nr, na, nb, l, m, nrm
   ! counter over reciprocal G vectors

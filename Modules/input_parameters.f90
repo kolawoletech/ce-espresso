@@ -96,10 +96,10 @@ MODULE input_parameters
         CHARACTER(len=80) :: calculation = 'none'
           ! Specify the type of the simulation
           ! See below for allowed values
-        CHARACTER(len=80) :: calculation_allowed(15)
+        CHARACTER(len=80) :: calculation_allowed(14)
         DATA calculation_allowed / 'scf', 'nscf', 'relax', 'md', 'cp', &
           'vc-relax', 'vc-md', 'vc-cp', 'bands', 'neb', 'smd', 'cp-wf', &
-          'cp-wf-nscf','cp-wf-pbe0', 'pbe0-nscf'/   ! Lingzhu Kong
+          'vc-cp-wf', 'cp-wf-nscf'/
         CHARACTER(len=80) :: verbosity = 'default'
           ! define the verbosity of the code output
         CHARACTER(len=80) :: verbosity_allowed(6)
@@ -270,6 +270,8 @@ MODULE input_parameters
           ! if memory = 'large' then QE tries to use (when implemented) algorithms using more memory
           !                     to enhance performance.
 
+          ! if .TRUE., perform exact exchange calculation using Wannier functions (X. Wu et al., Phys. Rev. B. 79, 085102 (2009))
+
         NAMELIST / control / title, calculation, verbosity, restart_mode, &
           nstep, iprint, isave, tstress, tprnfor, dt, ndr, ndw, outdir,   &
           prefix, wfcdir, max_seconds, ekin_conv_thr, etot_conv_thr,      &
@@ -300,6 +302,9 @@ MODULE input_parameters
         REAL(DP) :: cosac = 0.0_DP
         REAL(DP) :: cosbc = 0.0_DP
           ! Alternate definition of the cell - use either this or celldm
+
+        REAL(DP) :: ref_alat = 0.0_DP
+          ! reference cell alat in a.u. (see REF_CELL_PARAMETERS card) 
 
         INTEGER :: nat = 0
           ! total number of atoms
@@ -521,7 +526,24 @@ MODULE input_parameters
           ! if esm_debug is .TRUE., calcualte v_hartree and v_local
           ! for abs(gp)<=esm_debug_gpmax (gp is integer and has tpiba unit)
 
-        LOGICAL :: do_hartree = .true.
+        INTEGER :: space_group = 0
+          ! space group number for coordinates given in crystallographic form
+          !
+        LOGICAL :: uniqueb=.FALSE.
+          ! if .TRUE. for monoclinic lattice choose the b unique primitive 
+          ! vectors
+          !
+        INTEGER :: origin_choice = 1 
+          ! for space groups that have more than one origin choice, choose
+          ! the origin (can be 1 or 2)
+          !
+        LOGICAL :: rhombohedral = .TRUE.
+          !
+          ! if .TRUE. for rhombohedral space groups give the coordinates 
+          ! in rhombohedral axes. If .FALSE. in hexagonal axes, that are
+          ! converted internally in rhombohedral axes.  
+          !
+
 
         NAMELIST / system / ibrav, celldm, a, b, c, cosab, cosac, cosbc, nat, &
              ntyp, nbnd, ecutwfc, ecutrho, nr1, nr2, nr3, nr1s, nr2s,         &
@@ -535,7 +557,7 @@ MODULE input_parameters
              U_projection_type, input_dft, la2F, assume_isolated,             &
              nqx1, nqx2, nqx3, ecutfock,                                      &
              exxdiv_treatment, x_gamma_extrapolation, yukawa, ecutvcut,       &
-             exx_fraction, screening_parameter, do_hartree,                   &
+             exx_fraction, screening_parameter, ref_alat,                     &
              noncolin, lspinorb, starting_spin_angle, lambda, angle1, angle2, &
              report,              &
              constrained_magnetization, B_field, fixed_magnetization,         &
@@ -545,7 +567,8 @@ MODULE input_parameters
              ts_vdw, ts_vdw_isolated, ts_vdw_econv_thr,                       &
              xdm, xdm_a1, xdm_a2,                                             &
              step_pen, A_pen, sigma_pen, alpha_pen, no_t_rev,                 &
-             esm_bc, esm_efield, esm_w, esm_nfit, esm_debug, esm_debug_gpmax
+             esm_bc, esm_efield, esm_w, esm_nfit, esm_debug, esm_debug_gpmax, &
+             space_group, uniqueb, origin_choice, rhombohedral
 
 !=----------------------------------------------------------------------------=!
 !  ELECTRONS Namelist Input Parameters
@@ -581,15 +604,15 @@ MODULE input_parameters
         INTEGER :: electron_maxstep = 1000
           ! maximum number of steps in electronic minimization
           ! This parameter apply only when using 'cg' electronic or
-          ! ionic dynamics
+          ! ionic dynamics and electron_dynamics = 'CP-BO'
         LOGICAL :: scf_must_converge = .true.
           ! stop or continue if SCF does not converge
 
         CHARACTER(len=80) :: electron_dynamics = 'none'
           ! set how electrons should be moved
-        CHARACTER(len=80) :: electron_dynamics_allowed(6)
+        CHARACTER(len=80) :: electron_dynamics_allowed(7)
         DATA electron_dynamics_allowed &
-          / 'default', 'sd', 'cg', 'damp', 'verlet', 'none' /
+          / 'default', 'sd', 'cg', 'damp', 'verlet', 'none', 'cp-bo' /
 
         REAL(DP) :: electron_damping = 0.0_DP
           ! meaningful only if " electron_dynamics = 'damp' "
@@ -770,6 +793,7 @@ MODULE input_parameters
         REAL(DP) :: conv_thr = 1.E-6_DP
           ! convergence threshold in electronic ONLY minimizations
           ! used only in PWscf
+          ! used in electron_dynamics = 'CP-BO' in CP and PWscf
 
         INTEGER :: mixing_fixed_ns  = 0
           ! For DFT+U calculations, PWscf only
@@ -839,6 +863,9 @@ MODULE input_parameters
 
         REAL(DP) :: efield_cart(3)
           ! electric field vector in cartesian system of reference
+        
+       CHARACTER(len=80) :: efield_phase='none'
+          ! for Berry's phase electric field selection of string phases
 
        INTEGER  :: epol2 = 3
           ! electric field direction
@@ -852,6 +879,30 @@ MODULE input_parameters
         LOGICAL :: occupation_constraints = .false.
           ! If true perform CP dynamics with constrained occupations
           ! to be used together with penalty functional ...
+
+        !
+        ! ... CP-BO ...
+        LOGICAL :: tcpbo = .FALSE.
+          ! if true perform CP-BO minimization of electron energy
+
+        REAL(DP) :: emass_emin = 0.0_DP
+          ! meaningful only if electron_dynamics = 'CP-BO'
+          ! effective electron mass used in CP-BO electron minimization in
+          ! atomic units ( 1 a.u. of mass = 1/1822.9 a.m.u. = 9.10939 * 10^-31 kg )
+
+        REAL(DP) :: emass_cutoff_emin = 0.0_DP
+          ! meaningful only if electron_dynamics = 'CP-BO'
+          ! mass cut-off (in Rydbergs) for the Fourier acceleration in CP-BO
+          ! electron minimization
+
+        REAL(DP) :: electron_damping_emin = 0.0_DP
+          ! meaningful only if electron_dynamics = 'CP-BO'
+          ! damping parameter utilized in CP-BO electron minimization
+
+        REAL(DP) :: dt_emin = 0.0_DP
+          ! meaningful only if electron_dynamics = 'CP-BO'
+          ! time step for CP-BO electron minimization dynamics, in atomic units
+          ! CP: 1 a.u. of time = 2.4189 * 10^-17 s, PW: twice that much
 
         NAMELIST / electrons / emass, emass_cutoff, orthogonalization, &
           electron_maxstep, scf_must_converge, ortho_eps, ortho_max, electron_dynamics,   &
@@ -870,24 +921,15 @@ MODULE input_parameters
           occupation_dynamics, tcg, maxiter, etresh, passop, epol,     &
           efield, epol2, efield2, diago_full_acc,                      &
           occupation_constraints, niter_cg_restart,                    &
-          niter_cold_restart, lambda_cold, efield_cart, real_space
+          niter_cold_restart, lambda_cold, efield_cart, real_space,    &
+          tcpbo,emass_emin, emass_cutoff_emin, electron_damping_emin,  &
+          dt_emin, efield_phase
 
 !
 !=----------------------------------------------------------------------------=!
 !  IONS Namelist Input Parameters
 !=----------------------------------------------------------------------------=!
 !
-        CHARACTER(len=80) :: phase_space = 'full'
-          ! phase_space = 'full' | 'coarse-grained'
-          ! 'full'             the full phase-space is used for the ionic
-          !                    dynamics
-          ! 'coarse-grained'   a coarse-grained phase-space, defined by a set
-          !                    of constraints, is used for the ionic dynamics
-
-!        CHARACTER(len=80) :: phase_space_allowed(2)
-!        DATA phase_space_allowed / 'full', 'coarse-grained' /
-        CHARACTER(len=80) :: phase_space_allowed(1)
-        DATA phase_space_allowed / 'full' /
 
         CHARACTER(len=80) :: ion_dynamics = 'none'
           ! set how ions should be moved
@@ -897,8 +939,10 @@ MODULE input_parameters
                                     'langevin-smc' /
 
         REAL(DP) :: ion_radius(nsx) = 0.5_DP
-          ! pseudo-atomic radius of the i-th atomic species
-          ! (for Ewald summation), values between 0.5 and 2.0 are usually used.
+          ! pseudo-atomic radius of the i-th atomic species (CP only)
+          ! for Ewald summation: typical values range between 0.5 and 2.0 
+       INTEGER :: iesr = 1
+          ! perform Ewald summation on iesr*iesr*iesr cells - CP only
 
         REAL(DP) :: ion_damping = 0.2_DP
           ! meaningful only if " ion_dynamics = 'damp' "
@@ -1034,29 +1078,15 @@ MODULE input_parameters
 
         REAL(DP)  :: w_1 = 0.5E-1_DP
         REAL(DP)  :: w_2 = 0.5_DP
-
-        REAL(DP)  :: sic_rloc = 0.0_DP
-
         !
-        ! ... variable for meta-dynamics
-        !
-        INTEGER, PARAMETER :: max_nconstr = 100
-        INTEGER  :: fe_nstep = 100
-        INTEGER  :: sw_nstep = 10
-        INTEGER  :: eq_nstep = 0
-        REAL(DP) :: g_amplitude = 0.005_DP
-        !
-        REAL(DP) :: fe_step( max_nconstr ) = 0.4_DP
-        !
-        NAMELIST / ions / phase_space, ion_dynamics, ion_radius, ion_damping,  &
+        NAMELIST / ions / ion_dynamics, iesr, ion_radius, ion_damping,         &
                           ion_positions, ion_velocities, ion_temperature,      &
                           tempw, fnosep, nhgrp, fnhscl, nhpcl, nhptyp, ndega, tranp,   &
                           amprp, greasp, tolp, ion_nstepe, ion_maxstep,        &
                           refold_pos, upscale, delta_t, pot_extrapolation,     &
                           wfc_extrapolation, nraise, remove_rigid_rot,         &
                           trust_radius_max, trust_radius_min,                  &
-                          trust_radius_ini, w_1, w_2, bfgs_ndim, sic_rloc,     &
-                          fe_step, fe_nstep, sw_nstep, eq_nstep, g_amplitude
+                          trust_radius_ini, w_1, w_2, bfgs_ndim
 
 
 !=----------------------------------------------------------------------------=!
@@ -1131,7 +1161,7 @@ MODULE input_parameters
         INTEGER   :: cell_nstepe = 1
           ! number of electronic steps for each cell step
 
-        REAL(DP) :: cell_damping = 0.0_DP
+        REAL(DP) :: cell_damping = 0.1_DP
           ! meaningful only if " cell_dynamics = 'damp' "
           ! damping frequency times delta t, optimal values could be
           ! calculated with the formula
@@ -1198,13 +1228,15 @@ MODULE input_parameters
           REAL(DP) :: wf_q
           REAL(DP) :: wf_friction
 !=======================================================================
-!Lingzhu Kong
+!exx_wf related
           INTEGER  :: vnbsp
-          INTEGER  :: neigh
-          REAL(DP) :: poisson_eps
-          REAL(DP) :: dis_cutoff
-          REAL(DP) :: exx_ps_rcut
-          REAL(DP) :: exx_me_rcut
+          INTEGER  :: exx_neigh
+          REAL(DP) :: exx_poisson_eps
+          REAL(DP) :: exx_dis_cutoff
+          REAL(DP) :: exx_ps_rcut_self
+          REAL(DP) :: exx_ps_rcut_pair
+          REAL(DP) :: exx_me_rcut_self
+          REAL(DP) :: exx_me_rcut_pair
 !=======================================================================
 
           INTEGER :: nit
@@ -1221,10 +1253,11 @@ MODULE input_parameters
           !
           LOGICAL :: writev
 !==============================================================================
-!Lingzhu Kong
+!exx_wf related
           NAMELIST / wannier / wf_efield, wf_switch, sw_len, efx0, efy0, efz0,&
-                               efx1, efy1, efz1, wfsd, wfdt, neigh,poisson_eps,&
-                               dis_cutoff,exx_ps_rcut, exx_me_rcut, vnbsp,    &
+                               efx1, efy1, efz1, wfsd, wfdt,exx_neigh,exx_poisson_eps,&
+                               exx_dis_cutoff,exx_ps_rcut_self, exx_me_rcut_self,   &
+                               exx_ps_rcut_pair, exx_me_rcut_pair, vnbsp,&
                                maxwfdt, wf_q, wf_friction, nit, nsd, nsteps,  & 
                                tolw, adapt, calwf, nwf, wffort, writev
 !===============================================================================
@@ -1276,10 +1309,8 @@ MODULE input_parameters
         LOGICAL   :: tforces = .false.
         LOGICAL   :: tocc = .false.
         LOGICAL   :: tcell = .false.
-        LOGICAL   :: tdipole = .false.
         LOGICAL   :: tionvel = .false.
         LOGICAL   :: tconstr = .false.
-        LOGICAL   :: tesr = .false.
         LOGICAL   :: tksout = .false.
         LOGICAL   :: ttemplate = .false.
         LOGICAL   :: twannier = .false.
@@ -1290,11 +1321,11 @@ MODULE input_parameters
         REAL(DP), ALLOCATABLE :: rd_pos(:,:)  ! unsorted positions from input
         INTEGER,  ALLOCATABLE :: sp_pos(:)
         INTEGER,  ALLOCATABLE :: if_pos(:,:)
-        INTEGER,  ALLOCATABLE :: id_loc(:)
         INTEGER,  ALLOCATABLE :: na_inp(:)
         LOGICAL  :: tapos = .false.
+        LOGICAL  :: lsg   = .false.
         CHARACTER(len=80) :: atomic_positions = 'crystal'
-          ! atomic_positions = 'bohr' | 'angstrong' | 'crystal' | 'alat'
+          ! atomic_positions = 'bohr' | 'angstrom' | 'crystal' | 'alat'
           ! select the units for the atomic positions being read from stdin
 
 !
@@ -1334,21 +1365,18 @@ MODULE input_parameters
         LOGICAL   :: tf_inp = .false.
 
 !
-!    DIPOLE
-!
-        LOGICAL :: tdipole_card = .false.
-
-!
-!    ESR
-!
-       INTEGER :: iesr_inp = 1
-
-!
 !    CELL_PARAMETERS
 !
        REAL(DP) :: rd_ht(3,3) = 0.0_DP
        CHARACTER(len=80) :: cell_units = 'none'
        LOGICAL   :: trd_ht = .false.
+
+!
+!    REFERENCE_CELL_PARAMETERS
+!
+       REAL(DP) :: rd_ref_ht(3,3) = 0.0_DP
+       CHARACTER(len=80) :: ref_cell_units = 'alat'
+       LOGICAL   :: ref_cell = .false.
 
 !
 !    CONSTRAINTS
@@ -1385,11 +1413,13 @@ MODULE input_parameters
 !
       TYPE (wannier_data) :: wan_data(nwanx,2)
 
+
 !  END manual
 ! ----------------------------------------------------------------------
 
       LOGICAL :: xmloutput = .false.
       ! if .true. PW produce an xml output
+
 CONTAINS
 !
 !----------------------------------------------------------------------------
@@ -1411,8 +1441,6 @@ SUBROUTINE reset_input_checks()
   tocc = .false.
   tksout = .false.
   tionvel = .false.
-  tesr = .false.
-  tdipole = .false.
   tcell = .false.
   !
   END SUBROUTINE reset_input_checks
@@ -1427,7 +1455,6 @@ SUBROUTINE reset_input_checks()
     IF ( allocated( rd_pos ) ) DEALLOCATE( rd_pos )
     IF ( allocated( sp_pos ) ) DEALLOCATE( sp_pos )
     IF ( allocated( if_pos ) ) DEALLOCATE( if_pos )
-    IF ( allocated( id_loc ) ) DEALLOCATE( id_loc )
     IF ( allocated( na_inp ) ) DEALLOCATE( na_inp )
     IF ( allocated( rd_vel ) ) DEALLOCATE( rd_vel )
     IF ( allocated( sp_vel ) ) DEALLOCATE( sp_vel )
@@ -1436,7 +1463,6 @@ SUBROUTINE reset_input_checks()
     ALLOCATE( rd_pos( 3, nat ) )
     ALLOCATE( sp_pos( nat)   )
     ALLOCATE( if_pos( 3, nat ) )
-    ALLOCATE( id_loc( nat)   )
     ALLOCATE( na_inp( ntyp)  )
     ALLOCATE( rd_vel( 3, nat ) )
     ALLOCATE( sp_vel( nat)   )
@@ -1445,7 +1471,6 @@ SUBROUTINE reset_input_checks()
     rd_pos = 0.0_DP
     sp_pos = 0
     if_pos = 1
-    id_loc = 0
     na_inp = 0
     rd_vel = 0.0_DP
     sp_vel = 0
@@ -1504,7 +1529,6 @@ SUBROUTINE reset_input_checks()
     IF ( allocated( rd_pos ) ) DEALLOCATE( rd_pos )
     IF ( allocated( sp_pos ) ) DEALLOCATE( sp_pos )
     IF ( allocated( if_pos ) ) DEALLOCATE( if_pos )
-    IF ( allocated( id_loc ) ) DEALLOCATE( id_loc )
     IF ( allocated( na_inp ) ) DEALLOCATE( na_inp )
     IF ( allocated( rd_vel ) ) DEALLOCATE( rd_vel )
     IF ( allocated( sp_vel ) ) DEALLOCATE( sp_vel )

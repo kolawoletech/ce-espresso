@@ -261,6 +261,11 @@ MODULE read_namelists_module
        esm_debug=.FALSE.
        esm_debug_gpmax=0
        !
+       space_group=0
+       uniqueb = .FALSE.
+       origin_choice = 1
+       rhombohedral = .TRUE.
+       !
        RETURN
        !
      END SUBROUTINE
@@ -288,7 +293,7 @@ MODULE read_namelists_module
        electron_maxstep = 100
        scf_must_converge = .true.
        !
-       ! ... ( 'sd' | 'cg' | 'damp' | 'verlet' | 'none' | 'diis' )
+       ! ... ( 'sd' | 'cg' | 'damp' | 'verlet' | 'none' | 'diis' | 'cp-bo' )
        !
        electron_dynamics = 'none'
        electron_damping = 0.1_DP
@@ -361,12 +366,20 @@ MODULE read_namelists_module
        efield_cart(1)=0.d0
        efield_cart(2)=0.d0
        efield_cart(3)=0.d0
+       efield_phase='none'
        !
        occupation_constraints = .false.
        !
        adaptive_thr   =  .false.
        conv_thr_init  =  0.1E-2_DP
        conv_thr_multi =  0.1_DP
+       !
+       ! ... CP-BO ...
+       tcpbo = .false.
+       emass_emin = 200.0_DP
+       emass_cutoff_emin = 6.0_DP
+       electron_damping_emin = 0.35_DP
+       dt_emin = 4.0_DP
        !
        RETURN
        !
@@ -410,11 +423,6 @@ MODULE read_namelists_module
        IMPLICIT NONE
        !
        CHARACTER(LEN=2) :: prog   ! ... specify the calling program
-       !
-       !
-       ! ... ( 'full' | 'coarse-grained' )
-       !
-       phase_space = 'full'
        !
        ! ... ( 'sd' | 'cg' | 'damp' | 'verlet' | 'none' | 'bfgs' | 'beeman' )
        !
@@ -466,16 +474,6 @@ MODULE read_namelists_module
        w_1              = 0.01_DP
        w_2              = 0.50_DP
        !
-       sic_rloc = 0.0_DP
-       !
-       ! ... meta-dynamics defaults
-       !
-       fe_step     = 0.4_DP
-       fe_nstep    = 100
-       sw_nstep    = 10
-       eq_nstep    = 0
-       g_amplitude = 0.005_DP
-       !
        RETURN
        !
      END SUBROUTINE
@@ -520,7 +518,7 @@ MODULE read_namelists_module
        cell_dofree = 'all'
        cell_factor = 0.0_DP
        cell_nstepe = 1
-       cell_damping = 0.0_DP
+       cell_damping = 0.1_DP
        press_conv_thr = 0.5_DP
        !
        RETURN
@@ -601,13 +599,15 @@ MODULE read_namelists_module
        wf_q        = 1500.0_DP
        wf_friction = 0.3_DP
 !=======================================================================
-!Lingzhu Kong
-       neigh       = 48
-       vnbsp       = 0
-       poisson_eps = 1.D-6
-       dis_cutoff  = 7.0_DP
-       exx_ps_rcut = 5.0
-       exx_me_rcut = 10.0
+!exx_wf related
+       exx_neigh        =  60 
+       vnbsp            =  0
+       exx_poisson_eps  =  1.E-6_DP
+       exx_dis_cutoff   =  8.0_DP
+       exx_ps_rcut_self =  6.0_DP
+       exx_ps_rcut_pair =  5.0_DP
+       exx_me_rcut_self = 10.0_DP
+       exx_me_rcut_pair =  7.0_DP
 !=======================================================================
        !
        nit    = 10
@@ -818,6 +818,13 @@ MODULE read_namelists_module
        CALL mp_bcast( esm_nfit,           ionode_id, intra_image_comm )
        CALL mp_bcast( esm_debug,          ionode_id, intra_image_comm )
        CALL mp_bcast( esm_debug_gpmax,    ionode_id, intra_image_comm )
+       !
+       ! ... space group information
+       !
+       CALL mp_bcast( space_group,        ionode_id, intra_image_comm )
+       CALL mp_bcast( uniqueb,            ionode_id, intra_image_comm )
+       CALL mp_bcast( origin_choice,      ionode_id, intra_image_comm )
+       CALL mp_bcast( rhombohedral,       ionode_id, intra_image_comm )
 
        RETURN
        !
@@ -918,6 +925,7 @@ MODULE read_namelists_module
        CALL mp_bcast( epol2,   ionode_id, intra_image_comm )
        CALL mp_bcast( efield2, ionode_id, intra_image_comm )
        CALL mp_bcast( efield_cart,   ionode_id, intra_image_comm )
+       CALL mp_bcast( efield_phase,   ionode_id, intra_image_comm )
        !
        ! ... occupation constraints ...
        !
@@ -928,6 +936,14 @@ MODULE read_namelists_module
        CALL mp_bcast( adaptive_thr,       ionode_id, intra_image_comm )
        CALL mp_bcast( conv_thr_init,      ionode_id, intra_image_comm )
        CALL mp_bcast( conv_thr_multi,     ionode_id, intra_image_comm )
+       !
+       ! ... CP-BO ...
+       CALL mp_bcast( tcpbo,                 ionode_id, intra_image_comm )
+       CALL mp_bcast( emass_emin,            ionode_id, intra_image_comm )
+       CALL mp_bcast( emass_cutoff_emin,     ionode_id, intra_image_comm )
+       CALL mp_bcast( electron_damping_emin, ionode_id, intra_image_comm )
+       CALL mp_bcast( dt_emin,               ionode_id, intra_image_comm )
+       !
        RETURN
        !
      END SUBROUTINE
@@ -949,7 +965,6 @@ MODULE read_namelists_module
        !
        IMPLICIT NONE
        !
-       CALL mp_bcast( phase_space,       ionode_id, intra_image_comm )
        CALL mp_bcast( ion_dynamics,      ionode_id, intra_image_comm )
        CALL mp_bcast( ion_radius,        ionode_id, intra_image_comm )
        CALL mp_bcast( ion_damping,       ionode_id, intra_image_comm )
@@ -985,14 +1000,6 @@ MODULE read_namelists_module
        CALL mp_bcast( trust_radius_ini, ionode_id, intra_image_comm )
        CALL mp_bcast( w_1,              ionode_id, intra_image_comm )
        CALL mp_bcast( w_2,              ionode_id, intra_image_comm )
-       !
-       CALL mp_bcast( sic_rloc, ionode_id, intra_image_comm )
-       !
-       CALL mp_bcast( fe_step,     ionode_id, intra_image_comm )
-       CALL mp_bcast( fe_nstep,    ionode_id, intra_image_comm )
-       CALL mp_bcast( sw_nstep,    ionode_id, intra_image_comm )
-       CALL mp_bcast( eq_nstep,    ionode_id, intra_image_comm )
-       CALL mp_bcast( g_amplitude, ionode_id, intra_image_comm )
        !
        RETURN
        !
@@ -1115,6 +1122,16 @@ MODULE read_namelists_module
        CALL mp_bcast( nwf,         ionode_id, intra_image_comm )
        CALL mp_bcast( wffort,      ionode_id, intra_image_comm )
        CALL mp_bcast( writev,      ionode_id, intra_image_comm )
+!=================================================================
+!exx_wf related
+       CALL mp_bcast( exx_neigh,       ionode_id, intra_image_comm )
+       CALL mp_bcast( exx_poisson_eps, ionode_id, intra_image_comm )
+       CALL mp_bcast( exx_dis_cutoff,  ionode_id, intra_image_comm )
+       CALL mp_bcast( exx_ps_rcut_self, ionode_id, intra_image_comm )
+       CALL mp_bcast( exx_ps_rcut_pair, ionode_id, intra_image_comm )
+       CALL mp_bcast( exx_me_rcut_self, ionode_id, intra_image_comm )
+       CALL mp_bcast( exx_me_rcut_pair, ionode_id, intra_image_comm )
+       CALL mp_bcast( vnbsp,       ionode_id, intra_image_comm )
        !
        RETURN
        !
@@ -1423,13 +1440,6 @@ MODULE read_namelists_module
        LOGICAL           :: allowed = .FALSE.
        !
        !
-       DO i = 1, SIZE( phase_space_allowed )
-          IF( TRIM( phase_space ) == phase_space_allowed(i) ) allowed = .TRUE.
-       END DO
-       IF ( .NOT. allowed ) &
-          CALL errore( sub_name, ' phase_space '''// &
-                       & TRIM( phase_space )// ''' not allowed ', 1 )
-       !
        allowed = .FALSE.
        DO i = 1, SIZE(ion_dynamics_allowed)
           IF( TRIM(ion_dynamics) == ion_dynamics_allowed(i) ) allowed = .TRUE.
@@ -1449,9 +1459,6 @@ MODULE read_namelists_module
           CALL errore( sub_name,' ion_nstepe out of range ',1)
        IF( ion_maxstep < 0 ) &
           CALL errore( sub_name,' ion_maxstep out of range ',1)
-       !
-       IF (sic /= 'none' .and. sic_rloc == 0.0_DP) &
-          CALL errore( sub_name, ' invalid sic_rloc with sic activated ', 1 )
        !
        RETURN
        !
@@ -1587,9 +1594,19 @@ MODULE read_namelists_module
              IF ( prog == 'PW' ) &
                 CALL errore( sub_name, ' calculation ' // &
                            & TRIM( calculation ) // ' not implemented ', 1 )
+          CASE ( 'vc-cp-wf' )
+             IF( prog == 'CP' ) THEN
+                electron_dynamics = 'verlet'
+                ion_dynamics      = 'verlet'
+                cell_dynamics     = 'pr'
+             ELSE IF( prog == 'PW' ) THEN
+                CALL errore( sub_name, ' calculation ' // &
+                           & TRIM( calculation ) // ' not implemented ', 1 )
+             END IF
+             !
 !=========================================================================
 !Lingzhu Kong
-          CASE ( 'cp-wf-nscf','cp-wf-pbe0','pbe0-nscf' )
+          CASE ( 'cp-wf-nscf' )
              IF( prog == 'CP' ) THEN
                 occupations       = 'fixed'
                 electron_dynamics = 'damp'
@@ -1796,9 +1813,8 @@ MODULE read_namelists_module
                TRIM( calculation ) == 'cp'       .OR. &
                TRIM( calculation ) == 'vc-cp'    .OR. &
                TRIM( calculation ) == 'smd'      .OR. &
-               TRIM( calculation ) == 'cp-wf-nscf' .OR. &   !Lingzhu Kong
-               TRIM( calculation ) == 'cp-wf-pbe0' .OR. &   !Lingzhu Kong
-               TRIM( calculation ) == 'pbe0-nscf'  .OR. &   !Lingzhu Kong
+               TRIM( calculation ) == 'cp-wf-nscf' .OR. &
+               TRIM( calculation ) == 'vc-cp-wf'   .OR. &
                TRIM( calculation ) == 'cp-wf' ) READ( unit_loc, ions, iostat = ios )
   
        END IF
@@ -1818,7 +1834,8 @@ MODULE read_namelists_module
           IF( TRIM( calculation ) == 'vc-relax' .OR. &
               TRIM( calculation ) == 'vc-cp'    .OR. &
               TRIM( calculation ) == 'vc-md'    .OR. &
-              TRIM( calculation ) == 'vc-md' ) THEN
+              TRIM( calculation ) == 'vc-md'    .OR. & 
+              TRIM( calculation ) == 'vc-cp-wf') THEN
              READ( unit_loc, cell, iostat = ios )
           END IF
        END IF
@@ -1850,10 +1867,9 @@ MODULE read_namelists_module
        CALL wannier_defaults( prog )
        ios = 0
        IF( ionode ) THEN
-          IF( TRIM( calculation ) == 'cp-wf'       .OR. & ! Lingzhu Kong
-              TRIM( calculation ) == 'cp-wf-nscf'  .OR. & ! Lingzhu Kong
-              TRIM( calculation ) == 'cp-wf-pbe0'  .OR. & ! Lingzhu Kong
-              TRIM( calculation ) == 'pbe0-nscf' ) THEN   ! Lingzhu Kong
+          IF( TRIM( calculation ) == 'cp-wf'       .OR. &
+              TRIM( calculation ) == 'vc-cp-wf'    .OR. &
+              TRIM( calculation ) == 'cp-wf-nscf') THEN
              READ( unit_loc, wannier, iostat = ios )
           END IF
        END IF

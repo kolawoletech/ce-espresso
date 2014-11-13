@@ -1,5 +1,5 @@
 !
-! Copyright (C) 2002-2011 Quantum ESPRESSO group
+! Copyright (C) 2002-2014 Quantum ESPRESSO group
 ! This file is distributed under the terms of the
 ! GNU General Public License. See the file `License'
 ! in the root directory of the present distribution,
@@ -14,11 +14,12 @@ MODULE read_cards_module
    !
    USE kinds,     ONLY : DP
    USE io_global, ONLY : stdout
-   USE constants, ONLY : angstrom_au
+   USE wy_pos,    ONLY : wypos
    USE parser,    ONLY : field_count, read_line, get_field, parse_unit
    USE io_global, ONLY : ionode, ionode_id
    !
    USE input_parameters
+   !
    !
    IMPLICIT NONE
    !
@@ -58,9 +59,10 @@ CONTAINS
       trd_ht = .false.
       rd_ht  = 0.0_DP
       !
-      ! ... dipole
+      ! ... Reference Simulation cell from standard input
       !
-      tdipole_card = .false.
+      ref_cell = .false.
+      rd_ref_ht  = 0.0_DP
       !
       ! ... Constraints
       !
@@ -70,10 +72,6 @@ CONTAINS
       ! ... ionic mass initialization
       !
       atom_mass = 0.0_DP
-      !
-      ! ... dimension of the real space Ewald summation
-      !
-      iesr_inp = 1
       !
       ! ... k-points
       !
@@ -149,7 +147,7 @@ CONTAINS
          !
       ELSEIF ( trim(card) == 'ATOMIC_SPECIES' ) THEN
          !
-         CALL card_atomic_species( input_line, prog )
+         CALL card_atomic_species( input_line )
          !
       ELSEIF ( trim(card) == 'ATOMIC_POSITIONS' ) THEN
          !
@@ -157,7 +155,7 @@ CONTAINS
          !
       ELSEIF ( trim(card) == 'ATOMIC_FORCES' ) THEN
          !
-         CALL card_atomic_forces( input_line, prog )
+         CALL card_atomic_forces( input_line )
          !
       ELSEIF ( trim(card) == 'CONSTRAINTS' ) THEN
          !
@@ -165,15 +163,11 @@ CONTAINS
          !
       ELSEIF ( trim(card) == 'DIPOLE' ) THEN
          !
-         CALL card_dipole( input_line )
-         IF ( prog == 'PW' .and. ionode ) &
-            WRITE( stdout,'(A)') 'Warning: card '//trim(input_line)//' ignored'
+         CALL errore('read_cards','card DIPOLE no longer existing',1)
          !
       ELSEIF ( trim(card) == 'ESR' ) THEN
          !
-         CALL card_esr( input_line )
-         IF ( prog == 'PW' .and. ionode ) &
-            WRITE( stdout,'(A)') 'Warning: card '//trim(input_line)//' ignored'
+         CALL errore('read_cards','card ESR no longer existing',1)
          !
       ELSEIF ( trim(card) == 'K_POINTS' ) THEN
          !
@@ -191,6 +185,10 @@ CONTAINS
       ELSEIF ( trim(card) == 'CELL_PARAMETERS' ) THEN
          !
          CALL card_cell_parameters( input_line )
+         !
+      ELSEIF ( trim(card) == 'REF_CELL_PARAMETERS' ) THEN
+         !
+         CALL card_ref_cell_parameters( input_line )
          !
       ELSEIF ( trim(card) == 'ATOMIC_VELOCITIES' ) THEN
          !
@@ -262,12 +260,11 @@ CONTAINS
    !    END manual
    !------------------------------------------------------------------------
    !
-   SUBROUTINE card_atomic_species( input_line, prog )
+   SUBROUTINE card_atomic_species( input_line )
       !
       IMPLICIT NONE
       !
       CHARACTER(len=256) :: input_line
-      CHARACTER(len=2)   :: prog
       INTEGER            :: is, ip, ierr
       CHARACTER(len=4)   :: lb_pos
       CHARACTER(len=256) :: psfile
@@ -356,10 +353,12 @@ CONTAINS
       INTEGER            :: ia, k, is, nfield, idx, rep_i
       LOGICAL, EXTERNAL  :: matches
       LOGICAL            :: tend
+      REAL(DP)           :: inp1, inp2
+      INTEGER            :: fieldused
       !
       INTEGER            :: ifield, ierr
       REAL(DP)           :: field_value
-      CHARACTER(len=256) :: field_str, error_msg
+      CHARACTER(len=256) :: field_str, error_msg, wp
       !
       !
       IF ( tapos ) THEN
@@ -383,8 +382,12 @@ CONTAINS
       sp_pos = 0
       rd_pos = 0.0_DP
       na_inp = 0
+      lsg=.FALSE.
       !
-      IF ( matches( "CRYSTAL", input_line ) ) THEN
+      IF ( matches( "CRYSTAL_SG", input_line ) ) THEN
+         atomic_positions = 'crystal'
+         lsg=.TRUE.
+      ELSEIF ( matches( "CRYSTAL", input_line ) ) THEN
          atomic_positions = 'crystal'
       ELSEIF ( matches( "BOHR", input_line ) ) THEN
          atomic_positions = 'bohr'
@@ -414,14 +417,6 @@ CONTAINS
          !
          CALL field_count( nfield, input_line )
          !
-         IF ( sic /= 'none' .and. nfield /= 8 ) &
-               CALL errore( 'read_cards', &
-                           'ATOMIC_POSITIONS with sic, 8 columns required', 1 )
-         !
-         IF ( nfield /= 4 .and. nfield /= 7 .and. nfield /= 8) &
-               CALL errore( 'read_cards', 'wrong number of columns ' // &
-                           & 'in ATOMIC_POSITIONS', ia )
-
          ! read atom symbol (column 1) and coordinate
          CALL get_field(1, lb_pos, input_line)
          lb_pos = trim(lb_pos)
@@ -429,30 +424,76 @@ CONTAINS
          error_msg = 'Error while parsing atomic position card.'
          ! read field 2 (atom X coordinate)
          CALL get_field(2, field_str, input_line)
-         rd_pos(1,ia) = feval_infix(ierr, field_str )
-         CALL errore('card_atomic_positions', error_msg, ierr)
-         ! read field 2 (atom Y coordinate)
-         CALL get_field(3, field_str, input_line)
-         rd_pos(2,ia) = feval_infix(ierr, field_str )
-         CALL errore('card_atomic_positions', error_msg, ierr)
-         ! read field 2 (atom Z coordinate)
-         CALL get_field(4, field_str, input_line)
-         rd_pos(3,ia) = feval_infix(ierr, field_str )
-         CALL errore('card_atomic_positions', error_msg, ierr)
+         !     
+         !If the ia position is expressed in wyckoff position.
+         IF (lsg.AND.LEN_TRIM(field_str)<4.AND.&
+              ((IACHAR(field_str(LEN_TRIM(field_str):LEN_TRIM(field_str)))>64.AND.&
+               IACHAR(field_str(LEN_TRIM(field_str):LEN_TRIM(field_str)))<123))) THEN
+            !wyckoff position case
+            !
+            wp=field_str
+            inp1=1.d5
+            inp2=1.d5
+            !
+            IF (nfield>2) THEN
+               ! read field 2 (1st coordinate)
+               CALL get_field(3, field_str, input_line)
+               inp1 = feval_infix(ierr, field_str )
+               CALL errore('card_atomic_positions', error_msg, ierr)
                !
-         IF ( nfield >= 7 ) THEN
-            ! read constrains (fields 5-7, if present)
-            CALL get_field(5, field_str, input_line)
-            READ(field_str, *) if_pos(1,ia)
-            CALL get_field(6, field_str, input_line)
-            READ(field_str, *) if_pos(2,ia)
-            CALL get_field(7, field_str, input_line)
-            READ(field_str, *) if_pos(3,ia)
-         ENDIF
-         !
-         IF ( nfield == 8 ) THEN
-            CALL get_field(5, field_str, input_line)
-            READ(field_str, *) id_loc(ia)
+               IF (nfield>3) THEN
+                  ! read field 3 (2nd coordinate)
+                  CALL get_field(4, field_str, input_line)
+                  inp2 = feval_infix(ierr, field_str )
+                  CALL errore('card_atomic_positions', error_msg, ierr)
+               ENDIF
+            ENDIF
+            !
+            CALL wypos(rd_pos(1,ia),wp,inp1,inp2,space_group, &
+                 uniqueb,rhombohedral,origin_choice)
+            !
+            fieldused=3
+            IF ((rd_pos(1,ia)==inp1).OR.(rd_pos(2,ia)==inp1).OR.(rd_pos(3,ia)==inp1))&
+               fieldused=fieldused+1
+            IF ((rd_pos(2,ia)==inp2).OR.(rd_pos(3,ia)==inp2)) fieldused=fieldused+1
+            !
+            !         
+            !
+            IF ( nfield >= 5 ) THEN
+               ! read constrains (fields 3-5, if present)
+               CALL get_field(fieldused, field_str, input_line)
+               READ(field_str, *) if_pos(1,ia)
+               CALL get_field(fieldused+1, field_str, input_line)
+               READ(field_str, *) if_pos(2,ia)
+               CALL get_field(fieldused+2, field_str, input_line)
+               READ(field_str, *) if_pos(3,ia)
+            ENDIF
+            !
+         ELSE
+            IF ( nfield /= 4 .and. nfield /= 7 ) &
+            CALL errore( 'read_cards', 'wrong number of columns ' // &
+                           & 'in ATOMIC_POSITIONS', ia )
+
+            rd_pos(1,ia) = feval_infix(ierr, field_str )
+            CALL errore('card_atomic_positions', error_msg, ierr)
+            ! read field 2 (atom Y coordinate)
+            CALL get_field(3, field_str, input_line)
+            rd_pos(2,ia) = feval_infix(ierr, field_str )
+            CALL errore('card_atomic_positions', error_msg, ierr)
+            ! read field 2 (atom Z coordinate)
+            CALL get_field(4, field_str, input_line)
+            rd_pos(3,ia) = feval_infix(ierr, field_str )
+            CALL errore('card_atomic_positions', error_msg, ierr)
+            IF ( nfield >= 7 ) THEN
+               ! read constrains (fields 5-7, if present)
+               CALL get_field(5, field_str, input_line)
+               READ(field_str, *) if_pos(1,ia)
+               CALL get_field(6, field_str, input_line)
+               READ(field_str, *) if_pos(2,ia)
+               CALL get_field(7, field_str, input_line)
+               READ(field_str, *) if_pos(3,ia)
+            ENDIF
+            !
          ENDIF
          !
          match_label: DO is = 1, ntyp
@@ -516,12 +557,11 @@ CONTAINS
    !    END manual
    !------------------------------------------------------------------------
    !
-   SUBROUTINE card_atomic_forces( input_line, prog )
+   SUBROUTINE card_atomic_forces( input_line )
       !
       IMPLICIT NONE
       !
       CHARACTER(len=256) :: input_line
-      CHARACTER(len=2)   :: prog
       INTEGER            :: ia, k, nfield
       CHARACTER(len=4)   :: lb
       !
@@ -631,7 +671,7 @@ CONTAINS
    SUBROUTINE card_kpoints( input_line )
       !
       USE bz_form, ONLY : transform_label_coord
-      USE input_parameters, ONLY : ibrav, celldm, point_label_type
+      USE cell_base, ONLY : cell_base_init, celldm_cb => celldm
       IMPLICIT NONE
       !
       CHARACTER(len=256) :: input_line, buffer
@@ -752,9 +792,12 @@ CONTAINS
                   ENDIF
                ENDDO
             ENDDO
-            IF ( npk_label > 0 ) &
-               CALL transform_label_coord(ibrav, celldm, xkaux, letter, &
+            IF ( npk_label > 0 ) THEN
+               CALL cell_base_init ( ibrav, celldm, a, b, c, cosab, &
+                              cosac, cosbc, trd_ht, rd_ht, cell_units )
+               CALL transform_label_coord(ibrav, celldm_cb, xkaux, letter, &
                     label_list, npk_label, nkstot, k_points, point_label_type )
+            END IF
 
             DEALLOCATE(letter)
             DEALLOCATE(label_list)
@@ -930,94 +973,6 @@ CONTAINS
    !    BEGIN manual
    !----------------------------------------------------------------------
    !
-   ! DIPOLE
-   !
-   !   calculate polarizability
-   !
-   ! Syntax:
-   !
-   !   DIPOLE
-   !
-   ! Where:
-   !
-   !    no parameters
-   !
-   !----------------------------------------------------------------------
-   !    END manual
-   !------------------------------------------------------------------------
-   !
-   SUBROUTINE card_dipole( input_line )
-      !
-      IMPLICIT NONE
-      !
-      CHARACTER(len=256) :: input_line
-      !
-      !
-      IF ( tdipole ) THEN
-         CALL errore( ' card_dipole ', ' two occurrences', 2 )
-      ENDIF
-      !
-      tdipole_card = .true.
-      tdipole = .true.
-      !
-      RETURN
-      !
-   END SUBROUTINE card_dipole
-   !
-   !
-   !------------------------------------------------------------------------
-   !    BEGIN manual
-   !----------------------------------------------------------------------
-   !
-   ! IESR
-   !
-   !   use the specified number of neighbour cells for Ewald summations
-   !
-   ! Syntax:
-   !
-   !   ESR
-   !    iesr
-   !
-   ! Example:
-   !
-   !   ESR
-   !    3
-   !
-   ! Where:
-   !
-   !      iesr (integer)  determines the number of neighbour cells to be
-   !                      considered:
-   !                        iesr = 1 : nearest-neighbour cells (default)
-   !                        iesr = 2 : next-to-nearest-neighbour cells
-   !                        and so on
-   !
-   !----------------------------------------------------------------------
-   !    END manual
-   !------------------------------------------------------------------------
-   !
-   SUBROUTINE card_esr( input_line )
-      !
-      IMPLICIT NONE
-      !
-      CHARACTER(len=256) :: input_line
-      !
-      IF ( tesr ) THEN
-         CALL errore( ' card_esr ', ' two occurrences', 2 )
-      ENDIF
-      CALL read_line( input_line )
-      READ(input_line,*) iesr_inp
-      !
-      tesr = .true.
-      !
-      RETURN
-      !
-   END SUBROUTINE card_esr
-   !
-   !
-   !------------------------------------------------------------------------
-   !    BEGIN manual
-   !----------------------------------------------------------------------
-   !
    ! CELL_PARAMETERS
    !
    !   use the specified cell dimensions
@@ -1087,6 +1042,75 @@ CONTAINS
       RETURN
       !
    END SUBROUTINE card_cell_parameters
+   !
+   !
+   !------------------------------------------------------------------------
+   !    BEGIN manual
+   !----------------------------------------------------------------------
+   !
+   ! REF_CELL_PARAMETERS
+   !
+   !   use the specified cell dimensions
+   !
+   ! Syntax:
+   !
+   !    REF_CELL_PARAMETERS (cell_option)
+   !      rd_ref_HT(1,1) rd_ref_HT(1,2) rd_ref_HT(1,3)
+   !      rd_ref_HT(2,1) rd_ref_HT(2,2) rd_ref_HT(2,3)
+   !      rd_ref_HT(3,1) rd_ref_HT(3,2) rd_ref_HT(3,3)
+   !
+   !   cell_option == alat      lattice vectors in units of alat set by ref_alat keyword (default)
+   !   cell_option == bohr      lattice vectors in Bohr
+   !   cell_option == angstrom  lattice vectors in Angstrom
+   !
+   ! Example:
+   !
+   ! REF_CELL_PARAMETERS
+   !    24.50644311    0.00004215   -0.14717844
+   !    -0.00211522    8.12850030    1.70624903
+   !     0.16447787    0.74511792   23.07395418
+   !
+   ! Where:
+   !
+   !      rd_ref_HT(i,j) (real)  cell dimensions ( in a.u. ),
+   !        note the relation with reference lattice vectors:
+   !        rd_ref_HT(1,:) = ref_A1, rd_ref_HT(2,:) = ref_A2, rd_ref_HT(3,:) = re_A3
+   !
+   !----------------------------------------------------------------------
+   !    END manual
+   !------------------------------------------------------------------------
+   !
+   SUBROUTINE card_ref_cell_parameters( input_line )
+      !
+      IMPLICIT NONE
+      !
+      CHARACTER(len=256) :: input_line
+      INTEGER            :: i, j
+      LOGICAL, EXTERNAL  :: matches
+      !
+      !
+      IF ( ref_cell ) THEN
+         CALL errore( ' card_reference_cell_parameters ', ' two occurrences', 2 )
+      ENDIF
+      !
+      IF ( matches( "BOHR", input_line ) ) THEN
+         ref_cell_units = 'bohr'
+      ELSEIF ( matches( "ANGSTROM", input_line ) ) THEN
+         ref_cell_units = 'angstrom'
+      ELSE
+         ref_cell_units = 'alat'
+      ENDIF
+      !
+      DO i = 1, 3
+         CALL read_line( input_line )
+         READ(input_line,*) ( rd_ref_ht( i, j ), j = 1, 3 )
+      ENDDO
+      !
+      ref_cell = .true.
+      !
+      RETURN
+      !
+   END SUBROUTINE card_ref_cell_parameters
    !
    !
    !------------------------------------------------------------------------

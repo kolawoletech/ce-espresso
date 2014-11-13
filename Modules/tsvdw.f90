@@ -18,7 +18,6 @@ USE cell_base,          ONLY: h                  !h matrix for converting betwee
 USE cell_base,          ONLY: ainv               !h^-1 matrix for converting between r and s coordinates via s = h^-1 r)
 USE cell_base,          ONLY: omega              !cell volume (in au^3)
 USE constants,          ONLY: pi                 !pi in double-precision
-USE control_flags,      ONLY: lwfpbe0            !if .TRUE. then PBE0 calculation using Wannier orbitals is turned on ... BS 
 USE fft_base,           ONLY: dffts              !FFT derived data type
 USE fft_base,           ONLY: dfftp              !FFT derived data type 
 USE funct,              ONLY: get_iexch          !retrieves type of exchange utilized in functional
@@ -56,6 +55,7 @@ REAL(DP), PUBLIC :: EtsvdW                                   !the TS-vdW energy
 REAL(DP), DIMENSION(:), ALLOCATABLE, PUBLIC :: UtsvdW        !the TS-vdW wavefunction forces (dispersion potential)
 REAL(DP), DIMENSION(:,:), ALLOCATABLE, PUBLIC :: FtsvdW      !the TS-vdW ionic forces (-dE/dR)
 REAL(DP), DIMENSION(:,:), ALLOCATABLE, PUBLIC :: HtsvdW      !the TS-vdW cell forces (dE/dh)
+REAL(DP), DIMENSION(:), ALLOCATABLE, PUBLIC :: VefftsvdW     !the TS-vdW effective Hirshfeld volume
 !
 ! PRIVATE variables 
 !
@@ -172,6 +172,10 @@ PRIVATE :: GetVdWParam
   ALLOCATE(FtsvdW(3,nat)); FtsvdW=0.0_DP
   ALLOCATE(HtsvdW(3,3)); HtsvdW=0.0_DP
   !
+  ! Initialization of TS-vdW Hirshfeld effective volume public variable ... used in CP print_out.f90
+  !
+  ALLOCATE(VefftsvdW(nat)); VefftsvdW=0.0_DP
+  !
   Ndim=MAX(nr1*nr2,dffts%npp(me_bgrp+1)*nr1*nr2)
   ALLOCATE(UtsvdW(Ndim)); UtsvdW=0.0_DP
   !
@@ -196,8 +200,6 @@ PRIVATE :: GetVdWParam
     CALL errore('tsvdw','TS-vdW sR parameter only available for PBE and PBE0 functionals...',1)
     !
   END IF
-  !
-  IF(lwfpbe0) sR=0.96_DP !RAD/BS: Temporary fix for PBE0 (see RAD/BS flag directly above)...
   !
   WRITE(stdout,'(5X,"sR = ",F9.6)') sR
   !
@@ -1369,6 +1371,8 @@ PRIVATE :: GetVdWParam
   !
   CALL mp_sum(veff,intra_image_comm)
   !
+  VefftsvdW = veff
+  !
   CALL stop_clock('tsvdw_veff')
   !
   RETURN
@@ -2289,6 +2293,7 @@ PRIVATE :: GetVdWParam
   IF (ALLOCATED(UtsvdW))   DEALLOCATE(UtsvdW)
   IF (ALLOCATED(FtsvdW))   DEALLOCATE(FtsvdW)
   IF (ALLOCATED(HtsvdW))   DEALLOCATE(HtsvdW)
+  IF (ALLOCATED(VefftsvdW))DEALLOCATE(VefftsvdW)
   IF (ALLOCATED(vfree))    DEALLOCATE(vfree)
   IF (ALLOCATED(dpfree))   DEALLOCATE(dpfree)
   IF (ALLOCATED(R0free))   DEALLOCATE(R0free)

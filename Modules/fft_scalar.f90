@@ -67,9 +67,13 @@
 #if defined __FFTW 
 
         INTEGER   :: cft_b_dims( 4 )
+!$omp threadprivate (cft_b_dims)
         C_POINTER :: cft_b_bw_planz = 0
+!$omp threadprivate (cft_b_bw_planz)
         C_POINTER :: cft_b_bw_planx = 0
+!$omp threadprivate (cft_b_bw_planx)
         C_POINTER :: cft_b_bw_plany = 0
+!$omp threadprivate (cft_b_bw_plany)
 
 #endif
 
@@ -1859,7 +1863,7 @@ SUBROUTINE cfft3ds (f, nx, ny, nz, ldx, ldy, ldz, isign, &
       !
 #if defined __FFTW
 
-!$omp single
+!$omp parallel
 
       IF( cft_b_bw_planz  == 0 ) THEN
          CALL CREATE_PLAN_1D( cft_b_bw_planz, nz, 1 )
@@ -1874,7 +1878,7 @@ SUBROUTINE cfft3ds (f, nx, ny, nz, ldx, ldy, ldz, isign, &
          cft_b_dims(2) = ny
       END IF
 
-!$omp end single
+!$omp end parallel
 
 #else
 
@@ -2060,7 +2064,7 @@ end function allowed
 !    nr  (input) tentative order n of a fft
 !
 !    np  (optional input) if present restrict the search of the order
-!        in the ensamble of multiples of np
+!        in the ensemble of multiples of np
 !
 !    Output: the same if n is a good number
 !         the closest higher number that is good

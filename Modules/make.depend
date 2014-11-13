@@ -216,13 +216,14 @@ radial_grids.o : kind.o
 random_numbers.o : kind.o
 read_cards.o : autopilot.o
 read_cards.o : bz_form.o
-read_cards.o : constants.o
+read_cards.o : cell_base.o
 read_cards.o : input_parameters.o
 read_cards.o : io_global.o
 read_cards.o : kind.o
 read_cards.o : parser.o
 read_cards.o : wannier_new.o
 read_cards.o : wrappers.o
+read_cards.o : wypos.o
 read_input.o : ../iotk/src/iotk_module.o
 read_input.o : input_parameters.o
 read_input.o : io_global.o
@@ -308,8 +309,7 @@ recvec_subs.o : recvec.o
 set_signal.o : io_global.o
 set_signal.o : mp.o
 set_signal.o : mp_world.o
-sic.o : io_global.o
-sic.o : kind.o
+space_group.o : kind.o
 splinelib.o : kind.o
 stick_base.o : io_global.o
 stick_base.o : kind.o
@@ -322,7 +322,6 @@ stick_set.o : stick_base.o
 timestep.o : kind.o
 tsvdw.o : cell_base.o
 tsvdw.o : constants.o
-tsvdw.o : control_flags.o
 tsvdw.o : fft_base.o
 tsvdw.o : funct.o
 tsvdw.o : io_global.o
@@ -363,6 +362,7 @@ write_upf_v2.o : kind.o
 write_upf_v2.o : pseudo_types.o
 write_upf_v2.o : radial_grids.o
 ws_base.o : kind.o
+wypos.o : kind.o
 xc_rVV10.o : cell_base.o
 xc_rVV10.o : constants.o
 xc_rVV10.o : control_flags.o

@@ -85,8 +85,8 @@ read_xml_fields.o \
 recvec.o \
 recvec_subs.o \
 run_info.o \
+space_group.o \
 set_signal.o \
-sic.o \
 splinelib.o \
 stick_base.o \
 stick_set.o \
@@ -107,6 +107,7 @@ xc_vdW_DF.o \
 xc_rVV10.o \
 xml_input.o \
 xml_io_base.o \
+wypos.o \
 zdotc_wrapper.o \
 zhpev_drv.o 
 

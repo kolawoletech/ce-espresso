@@ -46,6 +46,7 @@ noncolin  Fe bcc   noncollinear magnetization
                    constraints: atomic, atomic direction, total magnetization
                    noncollinear stress
                    non-scf calculation, tetrahedra
+                   hybrid functionals (norm-conserving)
 paw-atom  O, Cu    PAW   
 paw-bfgs    H2O    PAW with bfgs    
 paw-vcbfgs  H2O    PAW with variable-cell bfgs    
@@ -56,6 +57,7 @@ pbe0-si444 Si      PBE0 hybrid functional, nq=4
 relax     CO       forces
                    bfgs and damped dynamics
                    energies, forces, bfgs with saw-like electric field 
+                   bfgs with external forces
 relax2    Al       forces in metals
                    bfgs_ndim=3
 scf       Si fcc   davidson and cg diagonalizations

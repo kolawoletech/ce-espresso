@@ -859,6 +859,7 @@ input.o : pwcom.o
 input.o : realus.o
 input.o : start_k.o
 input.o : symm_base.o
+input.o : wyckoff.o
 input.o : xdm_dispersion.o
 interpolate.o : ../../Modules/control_flags.o
 interpolate.o : ../../Modules/fft_base.o
@@ -1334,6 +1335,7 @@ pw_restart.o : ../../Modules/io_global.o
 pw_restart.o : ../../Modules/ions_base.o
 pw_restart.o : ../../Modules/kernel_table.o
 pw_restart.o : ../../Modules/kind.o
+pw_restart.o : ../../Modules/mm_dispersion.o
 pw_restart.o : ../../Modules/mp.o
 pw_restart.o : ../../Modules/mp_bands.o
 pw_restart.o : ../../Modules/mp_diag.o
@@ -1347,6 +1349,7 @@ pw_restart.o : ../../Modules/parser.o
 pw_restart.o : ../../Modules/qexml.o
 pw_restart.o : ../../Modules/recvec.o
 pw_restart.o : ../../Modules/run_info.o
+pw_restart.o : ../../Modules/tsvdw.o
 pw_restart.o : ../../Modules/version.o
 pw_restart.o : ../../Modules/wavefunctions.o
 pw_restart.o : ../../Modules/xml_io_base.o
@@ -1390,13 +1393,10 @@ rdiaghg.o : ../../Modules/kind.o
 rdiaghg.o : ../../Modules/mp.o
 rdiaghg.o : ../../Modules/mp_bands.o
 rdiaghg.o : ../../Modules/mp_diag.o
-read_conf_from_file.o : ../../Modules/cell_base.o
 read_conf_from_file.o : ../../Modules/io_files.o
 read_conf_from_file.o : ../../Modules/io_global.o
-read_conf_from_file.o : ../../Modules/ions_base.o
 read_conf_from_file.o : ../../Modules/kind.o
 read_conf_from_file.o : pw_restart.o
-read_conf_from_file.o : pwcom.o
 read_file.o : ../../Modules/cell_base.o
 read_file.o : ../../Modules/constants.o
 read_file.o : ../../Modules/control_flags.o
@@ -2008,6 +2008,8 @@ write_ns.o : ldaU.o
 write_ns.o : pwcom.o
 write_ns.o : scf_mod.o
 wsweight.o : ../../Modules/kind.o
+wyckoff.o : ../../Modules/kind.o
+wyckoff.o : ../../Modules/space_group.o
 xdm_dispersion.o : ../../Modules/atom.o
 xdm_dispersion.o : ../../Modules/cell_base.o
 xdm_dispersion.o : ../../Modules/constants.o

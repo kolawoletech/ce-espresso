@@ -273,7 +273,7 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 	}
 		
 	var disk_io -type CHARACTER { 
-	    default { 'low' }
+	    default { see below }
 	    info {
                Specifies the amount of disk I/O activity
                'high':   save all data to disk at each SCF step
@@ -288,11 +288,11 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
                          ('scf', 'nscf', 'bands' calculations; some data
                           may be written anyway for other calculations)
 
-               Note that the amount of needed RAM increases as the amount
-               of I/O decreases! IMPORTANT: default has been changed to 'low'.
+               Default is 'low' for the scf case, 'medium' otherwise.
+               Note that the needed RAM increases as disk I/O decreases!
                It is no longer needed to specify 'high' in order to be able
                to restart from an interrupted calculation (see "restart_mode")
-               but you cannot restart from disk_io='none'
+               but you cannot restart in disk_io='none'
 	    }
 	}
 
@@ -611,6 +611,10 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
                 run, or restarting from an interrupted run.
 		If you fix the magnetization with "tot_magnetization",
 		you should not specify starting_magnetization.
+                In the spin-orbit case starting with zero 
+                starting_magnetization on all atoms imposes time reversal
+                symmetry. The magnetization is never calculated and 
+                kept zero (the internal variable domag is .FALSE.).
 	    }
 	}
 
@@ -1389,6 +1393,49 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
            }
          }
 
+         var space_group -type INTEGER {
+           default { 0 }
+           info { The number of the space group of the crystal, as given
+                 in the International Tables of Crystallography A (ITA).
+                 This allows to give in input only the inequivalent atomic 
+                 positions. The positions of all the symmetry equivalent atoms
+                 are calculated by the code. Used only when the atomic positions
+                 are of type crystal_sg. 
+           }
+         }
+
+         var uniqueb -type LOGICAL {
+           default { .FALSE. }
+           info { Used only for monoclinic lattices. If .TRUE. the b
+                  unique ibrav (-12 or -13) are used, and symmetry 
+                  equivalent positions are chosen assuming that the
+                  two fold axis or the mirror normal is parallel to the
+                  b axis. If .FALSE. it is parallel to the c axis.
+           }
+
+         }
+
+         var origin_choice -type INTEGER {
+           default { 1 }
+           info { Used only for space groups that in the ITA allow 
+                  the use of two different origins. origin_choice=1,
+                  means the first origin, while origin_choice=2 is the
+                  second origin.
+           }
+
+         }
+
+         var rhombohedral -type LOGICAL {
+           default { .TRUE. }
+           info { Used only for rhombohedral space groups. 
+                  When .TRUE. the coordinates of the inequivalent atoms are
+                  given with respect to the rhombohedral axes, when .FALSE.
+                  the coordinates of the inequivalent atoms are given with
+                  respect to the hexagonal axes. They are converted internally
+                  to the rhombohedral axes and ibrav=5 is used in both cases.
+           }
+         }
+
     }
 
     #
@@ -1680,18 +1727,6 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 	    }
 	}
  
-	var phase_space -type CHARACTER { 
-	    default { 'full' }
-	    info {
-		'full' :           the full phase-space is used for the ionic
-                                   dynamics.
-
-		'coarse-grained' : a coarse-grained phase-space, defined by a set
-                                   of constraints, is used for the ionic dynamics
-                                   (used for calculation of free-energy barriers)
-	    }
-	}
-
 	var pot_extrapolation -type CHARACTER { 
 	    default { 'atomic' }
 	    info {
@@ -2028,7 +2063,9 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 			info { 
 			    label of the atom. Acceptable syntax:
 			    chemical symbol X (1 or 2 characters, case-insensitive) 
-			    or "Xn", n=0,..., 9; "X_*", "X-*" (e.g. C1, As_h)
+			    or chemical symbol plus a number or a letter, as in
+                            "Xn" (e.g. Fe1) or "X_*" or "X-*" (e.g. C1, C_h;
+                            max total length cannot exceed 3 characters)
 			}
 		    }
 		    col Mass_X -type REAL {
@@ -2066,8 +2103,8 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
     card ATOMIC_POSITIONS {
 
 	flag atompos_unit -use optional {
-	    enum { alat | bohr | angstrom | crystal }
-	    default { alat (DEPRECATED) }
+	    enum { alat | bohr | angstrom | crystal | crystal_sg }
+	    default { (DEPRECATED) alat }
 	    info {
 	        alat    : atomic positions are in cartesian coordinates, in
                           units of the lattice parameter (either celldm(1) 
@@ -2085,6 +2122,18 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
                           in relative coordinates of the primitive lattice
                           vectors as defined either in card CELL_PARAMETERS
                           or via the ibrav + celldm / a,b,c... variables
+
+                crystal_sg : atomic positions are in crystal coordinates, i.e.
+                          in relative coordinates of the primitive lattice.
+                          This option differs from the previous one because
+                          in this case only the symmetry inequivalent atoms
+                          are given. The variable space_group must indicate
+                          the space group number used to find the symmetry
+                          equivalent atoms. The other variables that control 
+                          this option are uniqueb, origin_choice, and 
+                          rhombohedral.
+                          
+
 	    }
 	}
 
@@ -2127,6 +2176,22 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 
                                         Please note that this feature is NOT supported by XCrysDen (which will
                                         display a wrong structure, or nothing at all).	       
+                                        When atomic positions are of type crystal_sg coordinates can be given 
+                                        in the following three forms (Wyckoff positions):
+                                        C  1a 
+                                        C  8g   x 
+                                        C  24m  x y 
+                                        The first form must be used when the Wyckoff letter determines uniquely 
+                                        all three coordinates, the second form when the Wyckoff letter 
+                                        and one coordinate are needed, the third form when one letter and two 
+                                        coordinates are needed.
+                                        The forms:
+                                        C 8g  x  x  x
+                                        C 24m x  x  y 
+                                        are not allowed, but
+                                        C x x x
+                                        C x x y
+                                        are correct.
 				}
 				col x
 				col y
@@ -2140,6 +2205,9 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
 					which must be either 0 or 1.  Used to keep selected atoms and/or
 					selected components fixed in MD dynamics or
 					structural optimization run.
+                                           
+                                        With crystal_sg atomic coordinates the constraints are copied in all equivalent
+                                        atoms.
 				    }
 				    default { 1 }
 				    
@@ -2467,7 +2535,9 @@ input_description -distribution {Quantum Espresso} -package PWscf -program pw.x 
     #
 
     card ATOMIC_FORCES { 
-        label { Optional card used to specify external forces acting on atoms }
+        label { Optional card used to specify external forces acting on atoms.
+                BEWARE: if the sum of external forces is not zero, the center
+                of mass of the system will move }
         syntax {
            table atomic_forces {
               rows -start 1 -end nat {

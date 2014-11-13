@@ -38,9 +38,10 @@ SUBROUTINE iosys()
                             lorbm_     => lorbm, &
                             efield_    => efield, &
                             nberrycyc_ => nberrycyc, &
-                            efield_cart_ => efield_cart
+                            efield_cart_ => efield_cart, &
+                            phase_control
   !
-  USE cell_base,     ONLY : at, alat, omega, &
+  USE cell_base,     ONLY : at, alat, omega, bg, &
                             cell_base_init, init_dofree
   !
   USE ions_base,     ONLY : if_pos, ityp, tau, extfor, &
@@ -201,7 +202,8 @@ SUBROUTINE iosys()
                                gdir, nppstr, wf_collect,lelfield,lorbm,efield, &
                                nberrycyc, lkpoint_dir, efield_cart, lecrpa,    &
                                vdw_table_name, memory, tqmmm,                  &
-                               lcalc_z2, z2_m_threshold, z2_z_threshold
+                               lcalc_z2, z2_m_threshold, z2_z_threshold,       &
+                               efield_phase
 
   !
   ! ... SYSTEM namelist
@@ -230,7 +232,9 @@ SUBROUTINE iosys()
                                ts_vdw, ts_vdw_isolated, ts_vdw_econv_thr,     &
                                xdm, xdm_a1, xdm_a2,                           &
                                one_atom_occupations,                          &
-                               esm_bc, esm_efield, esm_w, esm_nfit
+                               esm_bc, esm_efield, esm_w, esm_nfit,           &
+                               space_group, uniqueb, origin_choice,           &
+                               rhombohedral
   !
   ! ... ELECTRONS namelist
   !
@@ -244,12 +248,13 @@ SUBROUTINE iosys()
   !
   ! ... IONS namelist
   !
-  USE input_parameters, ONLY : phase_space, ion_dynamics, ion_positions, tolp, &
+  USE input_parameters, ONLY : ion_dynamics, ion_positions, tolp, &
                                tempw, delta_t, nraise, ion_temperature,        &
                                refold_pos, remove_rigid_rot, upscale,          &
                                pot_extrapolation,  wfc_extrapolation,          &
                                w_1, w_2, trust_radius_max, trust_radius_min,   &
-                               trust_radius_ini, bfgs_ndim
+                               trust_radius_ini, bfgs_ndim, rd_pos, sp_pos, &
+                               rd_for, rd_if_pos => if_pos, lsg
   !
   ! ... CELL namelist
   !
@@ -275,14 +280,15 @@ SUBROUTINE iosys()
   USE tsvdw_module,          ONLY : vdw_isolated, vdw_econv_thr
   USE us,                    ONLY : spline_ps_ => spline_ps
   !
-  USE input_parameters,       ONLY : deallocate_input_parameters
+  USE input_parameters,      ONLY : deallocate_input_parameters
+  USE wyckoff,               ONLY : nattot, sup_spacegroup
   !
   IMPLICIT NONE
   !
   CHARACTER(LEN=256), EXTERNAL :: trimcheck
   INTEGER, EXTERNAL :: read_config_from_file
   !
-  INTEGER  :: ia, nt, inlc, ierr
+  INTEGER  :: ia, nt, inlc, ibrav_sg, ierr
   LOGICAL  :: exst, parallelfs
   REAL(DP) :: theta, phi
   !
@@ -800,7 +806,15 @@ SUBROUTINE iosys()
      !
   CASE DEFAULT
      !
-     io_level = 0
+     ! In the scf case, it is usually convenient to write to RAM;
+     ! otherwise it is preferrable to write to disk, since the number
+     ! of k-points can be large, leading to large RAM requirements
+     !
+     IF ( lscf ) THEN
+        io_level = 0
+     ELSE
+        io_level = 1
+     END IF
      !
   END SELECT
   !
@@ -1023,6 +1037,8 @@ SUBROUTINE iosys()
           'Berry Phase/electric fields not implemented with pools', 1 )
      IF ( lgauss .OR. ltetra ) CALL errore( 'iosys', &
           'Berry Phase/electric fields only for insulators!', 1 )
+     IF ( lmovecell ) CALL errore( 'iosys', &
+          'Berry Phase/electric fields not implemented with variable cell', 1 )
   END IF
   !
   ! ... Copy values from input module to PW internals
@@ -1038,6 +1054,17 @@ SUBROUTINE iosys()
   efield_     = efield
   nberrycyc_  = nberrycyc
   efield_cart_ = efield_cart
+  SELECT CASE(efield_phase)
+     CASE( 'none' )
+        phase_control=0
+     CASE ('write')
+        phase_control=1
+     CASE ('read')
+        phase_control=2
+     CASE DEFAULT
+        CALL errore( 'iosys', &
+          'Unknown efield_phase', 1 )
+  END SELECT
   tqr_        = tqr
   real_space_ = real_space
   !
@@ -1214,6 +1241,29 @@ SUBROUTINE iosys()
      vdw_econv_thr= ts_vdw_econv_thr
   END IF
   !
+  !  calculate all the atomic positions if only the inequivalent ones
+  !  have been given.
+  !  NB: ibrav is an output of this routine
+  !
+  IF (space_group /= 0 .AND. .NOT. lsg ) &
+     CALL errore('input','space_group requires crystal_sg atomic &
+                                                   &coordinates',1 )
+  IF (lsg) THEN
+     IF (space_group==0) &
+        CALL errore('input','The option crystal_sg requires the space group &
+                                                   &number',1 )
+        
+     CALL sup_spacegroup(rd_pos,sp_pos,rd_for,rd_if_pos,space_group,nat,&
+              uniqueb,rhombohedral,origin_choice,ibrav_sg)
+     IF (ibrav==-1) THEN
+        ibrav=ibrav_sg
+     ELSEIF (ibrav /= ibrav_sg) THEN
+        CALL errore ('input','Input ibrav not compatible with space group &
+                                                   &number',1 )
+     ENDIF
+     nat_=nattot
+  ENDIF
+  !
   ! QM/MM specific parameters
   !
   IF (.NOT. tqmmm) CALL qmmm_config( mode=-1 )
@@ -1248,11 +1298,13 @@ SUBROUTINE iosys()
   !
   ! ... read following cards
   !
+
   ALLOCATE( ityp( nat_ ) )
   ALLOCATE( tau(    3, nat_ ) )
   ALLOCATE( force(  3, nat_ ) )
   ALLOCATE( if_pos( 3, nat_ ) )
   ALLOCATE( extfor( 3, nat_ ) )
+
   IF ( tfixed_occ ) THEN
      IF ( nspin_ == 4 ) THEN
         ALLOCATE( f_inp( nbnd_, 1 ) )
@@ -1285,11 +1337,16 @@ SUBROUTINE iosys()
      wfc_dir = tmp_dir
   ENDIF
   !
+!   IF ( lmovecell ) THEN
+  at_old    = at
+  omega_old = omega
+!   ENDIF
+  !
   ! ... Read atomic positions and unit cell from data file, if needed,
   ! ... overwriting what has just been read before from input
   !
   ierr = 1
-  IF ( startingconfig == 'file' ) ierr = read_config_from_file()
+  IF ( startingconfig == 'file' )   ierr = read_config_from_file(nat, at_old,omega_old, lmovecell, at, bg, omega, tau)
   !
   ! ... read_config_from_file returns 0 if structure successfully read
   ! ... Atomic positions (tau) must be converted to internal units
@@ -1370,9 +1427,9 @@ SUBROUTINE iosys()
   ! ... and initialize a few other variables
   !
   IF ( lmovecell ) THEN
-     !
-     at_old    = at
-     omega_old = omega
+     ! The next two lines have been moved before the call to read_config_from_file:
+     !      at_old    = at
+     !      omega_old = omega
      IF ( cell_factor_ <= 0.D0 ) cell_factor_ = 1.2D0
      !
      IF ( cmass <= 0.D0 ) &
@@ -1432,13 +1489,16 @@ SUBROUTINE read_cards_pw ( psfile, tau_format )
   USE kinds,              ONLY : DP
   USE input_parameters,   ONLY : atom_label, atom_pfile, atom_mass, taspc, &
                                  tapos, rd_pos, atomic_positions, if_pos,  &
-                                 sp_pos, f_inp, rd_for, tavel, sp_vel, rd_vel
+                                 sp_pos, f_inp, rd_for, tavel, sp_vel, rd_vel, &
+                                 lsg
   USE dynamics_module,    ONLY : vel
   USE cell_base,          ONLY : at, ibrav
   USE ions_base,          ONLY : nat, ntyp => nsp, ityp, tau, atm, extfor
   USE fixed_occ,          ONLY : tfixed_occ, f_inp_ => f_inp
   USE ions_base,          ONLY : if_pos_ =>  if_pos, amass, fixatom
   USE control_flags,      ONLY : textfor, tv0rd
+  USE wyckoff,            ONLY : nattot, tautot, ityptot, extfortot, &
+                                 if_postot, clean_spacegroup
   !
   IMPLICIT NONE
   !
@@ -1473,13 +1533,22 @@ SUBROUTINE read_cards_pw ( psfile, tau_format )
   textfor = .false.
   IF( any( rd_for /= 0.0_DP ) ) textfor = .true.
   !
-  DO ia = 1, nat
-     !
-     tau(:,ia) = rd_pos(:,ia)
-     ityp(ia)  = sp_pos(ia)
-     extfor(:,ia) = rd_for(:,ia)
-     !
-  ENDDO
+  IF (lsg) THEN
+     tau(:,:)=tautot(:,:)
+     ityp(:) = ityptot(:)
+     extfor(:,:) = extfortot(:,:)
+     if_pos_(:,:) = if_postot(:,:)
+     CALL clean_spacegroup()
+  ELSE 
+     DO ia = 1, nat
+        !
+        tau(:,ia) = rd_pos(:,ia)
+        ityp(ia)  = sp_pos(ia)
+        extfor(:,ia) = rd_for(:,ia)
+        if_pos_(:,ia) = if_pos(:,ia)
+        !
+     ENDDO
+  ENDIF
   !
   ! ... check for initial velocities read from input file
   !
@@ -1498,7 +1567,6 @@ SUBROUTINE read_cards_pw ( psfile, tau_format )
   ! ... if_pos whose value is 0 when the coordinate is to be kept fixed, 1
   ! ... otherwise. 
   !
-  if_pos_(:,:) = if_pos(:,1:nat)
   fixatom = COUNT( if_pos_(1,:)==0 .AND. if_pos_(2,:)==0 .AND. if_pos_(3,:)==0 )
   !
   tau_format = trim( atomic_positions )

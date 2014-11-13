@@ -50,7 +50,7 @@ subroutine force_ew (alat, nat, ntyp, ityp, zv, at, bg, tau, &
   real(DP) :: forceion (3, nat)
   ! output: the ewald part of the forces
   !
-  integer, parameter :: mxr=500
+  integer, parameter :: mxr=50
   ! the maximum number of R vectors
 
   integer :: ig, n, na, nb, nt, nrm, ipol
@@ -91,7 +91,7 @@ subroutine force_ew (alat, nat, ntyp, ityp, zv, at, bg, tau, &
   ! upperbound is a safe upper bound for the error ON THE ENERGY
   !
   alpha = 1.1d0
-10 alpha = alpha - 0.01d0
+10 alpha = alpha - 1d-4
   if (alpha.eq.0.d0) call errore ('force_ew', 'optimal alpha not found', 1)
   upperbound = e2 * charge**2 * sqrt (2.d0 * alpha / tpi) * &
        qe_erfc ( sqrt (tpiba2 * gcutm / 4.d0 / alpha) )

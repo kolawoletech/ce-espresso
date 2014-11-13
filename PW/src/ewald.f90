@@ -53,7 +53,7 @@ function ewald (alat, nat, ntyp, ityp, zv, at, bg, tau, omega, g, &
   !
   !    here the local variables
   !
-  integer, parameter :: mxr = 500
+  integer, parameter :: mxr = 50
   ! the maximum number of R vectors included in r
   integer :: ng, nr, na, nb, nt, nrm
   ! counter over reciprocal G vectors
@@ -85,7 +85,7 @@ function ewald (alat, nat, ntyp, ityp, zv, at, bg, tau, omega, g, &
      charge = charge+zv (ityp (na) )
   enddo
   alpha = 2.9d0
-100 alpha = alpha - 0.01d0
+100 alpha = alpha - 1d-4
   !
   ! choose alpha in order to have convergence in the sum over G
   ! upperbound is a safe upper bound for the error in the sum over G

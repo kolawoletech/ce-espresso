@@ -47,7 +47,7 @@ subroutine stres_ewa (alat, nat, ntyp, ityp, zv, at, bg, tau, &
   !
   !    here the local variables
   !
-  integer, parameter :: mxr = 500
+  integer, parameter :: mxr = 50
   ! the maximum number of R vectors included in r sum
   integer :: ng,  nr, na, nb, l, m, nrm
   ! counter over reciprocal G vectors
@@ -87,7 +87,7 @@ subroutine stres_ewa (alat, nat, ntyp, ityp, zv, at, bg, tau, &
   ! upperbound is a safe upper bound for the error ON THE ENERGY
   !
   alpha = 2.9d0
-12 alpha = alpha - 0.01d0
+12 alpha = alpha - 1d-4
   if (alpha.eq.0.0) call errore ('stres_ew', 'optimal alpha not found &
        &', 1)
   upperbound = e2 * charge**2 * sqrt (2 * alpha / tpi) * &

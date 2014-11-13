@@ -34,7 +34,7 @@ subroutine ewald_dipole (tens,dipole)
   complex(DP), allocatable:: ewaldg(:,:,:), ewaldr(:,:,:)
   integer :: alpha, beta, na, ng, nt, ipol, nb, nrm, nr
 
-  integer, parameter :: mxr = 500
+  integer, parameter :: mxr = 50
   real (DP) :: r(3,mxr), r2(mxr), rmax, rr, dtau(3)
   real (DP) :: expcoeff
   complex(DP) :: carg, recarg, recarg_dgg
@@ -53,7 +53,7 @@ subroutine ewald_dipole (tens,dipole)
   enddo
   eta = 2.9d0
   do
-    eta = eta - 0.01d0
+    eta = eta - 1d-4
     !
     ! choose alpha in order to have convergence in the sum over G
     ! upperbound is a safe upper bound for the error in the sum over G

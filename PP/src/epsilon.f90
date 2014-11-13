@@ -94,10 +94,10 @@ CONTAINS
   !
   ! set the energy grid
   !
-  alpha = (wmax - wmin) / REAL(nw, DP)
+  alpha = (wmax - wmin) / REAL(nw-1, KIND=DP)
   !
   DO iw = 1, nw
-      wgrid(iw) = wmin + iw * alpha
+      wgrid(iw) = wmin + (iw-1) * alpha
   ENDDO
   !
 END SUBROUTINE grid_build
@@ -148,7 +148,7 @@ PROGRAM epsilon
   USE wvfct,       ONLY : nbnd
   USE lsda_mod,    ONLY : nspin
   USE mp_global,   ONLY : mp_startup
-  USE environment, ONLY : environment_start
+  USE environment, ONLY : environment_start, environment_end
   !
   IMPLICIT NONE
   !
@@ -311,6 +311,7 @@ PROGRAM epsilon
   IF ( ionode ) WRITE( stdout, *  )
 
   !
+  CALL environment_end ( 'epsilon' )
   !
   CALL stop_pp ()
 

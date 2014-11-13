@@ -54,10 +54,11 @@
   subroutine ions_nose_init( tempw_ , fnosep_ , nhpcl_ , nhptyp_ , ndega_ , nhgrp_ , fnhscl_)
     use constants,      only: k_boltzmann_au, pi, au_terahertz
     use control_flags,  only: tnosep
-    use ions_base,      only: ndofp, tions_base_init, nsp, nat, na
+    use ions_base,      only: ndofp, tions_base_init, nsp, nat, na, amass, ityp
     real(DP), intent(in)  :: tempw_ , fnosep_(:), fnhscl_(:) 
     integer, intent(in) :: nhpcl_ , nhptyp_ , ndega_ , nhgrp_(:)
     integer :: i, j, iat, is, ia
+    REAL(DP) :: amass_mean
 
     IF( .NOT. tions_base_init ) &
       CALL errore(' ions_nose_init ', ' you should call ions_base_init first ', 1 )
@@ -171,16 +172,84 @@
           endif
         enddo
       endif
+      !
       ! set the NH masses for all the chains
-      do j=1,nhpdim
-         qnp((j-1)*nhpcl+1) = qnp_(1)*gkbt2nhp(j)/gkbt
-         If (nhpcl > 1) then
-            do i=2,nhpcl
-               qnp((j-1)*nhpcl+i) = qnp_(i)
-            enddo
-         endif
-      enddo
-   END IF
+      !
+      IF((nhptyp.EQ.1).OR.(nhptyp.EQ.2)) THEN 
+        !===============================================================
+        ! for nhptyp = 1 or 2, the default NH masses are multiplied by 
+        ! the atomic masses so that the relative rates of thermostat 
+        ! fluctuations are inversely proportional to the masses of the
+        ! of the particles to which they are coupled (JOURNAL OF PHYSICAL
+        ! CHEMISTRY 97 (49): 12959-12966 DEC 9 1993). Helps in faster
+        ! equipartitioning of thermal energy. When nhpend = 1, the mass
+        ! of the common thermostat is multiplied by mean atomic mass of 
+        ! the system, amass _mean, = total atomic mass / number of atoms  
+        !
+        DO j=1,(nhpdim-nhpend)
+          ! 
+          IF(nhptyp.EQ.2) qnp((j-1)*nhpcl+1)=amass(ityp(j))*qnp_(1)*gkbt2nhp(j)/gkbt  
+          IF(nhptyp.EQ.1) qnp((j-1)*nhpcl+1)=amass(j)*qnp_(1)*gkbt2nhp(j)/gkbt  
+          !
+          IF(nhpcl.GT.1) THEN
+            !
+            DO i=2,nhpcl
+              !
+              IF(nhptyp.EQ.2) qnp((j-1)*nhpcl+i)=amass(ityp(j))*qnp_(i)
+              IF(nhptyp.EQ.1) qnp((j-1)*nhpcl+i)=amass(j)*qnp_(i)
+              !
+            END DO
+            !
+          END IF
+          ! 
+        END DO !j
+        !
+        IF(nhpend.EQ.1) THEN
+          !
+          amass_mean=0.0_DP
+          !
+          DO is=1,nat
+            ! 
+            amass_mean=amass_mean+amass(ityp(is))
+            !
+          END DO
+          !
+          amass_mean=amass_mean/DBLE(nat)
+          !
+          qnp((nhpdim-1)*nhpcl+1)=amass_mean*qnp_(1)*gkbt2nhp(nhpdim)/gkbt
+          !
+          IF(nhpcl.GT.1) THEN
+            !
+            DO i=2,nhpcl
+              !
+              qnp((nhpdim-1)*nhpcl+i)=amass_mean*qnp_(i)
+              !
+            END DO
+            !
+          END IF
+          !
+        END IF
+        !
+        !===============================================================
+        !
+      ELSE
+        !
+        !===============================================================
+        ! Default code : for nhptyp = 1 or 3 
+        DO j=1,nhpdim
+           qnp((j-1)*nhpcl+1) = qnp_(1)*gkbt2nhp(j)/gkbt
+           IF (nhpcl > 1) THEN
+              DO i=2,nhpcl
+                 qnp((j-1)*nhpcl+i) = qnp_(i)
+              END DO
+           END IF
+        END DO
+        ! Default code end 
+        !
+      END IF !nhptyp
+      !
+      !
+   END IF !tnosep
 
 
     !    WRITE( stdout,100)

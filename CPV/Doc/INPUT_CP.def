@@ -66,6 +66,10 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
 	   nconstr  { constr_tol }
 	   constr_type(.)   constr(1,.)   constr(2,.) [ constr(3,.)   constr(4,.) ] { constr_target(.) } ]
 
+	[ ATOMIC_FORCES
+           label_1 Fx(1) Fy(1) Fz(1)
+           .....
+           label_n Fx(n) Fy(n) Fz(n) ]
     }
 
 
@@ -85,9 +89,11 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
 		'relax', 
 		'vc-relax',
 		'vc-cp', 
-		'cp-wf'
+		'cp-wf',
+		'vc-cp-wf'
 		
 		(vc = variable-cell).
+		(wf = Wannier functions).
 	    }
 	}
 	
@@ -141,9 +147,9 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
 	var iprint -type INTEGER {
 	    default { 10 }
 	    info {
-		Number of steps between successive writings of relevant
-		physical quantities to standard output and to files "fort.3?"
-		or "prefix.???" depending on "prefix" parameter
+		Number of steps between successive writings of relevant physical quantities
+                to files named as "prefix.???" depending on "prefix" parameter. 
+                In the standard output relevant quantities are written every 10*iprint steps.
 	    }
 	}
 	
@@ -196,7 +202,18 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
 	    default { 'cp' }
 	    info {
 		prepended to input/output filenames:
-		prefix.pos, prefix.vel, etc.
+		  prefix.pos : atomic positions
+		  prefix.vel : atomic velocities 
+		  prefix.for : atomic forces 
+		  prefix.cel : cell parameters 
+		  prefix.str : stress tensors 
+		  prefix.evp : energies 
+		  prefix.hrs : Hirshfeld effective volumes (ts-vdw) 
+		  prefix.eig : eigen values 
+		  prefix.nos : Nose-Hoover variables 
+		  prefix.spr : spread of Wannier orbitals
+		  prefix.wfc : center of Wannier orbitals
+		  prefix.ncg : number of Poisson CG steps (PBE0)
 	    }
 	}
 
@@ -628,11 +645,26 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
 	    default { read from pseudopotential files } 
 	    info {
                    Exchange-correlation functional: eg 'PBE', 'BLYP' etc
-                   See Modules/functionals.f90 for allowed values. 
+                   See Modules/funct.f90 for allowed values. 
                    Overrides the value read from pseudopotential files.
                    Use with care and if you know what you are doing!
+
+                   Use 'PBE0' to perform hybrid functional calculation using Wannier functions. 
+                   Allowed calculation: 'cp-wf' and 'vc-cp-wf'
+                   See CP specific user manual for further guidance (or in CPV/Doc/user_guide.tex) 
+                   and examples in CPV/examples/EXX-wf-example. 
+                   Also see related keywords starting with exx_.
 	    }
 	}
+
+	var exx_fraction -type REAL { 
+	    default { it depends on the specified functional }
+	    info {
+		Fraction of EXX for hybrid functional calculations. In the case of 
+		input_dft='PBE0', the default value is 0.25.
+	    }
+	}
+
         var lda_plus_u        -type LOGICAL {
             default { .FALSE. }
             info { lda_plus_u = .TRUE. enables calculation with LDA+U
@@ -1020,7 +1052,7 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
     
     namelist IONS  {
 	label { 
-	    input this namelist only if calculation = 'cp', 'relax', 'vc-relax', 'vc_cp' 
+	    input this namelist only if calculation = 'cp', 'relax', 'vc-relax', 'vc-cp', 'cp-wf', 'vc-cp-wf' 
 	}
     
 	var ion_dynamics -type CHARACTER {
@@ -1075,6 +1107,36 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
             }
         }
 
+        var ion_damping -type REAL {
+          default { 0.2D0 }
+          info {
+            damping frequency times delta t, optimal values could be
+              calculated with the formula :
+              SQRT( 0.5 * LOG( ( E1 - E2 ) / ( E2 - E3 ) ) )
+              where E1, E2, E3 are successive values of the DFT total energy
+              in a steepest descent simulations.
+              meaningful only if " ion_dynamics = 'damp' "
+          }
+        }
+
+        dimension ion_radius -start 1 -end ntyp -type REAL {
+            default { 0.5 a.u. for all species }
+            info {
+                ion_radius(i): pseudo-atomic radius of the i-th atomic species
+                used in Ewald summation. Typical values: between 0.5 and 2.
+                Results should NOT depend upon such parameters if their values
+                are properly chosen. See also "iesr".
+            }
+        }
+
+        var iesr -type INTEGER {
+            default { 1 }
+            info {
+                The real-space contribution to the Ewald summation is performed
+                on iesr*iesr*iesr cells. Typically iesr=1 is sufficient to have
+                converged results. 
+            }
+        }
 
         var ion_nstepe -type INTEGER {
             default { 1 }
@@ -1259,7 +1321,7 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
 
     namelist CELL {
 	label {
-	    input this namelist only if calculation = 'vc-relax', 'vc-cp' 
+	    input this namelist only if calculation = 'vc-relax', 'vc-cp', 'vc-cp-wf' 
 	}
 
 
@@ -1396,6 +1458,8 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
                shape   = all axis and angles, keeping the volume fixed
                2Dxy    = only x and y components are allowed to change
                2Dshape = as above, keeping the area in xy plane fixed
+               volume  = isotropic variations of v1_x, v2_y, v3_z, keeping
+                         the shape fixed. Should be used only with ibrav=1. 
 	    }
 	}
     }
@@ -1494,7 +1558,7 @@ input_description -distribution {Quantum Espresso} -package CP -program cp.x {
 
     namelist WANNIER {
 	label {
-                only if calculation = 'cp-wf'
+                only if calculation = 'cp-wf', 'vc-cp-wf'
 	}
         message {
 Output files used by Wannier Function options are the following
@@ -1753,7 +1817,72 @@ Nota Bene 1:   For calwf = 5, wffort is not used. The
                G-vectors are written to G_PARA or G_SERL.
             }
         }
-    }	
+	var exx_neigh -type INTEGER {
+            default { 60 }
+            info {
+              An initial guess on the maximum number of neighboring (overlapping) Wannier functions. 
+            }
+        }
+
+	var exx_dis_cutoff -type REAL {
+            default { 8.0 }
+            info {
+              Radial cutoff distance (in bohr) for including overlapping Wannier function pairs
+              in EXX calculations.
+            }
+        }
+
+	var exx_poisson_eps -type REAL {
+            default { 1.0D-6 }
+            info {
+              Poisson solver convergence criterion during computation of the EXX potential. 
+            }
+        }
+
+	var exx_ps_rcut_self -type REAL {
+            default { 6.0 }
+            info {
+              Radial cutoff distance (in bohr) to compute the self EXX energy.
+              This distance determines the radius of the Poisson sphere centered at 
+              a given Wannier function center, and should be large enough to cover 
+              the majority of the orbital charge density.
+            }
+        }
+
+	var exx_ps_rcut_pair -type REAL {
+            default { 5.0 }
+            info {
+              Radial cutoff distance (in bohr) to compute the pair EXX energy.
+              This distance determines the radius of the Poisson sphere centered at 
+              the midpoint of two overlapping Wannier functions, and should be 
+              large enough to cover the majority of the orbital overlap charge density.
+              This parameter can generally be chosen as smaller than exx_ps_rcut_self.
+            }
+        }
+
+	var exx_me_rcut_self -type REAL {
+            default { 10.0 }
+            info {
+              Radial cutoff distance (in bohr) for the multipole-expansion sphere 
+              centered at a given Wannier function center.
+              The far-field self EXX potential in this sphere is generated with 
+              multipole expansion of the orbital charge density.
+            }
+        }
+
+	var exx_me_rcut_pair -type REAL {
+            default { 7.0 }
+            info {
+              Radial cutoff distance (in bohr) for the multipole-expansion sphere 
+              centered at the midpoint of two overlapping Wannier functions.
+              The far-field pair EXX potential in this sphere is generated with 
+              a multipole expansion of the orbital overlap charge density.
+              This parameter can generally be chosen as smaller than exx_me_rcut_self.
+            }
+        }
+
+
+    }
 
     #
     # card ATOMIC_SPECIES
@@ -1762,7 +1891,15 @@ Nota Bene 1:   For calwf = 5, wffort is not used. The
 	syntax {
 	    table atomic_species {
 		rows -start 1 -end ntyp {
-		    col X -type CHARACTER { info { label of the atom } }
+		    col X -type CHARACTER {
+                        info {
+                            label of the atom. Acceptable syntax:
+                            chemical symbol X (1 or 2 characters, case-insensitive)
+                            or chemical symbol plus a number or a letter, as in
+                            "Xn" (e.g. Fe1) or "X_*" or "X-*" (e.g. C1, C_h;
+                            max total length cannot exceed 3 characters)
+                        }
+		    }
 		    col Mass_X -type REAL {
 			info {
 			    mass of the atomic species [amu: mass of C = 12]
@@ -1795,7 +1932,7 @@ Nota Bene 1:   For calwf = 5, wffort is not used. The
 
 	flag atompos_unit -use optional {
 	    enum { alat | bohr | angstrom | crystal }
-	    default { bohr (DEPRECATED) }
+	    default { (DEPRECATED) bohr }
 	    info {
 	        alat    : atomic positions are in cartesian coordinates,
                           in units of the lattice parameter (either
@@ -1932,6 +2069,63 @@ Nota Bene 1:   For calwf = 5, wffort is not used. The
 			        v2(1)  v2(2)  v2(3)    ... 2nd lattice vector
 			        v3(1)  v3(2)  v3(3)    ... 3rd lattice vector
 			}		    
+			row v1
+			row v2
+			row v3
+		    }
+		}
+	    }
+	}
+    }
+
+
+    #
+    # REF_CELL_PARAMETERS
+    #
+    card REF_CELL_PARAMETERS {
+	flag lattice_type -use optional {
+            enum { bohr | angstrom }
+
+            info {
+                bohr / angstrom: reference cell parameters in bohr radii / angstrom.
+
+                To mimic a constant effective planewave kinetic energy (ecfixed) during a 
+                variable-cell calculation, the specified reference cell has to be large enough 
+                such that the individual cell vector lengths of the fluctuating cell do not 
+                exceed the corresponding reference lattice vector lengths during the entire 
+                calculation. The cost of the calculation will increase with the increasing 
+                size of the reference cell. The user must test for the proper reference cell 
+                parameters.
+
+                The reference cell parameters should be used in conjunction with q2sigma, 
+                qcutz, and ecfixed. See q2sigma for more information about mimicking constant 
+                effective planewave kinetic energy (ecfixed) during variable-cell calculations.
+
+                The reference cell parameters should be chosen as an isotropic scaling of the 
+                initial cell of the system. This means that the reference cell should have 
+                the same shape as the initial simulatoin cell. The reference cell parameters should 
+                NOT be changed throughout a given simulatoin. Typically, 2%-10% scaling of 
+                the unit cell vectors are sufficient. However, the cell fluctuations depend on 
+                the system and the thermodynamic conditions. So again user must test for the proper
+                choice of reference cell parameters.
+	    }
+	}
+
+	label {
+	    Optional card, needed only if one wants to do variable cell calculations accurately.
+      The reference cell generates additional buffer planewaves.
+	}
+
+	syntax {
+	    table lattice {
+		cols -start 1 -end 3 {
+		    rowgroup -type REAL {
+			info {
+        REF_CELL_PARAMETERS { bohr | angstrom } 
+        v1(1)  v1(2)  v1(3)    ... 1st reference lattice vector
+        v2(1)  v2(2)  v2(3)    ... 2nd reference lattice vector
+        v3(1)  v3(2)  v3(3)    ... 3rd reference lattice vector
+      }
 			row v1
 			row v2
 			row v3
@@ -2086,8 +2280,29 @@ Nota Bene 1:   For calwf = 5, wffort is not used. The
 	    }
 	}
     }	
+    #
+    # card ATOMIC_FORCES
+    #
 
-
+    card ATOMIC_FORCES { 
+        label { Optional card used to specify external forces acting on atoms }
+        syntax {
+           table atomic_forces {
+              rows -start 1 -end nat {
+                 col X -type CHARACTER {
+                     info { label of the atom as specified in ATOMIC_SPECIES }
+                  }
+                  colgroup -type REAL {
+                     info { external force on atom X (cartesian components, Ha/a.u. units)
+                     }
+                     col fx
+                     col fy
+                     col fz
+                   }
+              }
+           }
+        }
+    }	
     #
     # PLOT_WANNIER
     #
@@ -2108,12 +2323,48 @@ Nota Bene 1:   For calwf = 5, wffort is not used. The
                                    one index in needed.
                                 }
                             }
-
                        }
                     }
 	}
     }
 
+    #
+    # AUTOPILOT
+    #
+    card AUTOPILOT {
+
+      label {
+        Optional card, changes some variables on the fly of the calculation.
+
+        Notice that the rules has to be ordered in with time step and the Card has
+        to be terminated with "ENDRULES"
+      }
 
 
+      syntax {
+        table state_index {
+          rows -start 1 -end nevent {
+            col pilot_rule -type RULE {
+              info {
+                To set up a rule, one can add the scheduled steps with on_step and
+                separate the corresponding change in parameters with a column.
+
+                See a simple example bellow:
+
+                AUTOPILOT
+                    on_step =  31  : dt               = 5.0
+                    on_step =  91  : iprint           = 100
+                    on_step =  91  : isave            = 100
+                    on_step = 191  : ion_dynamics     = 'damp'
+                    on_step = 191  : electron_damping = 0.00
+                    on_step = 691  : ion_temperature  = 'nose'
+                    on_step = 691  : tempw            = 150.0
+                ENDRULES
+              }
+            }
+          }
+        }
+      }
+
+    }
 }

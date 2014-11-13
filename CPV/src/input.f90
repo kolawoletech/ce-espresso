@@ -132,7 +132,6 @@ MODULE input
                                tprnsfac_   => tprnsfac, &
                                ampre_      => ampre, &
                                trane_      => trane, &
-                               tdipole_    => tdipole, &
                                nomore_     => nomore, &
                                memchk_     => memchk, &
                                tpre_       => tpre, &
@@ -182,10 +181,10 @@ MODULE input
                                forc_maxiter_  => forc_maxiter
      USE control_flags, ONLY : force_pairing_ => force_pairing
      USE control_flags, ONLY : remove_rigid_rot_ => remove_rigid_rot
-     USE control_flags, ONLY : iesr
+     USE control_flags, ONLY : iesr_ => iesr
      USE control_flags, ONLY : textfor
      USE control_flags, ONLY : do_makov_payne, twfcollect
-     USE control_flags, ONLY : lwf, lwfnscf, lwfpbe0, lwfpbe0nscf ! Lingzhu Kong
+     USE control_flags, ONLY : lwf, lwfnscf, lwfpbe0nscf
      USE control_flags, ONLY : smallmem
      USE control_flags, ONLY : tconvthrs
      !
@@ -218,10 +217,11 @@ MODULE input
         ortho_eps, ortho_max, ntyp, tolp, calculation, disk_io, dt,            &
         tcg, ndr, ndw, iprint, isave, tstress, k_points, tprnfor, verbosity,   &
         ampre, nstep, restart_mode, ion_positions, startingwfc, printwfc,      &
-        orthogonalization, electron_velocities, nat, if_pos, phase_space,      &
+        orthogonalization, electron_velocities, nat, if_pos,                   &
         tefield, epol, efield, tefield2, epol2, efield2, remove_rigid_rot,     &
-        iesr_inp, saverho, tdipole_card, rd_for, assume_isolated, wf_collect,  &
-        memory
+        iesr, saverho, rd_for, assume_isolated, wf_collect,                    &
+        memory, ref_cell, tcpbo
+     USE funct,              ONLY : dft_is_hybrid
      !
      IMPLICIT NONE
      !
@@ -242,7 +242,7 @@ MODULE input
      etot_conv_thr_ = etot_conv_thr
      forc_conv_thr_ = forc_conv_thr
      ekin_maxiter_  = electron_maxstep
-     iesr           = iesr_inp
+     iesr_          = iesr
      remove_rigid_rot_ = remove_rigid_rot
      !
      ! ... define memory- and disk-related internal switches
@@ -284,22 +284,19 @@ MODULE input
      emass_ = emass
      emaec_ = emass_cutoff
 !====================================================================
-!Lingzhu Kong
+!exx_wf related
      lwf = ( TRIM( calculation ) == 'cp-wf'      .OR. &
-             TRIM( calculation ) == 'cp-wf-nscf' .OR. &
-             TRIM( calculation ) == 'cp-wf-pbe0' .OR. &
-             TRIM( calculation ) == 'pbe0-nscf' )
+             TRIM( calculation ) == 'vc-cp-wf'   .OR. &
+             TRIM( calculation ) == 'cp-wf-nscf')
      lwfnscf     = ( TRIM( calculation ) == 'cp-wf-nscf' )
-     lwfpbe0     = ( TRIM( calculation ) == 'cp-wf-pbe0')
-     lwfpbe0nscf = ( TRIM( calculation ) == 'pbe0-nscf' )
+     lwfpbe0nscf = ( dft_is_hybrid() .AND. lwfnscf  )
 !====================================================================
 
      !
      ! ... set the level of output, the code verbosity 
      !
-     trhor_ = ( TRIM( calculation ) == 'nscf'       .OR. &
-                TRIM( calculation ) == 'cp-wf-nscf' .OR. &
-                TRIM( calculation ) == 'pbe0-nscf'  )    ! Lingzhu Kong
+     trhor_ = ( TRIM( calculation ) == 'nscf'   .OR. &
+                TRIM( calculation ) == 'cp-wf-nscf')
      trhow_ = saverho
      tksw_  = ( TRIM( disk_io ) == 'high' )
      !
@@ -350,8 +347,6 @@ MODULE input
                       'unknown verbosity ' // TRIM( verbosity ), 1 )
          !
      END SELECT
-     !
-     tdipole_  = tdipole_card
      !
      ! ... set the restart flags
      !
@@ -740,7 +735,7 @@ MODULE input
      USE input_parameters, ONLY: ibrav , celldm , trd_ht, dt,                 &
            rd_ht, a, b, c, cosab, cosac, cosbc, ntyp , nat ,                  &
            na_inp , sp_pos , rd_pos , rd_vel, atom_mass, atom_label, if_pos,  &
-           atomic_positions, id_loc, sic, sic_epsilon, sic_rloc, ecutwfc,     &
+           atomic_positions, sic, sic_epsilon, ecutwfc,                       &
            ecutrho, ecfixed, qcutz, q2sigma, tk_inp, wmass,                   &
            ion_radius, emass, emass_cutoff, temph, fnoseh, nr1b, nr2b, nr3b,  &
            tempw, fnosep, nr1, nr2, nr3, nr1s, nr2s, nr3s, ekincw, fnosee,    &
@@ -749,7 +744,8 @@ MODULE input
            rotation_damping, occupation_damping, occupation_dynamics,         &
            rotation_dynamics, degauss, smearing, nhpcl, nhptyp, ndega,        &
            nhgrp, fnhscl, cell_units, restart_mode, sic_alpha ,               &
-           niter_cold_restart, lambda_cold, rd_for
+           niter_cold_restart, lambda_cold, rd_for, ref_cell, rd_ref_ht,      &
+           ref_cell_units, ref_alat
 
      USE input_parameters, ONLY: nconstr_inp, iprnks, nprnks,                  &
            etot_conv_thr, ekin_conv_thr, nspin, f_inp, nbnd,                   &
@@ -763,9 +759,14 @@ MODULE input
                                   adapt, calwf, nwf, wffort, writev,           &
                                   wannier_index
 !===============================================================
-!Lingzhu Kong
-     USE input_parameters, ONLY : neigh, poisson_eps, dis_cutoff, exx_ps_rcut,&
-                                  exx_me_rcut, vnbsp
+!exx_wf related
+     USE input_parameters, ONLY : neigh=>exx_neigh, vnbsp,&  
+                                  poisson_eps=>exx_poisson_eps,&
+                                  dis_cutoff=>exx_dis_cutoff,&
+                                  exx_ps_rcut_s=>exx_ps_rcut_self,&
+                                  exx_me_rcut_s=>exx_me_rcut_self,&
+                                  exx_ps_rcut_p=>exx_ps_rcut_pair,&
+                                  exx_me_rcut_p=>exx_me_rcut_pair
 !===============================================================
      !
      USE input_parameters, ONLY : abivol, abisur, pvar, fill_vac,     &
@@ -783,6 +784,7 @@ MODULE input
      USE control_flags,    ONLY : lconstrain, tpre, thdyn, tksw
      USE ions_base,        ONLY : zv
      USE cell_base,        ONLY : cell_base_init, cell_dyn_init, at, cell_alat
+     USE cell_base,        ONLY : ref_cell_base_init
      USE cell_nose,        ONLY : cell_nose_init
      USE ions_base,        ONLY : ions_base_init, greasp_ => greasp
      USE sic_module,       ONLY : sic_initval
@@ -841,11 +843,18 @@ MODULE input
      ! ...   Set Values for the cutoff
 
      CALL ecutoffs_setup( ecutwfc, ecutrho, ecfixed, qcutz, q2sigma, refg )
+     !
      if (.not. allocated(xk)) then
        allocate(xk(3,1))
        xk = 0.d0
      endif
-     CALL gcutoffs_setup( alat_ , tk_inp, nkstot, xk )
+     !
+     IF ( ref_cell ) THEN
+       CALL ref_cell_base_init( ref_cell, ref_alat, rd_ref_ht, ref_cell_units )
+       CALL gcutoffs_setup( ref_alat , tk_inp, nkstot, xk )
+     ELSE
+       CALL gcutoffs_setup( alat_ , tk_inp, nkstot, xk )
+     END IF
 
      ! ... 
      
@@ -888,7 +897,7 @@ MODULE input
      IF( ( TRIM( sic ) /= 'none' ) .and. ( tpre .or. thdyn ) ) &
         CALL errore( ' module setup ', ' Stress is not yet implemented with SIC ', 1 )
      !
-     CALL sic_initval( nat, id_loc, sic, sic_epsilon, sic_alpha, sic_rloc  )
+     CALL sic_initval( nat, sic, sic_epsilon, sic_alpha )
      !
      CALL ks_states_init( nspin, nprnks, iprnks )
      !
@@ -917,10 +926,11 @@ MODULE input
      lconstrain = ( nconstr_inp > 0 )
      !
 !========================================================================
-!Lingzhu Kong
+!exx_wf related
      CALL wannier_init( wf_efield, wf_switch, sw_len, efx0, efy0, efz0, &
-                        efx1, efy1, efz1, wfsd, wfdt, neigh,poisson_eps,&
-                        dis_cutoff, exx_ps_rcut, exx_me_rcut, vnbsp,    &
+                        efx1, efy1, efz1, wfsd, wfdt, neigh, poisson_eps,&
+                        dis_cutoff, exx_ps_rcut_s, exx_me_rcut_s,&
+                        exx_ps_rcut_p, exx_me_rcut_p, vnbsp,&
                         maxwfdt, wf_q, &
                         wf_friction, nit, nsd, nsteps, tolw, adapt,     &
                         calwf, nwf, wffort, writev, wannier_index,      &

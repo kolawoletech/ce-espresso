@@ -10,7 +10,7 @@
         
         USE io_global,  ONLY : stdout
         USE kinds
-        USE control_flags, ONLY : lwfpbe0, lwfpbe0nscf ! Lingzhu Kong
+        USE funct,      ONLY : dft_is_hybrid, get_exx_fraction
         IMPLICIT NONE
         SAVE
 
@@ -38,11 +38,11 @@
           REAL(DP)  :: EVDW
           REAL(DP)  :: EBAND
           REAL(DP)  :: EKIN
-          REAL(DP)  :: ATOT     ! Ensamble DFT
-          REAL(DP)  :: ENTROPY  ! Ensamble DFT
-          REAL(DP)  :: EGRAND   ! Ensamble DFT
-          REAL(DP)  :: VAVE   ! Ensamble DFT
-          REAL(DP)  :: EEXTFOR   ! Energy of the external forces
+          REAL(DP)  :: ATOT     ! Ensemble DFT
+          REAL(DP)  :: ENTROPY  ! Ensemble DFT
+          REAL(DP)  :: EGRAND   ! Ensemble DFT
+          REAL(DP)  :: VAVE     ! Ensemble DFT
+          REAL(DP)  :: EEXTFOR  ! Energy of the external forces
         END TYPE
 
         REAL(DP)  :: EHTE = 0.0_DP
@@ -170,9 +170,9 @@
              WRITE( stdout,100) etot, ekin, eht, esr, eself, epseu, enl, exc, vave
 
 !====================================================================================
-!Lingzhu Kong
-             if( lwfpbe0 .or. lwfpbe0nscf) then
-                WRITE( stdout,101) -exx*0.25, etot-exx*0.25
+!exx_wf related
+             if(dft_is_hybrid()) then
+                WRITE( stdout,101) -exx*get_exx_fraction(), etot
              end if
 !====================================================================================
 

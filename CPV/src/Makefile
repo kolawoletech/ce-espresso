@@ -8,7 +8,6 @@ IFLAGS=
 
 FOBJS = \
 berryion.o \
-berry_phase.o \
 bforceion.o \
 cell_nose.o \
 cg.o \
@@ -32,6 +31,13 @@ electrons_nose.o \
 energies.o \
 ensemble_dft.o \
 exch_corr.o \
+exx_cg.o \
+exx_es.o \
+exx_gs.o \
+exx_module.o \
+exx_pair.o \
+exx_psi.o \
+exx_vofr.o \
 fft.o \
 forces.o \
 fromscra.o \
@@ -63,7 +69,6 @@ ortho.o \
 phasefactor.o \
 plugin_initialization.o \
 plugin_ext_forces.o \
-polarization.o \
 potentials.o \
 pres_ai_mod.o \
 print_out.o \
@@ -77,6 +82,7 @@ qqberry.o \
 restart.o \
 restart_sub.o \
 runcp.o \
+sic.o \
 smallbox.o \
 smallbox_grid.o \
 smallbox_gvec.o \

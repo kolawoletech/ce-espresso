@@ -14,7 +14,7 @@ MODULE printout_base
   IMPLICIT NONE
   SAVE
 
-  CHARACTER(LEN=256) :: fort_unit(30:42)
+  CHARACTER(LEN=256) :: fort_unit(30:44)
   ! ...  fort_unit = fortran units for saving physical quantity
 
   CHARACTER(LEN=256) :: pprefix
@@ -66,6 +66,8 @@ CONTAINS
         fort_unit(40) = trim(pprefix)//'.the'
         fort_unit(41) = trim(pprefix)//'.spr'  ! wannier spread
         fort_unit(42) = trim(pprefix)//'.wfc'  ! wannier function
+        fort_unit(43) = trim(pprefix)//'.hrs'  ! hirshfeld volumes 
+        fort_unit(44) = trim(pprefix)//'.ncg'  ! number of cgsteps
         DO iunit = LBOUND( fort_unit, 1 ), UBOUND( fort_unit, 1 )
            OPEN(UNIT=iunit, FILE=fort_unit(iunit), &
                STATUS='unknown', POSITION='append', IOSTAT = ierr )
@@ -87,7 +89,7 @@ CONTAINS
     CHARACTER(LEN=*), OPTIONAL, INTENT(IN) :: suffix
     INTEGER :: iunit
     LOGICAL :: ok=.true.
-    ! ...  Open units 30, 31, ... 42 for simulation output
+    ! ...  Open units 30, 31, ... 44 for simulation output
     IF( PRESENT( suffix ) ) THEN
        IF( LEN( suffix ) /= 3 ) &
           CALL errore(" printout_base_open ", " wrong suffix ", 1 )
@@ -160,7 +162,7 @@ CONTAINS
     INTEGER :: iunit
     LOGICAL :: topen
     LOGICAL :: ok
-    ! ...   Close and flush unit 30, ... 42
+    ! ...   Close and flush unit 30, ... 44
     IF( PRESENT( suffix ) ) THEN
        IF( LEN( suffix ) /= 3 ) &
           CALL errore(" printout_base_close ", " wrong suffix ", 1 )
@@ -249,8 +251,8 @@ CONTAINS
  40 FORMAT(3X,'ATOMIC_POSITIONS')
  50 FORMAT(3X,'ATOMIC_VELOCITIES')
  60 FORMAT(3X,'Forces acting on atoms (au):')
-255 FORMAT(3X,A3,3E14.6)
-252 FORMAT(3E14.6)
+255 FORMAT(3X,A3,3E25.14)
+252 FORMAT(3E25.14)
     RETURN
   END SUBROUTINE printout_pos
 
@@ -311,5 +313,60 @@ CONTAINS
 100 FORMAT(3(F18.8,1X))
     RETURN
   END SUBROUTINE printout_stress
+
+  SUBROUTINE printout_vefftsvdw( iunit, veff, nat, nfi, tps )
+    !
+    USE kinds
+    !
+    INTEGER,   INTENT(IN)           :: iunit, nat
+    REAL(DP), INTENT(IN)           :: veff(nat)
+    INTEGER,   INTENT(IN), OPTIONAL :: nfi
+    REAL(DP), INTENT(IN), OPTIONAL :: tps
+    !
+    INTEGER :: i, j
+    !
+    IF( PRESENT( nfi ) .AND. PRESENT( tps ) ) THEN
+       WRITE( iunit, 30 ) nfi, tps
+    ELSE
+       WRITE( iunit, 40 )
+    END IF
+    !
+    DO i = 1, nat 
+       WRITE( iunit, 100 ) veff(i) 
+    END DO
+    !
+ 30 FORMAT(I7,1X,F11.8)
+ 40 FORMAT(3X,'Veff tsvdw')
+100 FORMAT(F20.10)
+    RETURN
+  END SUBROUTINE printout_vefftsvdw
+
+  SUBROUTINE printout_wfc( iunit, wfc_temp, nband, nfi, tps, iss )
+    !
+    USE kinds
+    !
+    INTEGER,   INTENT(IN)           :: iunit, nband 
+    REAL(DP), INTENT(IN)           :: wfc_temp(3,nband)
+    INTEGER,   INTENT(IN)           :: nfi
+    REAL(DP), INTENT(IN)           :: tps
+    INTEGER, INTENT(IN), OPTIONAL  :: iss 
+    !
+    INTEGER :: i, j
+    !
+    IF( PRESENT( iss ) ) THEN
+       WRITE( iunit, 40 ) nfi, tps, iss
+    ELSE
+       WRITE( iunit, 30 ) nfi, tps
+    END IF
+    !
+    DO i = 1, nband 
+       WRITE( iunit, 100 ) (wfc_temp(j,i),j=1,3) 
+    END DO
+    !
+ 30 FORMAT(I7,1X,F11.8)
+ 40 FORMAT(I7,1X,F11.8,1X,"spin=",I5)
+100 FORMAT(3E25.14)
+    RETURN
+  END SUBROUTINE printout_wfc
 
 END MODULE printout_base

@@ -36,7 +36,7 @@ MODULE control_flags
             tfor, tpre, tzeroe, tsde, tsdp, tsdc, taurdr,                    &
             ndr, ndw, tortho, ortho_eps, ortho_max, tstress, tprnfor,        &
             timing, memchk, tprnsfac,                                        &
-            trane,dt_old,ampre, tranp, amprp, tdipole, t_diis, t_diis_simple,&
+            trane,dt_old,ampre, tranp, amprp, t_diis, t_diis_simple,         &
             t_diis_rot, tnosee, tnosep, tnoseh, tcp, tcap, tdamp, tdampions, &
             tconvthrs, tolp, convergence_criteria, tionstep, nstepe,         &
             tsteepdesc, tatomicwfc, tscreen, gamma_only, force_pairing,      &
@@ -131,10 +131,6 @@ MODULE control_flags
   !
   LOGICAL :: tbeg = .FALSE.
   !
-  ! ... This flags control the calculation of the Dipole Moments
-  !
-  LOGICAL :: tdipole = .FALSE.
-  !
   ! ... Flags that controls DIIS electronic minimization
   !
   LOGICAL :: t_diis        = .FALSE.
@@ -177,9 +173,8 @@ MODULE control_flags
     use_SMC =.FALSE., &! if .TRUE. use the Smart Monte Carlo method
     lwf     =.FALSE., &! if .TRUE. the calc. is with wannier functions
     !=================================================================
-    !  Lingzhu Kong 
+    !exx_wf related 
     lwfnscf =.FALSE., &
-    lwfpbe0 =.FALSE., &! if .TRUE. the calc. is with wannier functions and with PBE0 functional
     lwfpbe0nscf=.FALSE.,&
     !=================================================================
     lbands  =.FALSE., &! if .TRUE. the calc. is band structure
@@ -368,9 +363,6 @@ MODULE control_flags
       !
       IF ( tcp .AND. tcap ) &
          CALL errore( ' control_flags ', ' TCP AND TCAP BOTH TRUE', 0 )
-      !
-      IF ( tdipole .AND. thdyn ) &
-         CALL errore( '  control_flags  ', ' DIPOLE WITH CELL DYNAMICS ', 0 )
       !
       IF ( tv0rd .AND. tsdp ) &
          CALL errore( ' control_flags ', &

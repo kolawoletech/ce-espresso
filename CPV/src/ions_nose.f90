@@ -391,6 +391,8 @@
         WRITE( stdout,564) (fnosep(i),i=1,nhpcl)
         WRITE( stdout,565) nhptyp, (nhpdim-nhpend), nhpend , nhpbeg, &
              (anum2nhp(j),j=1,nhpdim)
+        IF(nhptyp.EQ.1.OR.nhptyp.EQ.2)WRITE( stdout,'(//, &
+          "*** default NH masses are multiplied by atomic masses ***")')
         do j=1,nhpdim
            WRITE( stdout,566) j,(qnp((j-1)*nhpcl+i),i=1,nhpcl)
         enddo
@@ -404,8 +406,8 @@
      &       3X,'ion dynamics with nose` temperature control:', /, &
      &       3X,'temperature required      = ', f10.5, ' (kelvin) ', /, &
      &       3X,'NH chain length           = ', i3, /, &
-     &       3X,'active degrees of freedom = ', i3, /, &
-     &       3X,'time steps per nose osc.  = ', i5 )
+     &       3X,'active degrees of freedom = ', i6, /, &
+     &       3X,'time steps per nose osc.  = ', i6 )
  564  format( //, &
      &       3X,'nose` frequency(es)       = ', 20(1X,f10.3) ) 
 ! 565  format( //, &

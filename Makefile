@@ -47,6 +47,10 @@ pw : bindir mods liblapack libblas libs libiotk
 	if test -d PW ; then \
 	( cd PW ; $(MAKE) TLDEPS= all || exit 1) ; fi
 
+pw-lib : bindir mods liblapack libblas libs libiotk
+	if test -d PW ; then \
+	( cd PW ; $(MAKE) TLDEPS= pw-lib || exit 1) ; fi
+
 cp : bindir mods liblapack libblas libs libiotk
 	if test -d CPV ; then \
 	( cd CPV ; $(MAKE) TLDEPS= all || exit 1) ; fi
@@ -173,13 +177,29 @@ inst :
 		fi ; \
 	done )
 
+# Contains workaround for name conflicts (dos.x and bands.x) with WANT
 links : bindir
 	( cd bin/ ; \
 	rm -f *.x ; \
 	for exe in ../*/*/*.x ../*/bin/* ; do \
 	    if test ! -L $$exe ; then ln -fs $$exe . ; fi \
-	done \
+	done ; \
+	[ -f ../WANT/wannier/dos.x ] &&  ln -fs ../WANT/wannier/dos.x ../bin/dos_want.x ; \
+	[ -f ../PP/src/dos.x ] &&  ln -fs ../PP/src/dos.x ../bin/dos.x ; \
+	[ -f ../WANT/wannier/bands.x ] &&  ln -fs ../WANT/wannier/bands.x ../bin/bands_want.x ; \
+	[ -f ../PP/src/dos.x ] &&  ln -fs ../PP/src/bands.x ../bin/bands.x ; \
+	[ -f ../W90/wannier90.x ] &&  ln -fs ../W90/wannier90.x ../bin/wannier90.x ; \
 	)
+
+#########################################################
+# 'make install' works based on --with-prefix
+# - If the final directory does not exists it creates it
+#########################################################
+
+install : touch-dummy
+	if test -d bin ; then \
+	mkdir -p $(PREFIX) ; for x in `find . -name *.x -type f` ; do cp $$x $(PREFIX)/ ; done ; \
+	fi
 
 
 #########################################################

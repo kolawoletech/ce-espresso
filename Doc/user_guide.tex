@@ -1,5 +1,5 @@
 \documentclass[12pt,a4paper]{article}
-\def\version{5.1}
+\def\version{5.1.1}
 \def\qe{{\sc Quantum ESPRESSO}}
 
 \usepackage{html}
@@ -184,13 +184,13 @@ mentioned in Sect.\ref{SubSec:Terms}, include:
   vdW corrections;
   \item Ikutaro Hamada (NIMS, Japan) for OPTB86B-vdW and REV-vdW-DF2
    functionals;
-  \item Brian Kolb and Timo Thonhauser (Wake Forest University)
-  for the vdW-DF and vdW-DF2 functionals, with support from
+  \item Timo Thonhauser's group (Wake Forest University)
+  for vdW-DF and variants, with support from
   Riccardo Sabatini and Stefano de Gironcoli (SISSA and DEMOCRITOS);
   \item  Daniel Forrer (Padua Univ.) and Michele Pavone
   (Naples Univ. Federico II) for dispersions interaction in the 
   framework of DFT-D;
-  \item Filippo Spiga (Cambridge) for mixed MPI-OpenMP parallelization;
+  \item Filippo Spiga (University of Cambridge, UK) for mixed MPI-OpenMP parallelization;
   \item Costas Bekas and Alessandro Curioni (IBM Zurich) for the initial
   BlueGene porting.
 \end{itemize}
@@ -205,15 +205,15 @@ contributed in some way or another at some stage, follows:
 \begin{quote}
   {\AA}ke Sandgren, Audrius Alkauskas, Alain Allouche, Francesco Antoniella,
   Uli Aschauer,  Francesca Baletto, Gerardo Ballabio, Mauro Boero, Pietro
-  Bonf\`a, Claudia Bungaro, Paolo Cazzato, Gabriele Cipriani, 
-  Jiayu Dai, Cesar Da Silva, Alberto Debernardi, Gernot Deinzer, Marco Govoni,
-  Thomas Gruber, Martin Hilgeman, Yosuke Kanai, Konstantin Kudin,
+  Bonf\`a, Claudia Bungaro, Paolo Cazzato, Gabriele Cipriani, Jiayu Dai,
+  Cesar Da Silva, Alberto Debernardi, Gernot Deinzer, Alin Marin Elena, 
+  Marco Govoni, Thomas Gruber, Martin Hilgeman, Yosuke Kanai, Konstantin Kudin,
   Nicolas Lacorne, Stephane Lefranc, Sergey Lisenkov, Kurt Maeder,
   Andrea Marini, Giuseppe Mattioli, Nicolas Mounet, William Parker,
   Pasquale Pavone, Mickael Profeta, Guido Roma, Kurt Stokbro, 
   David Strubbe, Sylvie Stucki, Paul Tangney,  Pascal Thibaudeau, 
-  Antonio Tilocca, Jaro Tobik, Malgorzata Wierzbowska, Vittorio Zecca,
-  Silviu Zilberman, Federico Zipoli,
+  Timo Thonhauser, Antonio Tilocca, Jaro Tobik, Malgorzata Wierzbowska,
+  Vittorio Zecca, Silviu Zilberman, Federico Zipoli,
 \end{quote}
 and let us apologize to everybody we have forgotten.
  
@@ -915,7 +915,8 @@ the testing phase can never be ruled out, it is very unlikely
 that this happens on the provided tests and examples. 
 \end{itemize}
 
-\subsubsection{Cray XE and XT machines}
+% This section requires an update 
+\subsubsection{Cray machines}
 
 For Cray XE machines:
 \begin{verbatim}

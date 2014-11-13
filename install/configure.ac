@@ -7,6 +7,9 @@ AC_ARG_VAR(EXTLIB_FLAGS, This variable controls the flags passed to internal BLA
 # options
 # -----------------------------
 
+# set install dir to $INSTALLDIR if '--prefix; not specified
+AC_PREFIX_DEFAULT("\$(INSTALLDIR)")
+
 AC_ARG_ENABLE(parallel,
    [AS_HELP_STRING([--enable-parallel],
        [compile for parallel execution if possible (default: yes)])],
@@ -170,6 +173,7 @@ blacs_dir=$BLACS_LIB          # Where to look for libblacs.a
 ar=$AR                   # ar (shouldn't be needed)
 arflags=$ARFLAGS         # Flags for ar (as above)
 extlib_flags=$EXTLIB_FLAGS # Flags for internal copies of lapack and blas
+
 # configure for current directory by default
 if test "$topdir" = "" ; then topdir="`pwd`" ; fi
 
@@ -358,8 +362,9 @@ case "$arch" in
         openf95_version=`$mpif90 -V 2>&1 | grep "^Open64"`
         pgf_version=`$mpif90 -V 2>&1 | grep "^pgf"`
         g95_version=`$mpif90 -v 2>&1 | grep "g95"`
-        eko_version=`$mpif90 -v 2>&1 | grep "EKOPath"` # obsolescent
-        pathf95_version=`$mpif90 -v 2>&1 | grep "PathScale(TM)"`
+        enzo_version=`$mpif90 -v 2>&1 | grep "PathScale ENZO"`
+        eko_version=`$mpif90 -v 2>&1 | grep "PathScale EKOPath"`
+        pathf95_version=`$mpif90 -v 2>&1 | grep "PathScale"`
         gfortran_version=`$mpif90 -v 2>&1 | grep "gcc version"`
         #
         if test "$ifort_version" != ""
@@ -397,9 +402,15 @@ case "$arch" in
                 version=`echo $pgf_version | awk '{print $2}'`
                 echo "${ECHO_T}pgf90 $version"
                 f90_in_mpif90="pgf90"
+                # flag to test MKL with PGI
+                MKL_FLAGS="-pgf90libs"
+        elif test "$enzo_version" != ""
+        then
+                version=`echo $enzo_version | awk '{print $6}'`
+                echo "${ECHO_T}pathf95 $version"
+                f90_in_mpif90="pathf95"
         elif test "$eko_version" != ""
         then
-# obsolescent
                 version=`echo $eko_version | awk '{print $6}'`
                 echo "${ECHO_T}pathf95 $version"
                 f90_in_mpif90="pathf95"
@@ -448,11 +459,13 @@ f90 | fc | ftn )
         f90_version=openf95
     elif $f90 -V 2>&1 | grep -q "^pgf" ; then
         f90_version=pgf
-    elif $f90 -v 2>&1 | grep -q "EKOPath" ; then # obsolescent
+    elif $f90 -v 2>&1 | grep -q "PathScale ENZO" ; then
+        f90_version=pathf95
+    elif $f90 -v 2>&1 | grep -q "PathScale EKOPath" ; then
         f90_version=pathf95
     elif $f90 -v 2>&1 | grep -q "g95" ; then
         f90_version=g95
-    elif $f90 -version 2>&1 | grep -q "PathScale(TM)" ; then
+    elif $f90 -version 2>&1 | grep -q "PathScale" ; then
         f90_version=pathf95
     elif $f90 -v 2>&1 | grep -q "gcc version" ; then
         f90_version=gfortran
@@ -566,7 +579,7 @@ echo using F90... $f90
 
 case "$arch:$f90_version" in
 ia32:ifort* | ia64:ifort* | x86_64:ifort* | mac686:ifort* | crayxt*:ifort* )
-        try_fflags="-O2 -assume byterecl -g -traceback -par-report0 -vec-report0"
+        try_fflags="-O2 -assume byterecl -g -traceback"
         if test "$use_debug" -eq 1; then
             try_fflags="$try_fflags -fpe0 -CB"
         fi
@@ -957,7 +970,7 @@ then
 
         case "$arch:$f90" in
 
-        x86_64:pgf* | x86_64:path* | x86_64:openf95 | crayxt*:* )
+        x86_64:path* | x86_64:openf95 | crayxt*:* )
                 # check for acml - note that it contains lapack as well
                 try_libdirs="/opt/acml*/pathscale64/lib/"
                 try_libdirs="$ld_library_path $libdirs $try_libdirs"
@@ -1036,7 +1049,7 @@ then
                                  blas_libs="$try_loption $LIBS -lmkl_gnu_thread -lmkl_core"
                                  ldflags="$MKL_FLAGS $ldflags",
                                  echo "MKL not found",
-                                 -lmkl_sequential -lmkl_core)
+                                 -lmkl_sequential -lmkl_core -lpthread)
 			   else
      			      AC_SEARCH_LIBS(dgemm, mkl_intel_ipf, 
                                  have_blas=1 have_mkl=1 
@@ -1046,6 +1059,76 @@ then
                                  -lmkl_sequential -lmkl_core)
 			   fi
                         fi
+                        if test "$ac_cv_search_dgemm" != "no"
+                        then break ; fi
+                done
+                ;;
+
+        x86_64:pgf* )
+                try_libdirs="/opt/acml*/pathscale64/lib/"
+                try_libdirs="$ld_library_path $libdirs $try_libdirs"
+
+                # Check first MKL...
+                for dir in none $try_libdirs
+                do
+                        unset ac_cv_search_dgemm # clear cached value
+                        if test "$dir" = "none"
+                        then
+                               try_loption=
+                        else
+                                echo $ECHO_N "in $dir: " $ECHO_C
+                                try_loption="-L$dir"
+                        fi
+
+                        # Check first MKL...
+                        FFLAGS="$test_fflags"
+                        LDFLAGS="$MKL_FLAGS $test_ldflags $try_loption"
+                        LIBS="$MKL_LIBS"
+
+                        if test "$use_openmp" -eq 0; then
+                              AC_SEARCH_LIBS(dgemm, mkl_intel_lp64,
+                                 have_blas=1 have_mkl=1
+                                 blas_libs="$try_loption $LIBS -lmkl_sequential -lmkl_core"
+                                 ldflags="$MKL_FLAGS $ldflags",
+                                 echo "MKL not found",
+                                 -lmkl_sequential -lmkl_core -ldl)
+                        else
+                              AC_SEARCH_LIBS(dgemm, mkl_intel_lp64,
+                                 have_blas=1 have_mkl=1
+                                 blas_libs="$try_loption $LIBS -lmkl_core -lmkl_pgi_thread"
+                                 ldflags="$MKL_FLAGS $ldflags",
+                                 echo "MKL not found",
+                                 -lmkl_sequential -lmkl_core -ldl -lpthread -lm)
+                        fi
+
+                        if test "$ac_cv_search_dgemm" != "no"
+                        then break ; fi
+                done
+
+                # ... then ACML
+                for dir in none $try_libdirs
+                do
+                        unset ac_cv_search_dgemm # clear cached value
+                        if test "$dir" = "none"
+                        then
+                               try_loption=
+                        else
+                                echo $ECHO_N "in $dir: " $ECHO_C
+                                try_loption="-L$dir"
+                        fi
+
+                        FFLAGS="$test_fflags"
+                        LDFLAGS="$test_ldflags $try_loption"
+                        LIBS=""
+
+                        if test "$use_openmp" -eq 0; then
+                                AC_SEARCH_LIBS(dgemm, acml, have_blas=1 have_lapack=1
+                                    have_acml=1 blas_libs="$try_loption $LIBS")
+                        else
+                                AC_SEARCH_LIBS(dgemm, acml_mp, have_blas=1 have_lapack=1
+                                    have_acml=1 blas_libs="$try_loption $LIBS")
+                        fi
+
                         if test "$ac_cv_search_dgemm" != "no"
                         then break ; fi
                 done
@@ -1128,7 +1211,7 @@ then
                                  blas_libs="$try_loption $LIBS -lmkl_gnu_thread -lmkl_core"
                                  ldflags="$MKL_FLAGS $ldflags",
                                  echo "MKL not found",
-                                 -lmkl_sequential -lmkl_core)
+                                 -lmkl_sequential -lmkl_core -lpthread)
 			   else
      			      AC_SEARCH_LIBS(dgemm, mkl_intel_lp64, 
                                  have_blas=1 have_mkl=1 
@@ -1191,7 +1274,7 @@ then
                                  blas_libs="$try_loption $LIBS -lmkl_gnu_thread -lmkl_core"
                                  ldflags="$MKL_FLAGS $ldflags",
                                  echo "MKL not found",
-                                 -lmkl_sequential -lmkl_core)
+                                 -lmkl_sequential -lmkl_core -lpthread)
 			   else
      			      AC_SEARCH_LIBS(dgemm, mkl_intel, 
                                  have_blas=1 have_mkl=1 
@@ -2129,6 +2212,9 @@ AC_SUBST(parallel_report)
 AC_SUBST(wget)
 AC_SUBST(topdir)
 AC_SUBST(extlib_flags)
+
+# Maybe not necessary... @prefix@ is a autoconf common keyword
+AC_SUBST(prefix)
 
 AC_CONFIG_HEADERS([include/c_defs.h:include/c_defs.h.in])
 AC_CONFIG_FILES(make.sys)

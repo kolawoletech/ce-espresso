@@ -543,7 +543,7 @@ MODULE input_parameters
           ! in rhombohedral axes. If .FALSE. in hexagonal axes, that are
           ! converted internally in rhombohedral axes.  
           !
-
+        LOGICAL :: do_hartree = .true.
 
         NAMELIST / system / ibrav, celldm, a, b, c, cosab, cosac, cosbc, nat, &
              ntyp, nbnd, ecutwfc, ecutrho, nr1, nr2, nr3, nr1s, nr2s,         &

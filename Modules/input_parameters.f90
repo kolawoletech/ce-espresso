@@ -543,7 +543,9 @@ MODULE input_parameters
           ! in rhombohedral axes. If .FALSE. in hexagonal axes, that are
           ! converted internally in rhombohedral axes.  
           !
-        LOGICAL :: do_hartree = .true.
+
+        ! scaling factors for Hartree, eXchange and Correlation
+        REAL(DP) :: h_factor = 1.d0, x_factor = 1.d0, c_factor = 1.d0
 
         NAMELIST / system / ibrav, celldm, a, b, c, cosab, cosac, cosbc, nat, &
              ntyp, nbnd, ecutwfc, ecutrho, nr1, nr2, nr3, nr1s, nr2s,         &
@@ -555,6 +557,7 @@ MODULE input_parameters
              Hubbard_J0, Hubbard_beta,                                        &
              edir, emaxpos, eopreg, eamp, smearing, starting_ns_eigenvalue,   &
              U_projection_type, input_dft, la2F, assume_isolated,             &
+             h_factor, x_factor, c_factor,                                    &
              nqx1, nqx2, nqx3, ecutfock,                                      &
              exxdiv_treatment, x_gamma_extrapolation, yukawa, ecutvcut,       &
              exx_fraction, screening_parameter, ref_alat,                     &

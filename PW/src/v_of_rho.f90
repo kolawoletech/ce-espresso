@@ -370,6 +370,7 @@ SUBROUTINE v_xc( rho, rho_core, rhog_core, etxc, vtxc, v )
   USE scf,              ONLY : scf_type
   USE mp_bands,         ONLY : intra_bgrp_comm
   USE mp,               ONLY : mp_sum
+  USE input_parameters, ONLY : x_factor, c_factor
 
   !
   IMPLICIT NONE
@@ -427,9 +428,9 @@ SUBROUTINE v_xc( rho, rho_core, rhog_core, etxc, vtxc, v )
            !
            CALL xc( arhox, ex, ec, vx(1), vc(1) )
            !
-           v(ir,1) = e2*( vx(1) + vc(1) )
+           v(ir,1) = e2*( vx(1)*x_factor + vc(1)*c_factor )
            !
-           etxc = etxc + e2*( ex + ec ) * rhox
+           etxc = etxc + e2*( ex*x_factor + ec*c_factor ) * rhox
            !
            vtxc = vtxc + v(ir,1) * rho%of_r(ir,1)
            !
@@ -472,9 +473,9 @@ SUBROUTINE v_xc( rho, rho_core, rhog_core, etxc, vtxc, v )
            !
            CALL xc_spin( arhox, zeta, ex, ec, vx(1), vx(2), vc(1), vc(2) )
            !
-           v(ir,:) = e2*( vx(:) + vc(:) )
+           v(ir,:) = e2*( vx(:)*x_factor + vc(:)*c_factor )
            !
-           etxc = etxc + e2*( ex + ec ) * rhox
+           etxc = etxc + e2*( ex*x_factor + ec*c_factor ) * rhox
            !
            vtxc = vtxc + ( v(ir,1)*rho%of_r(ir,1) + v(ir,2)*rho%of_r(ir,2) )
            !
@@ -513,7 +514,7 @@ SUBROUTINE v_xc( rho, rho_core, rhog_core, etxc, vtxc, v )
            !
            vs = 0.5D0*( vx(1) + vc(1) - vx(2) - vc(2) )
            !
-           v(ir,1) = e2*( 0.5D0*( vx(1) + vc(1) + vx(2) + vc(2 ) ) )
+           v(ir,1) = e2*( 0.5D0*( vx(1) + vc(1) + vx(2) + vc(2) ) )
            !
            IF ( amag > vanishing_mag ) THEN
               !
@@ -554,7 +555,7 @@ SUBROUTINE v_xc( rho, rho_core, rhog_core, etxc, vtxc, v )
   ! ... add gradient corrections (if any)
   !
   CALL gradcorr( rho%of_r, rho%of_g, rho_core, rhog_core, etxc, vtxc, v )
- 
+
   !
   ! ... add non local corrections (if any)
   !
@@ -587,7 +588,7 @@ SUBROUTINE v_h( rhog, ehart, charge, v )
   USE mp,        ONLY: mp_sum
   USE martyna_tuckerman, ONLY : wg_corr_h, do_comp_mt
   USE esm,       ONLY: do_comp_esm, esm_hartree, esm_bc
-  USE input_parameters, ONLY : do_hartree
+  USE input_parameters, ONLY : h_factor
   !
   IMPLICIT NONE
   !
@@ -616,10 +617,6 @@ SUBROUTINE v_h( rhog, ehart, charge, v )
   END IF
   !
   CALL mp_sum(  charge , intra_bgrp_comm )
-  if (.not. do_hartree) then
-     ehart = 0.d0
-     return
-  endif
   !
   ! ... calculate hartree potential in G-space (NB: V(G=0)=0 )
   !
@@ -637,7 +634,7 @@ SUBROUTINE v_h( rhog, ehart, charge, v )
 !$omp parallel do private( fac, rgtot_re, rgtot_im ), reduction(+:ehart)
      DO ig = gstart, ngm
         !
-        fac = 1.D0 / gg(ig)
+        fac = 1.D0 / gg(ig) * h_factor
         !
         rgtot_re = REAL(  rhog(ig,1) )
         rgtot_im = AIMAG( rhog(ig,1) )
@@ -657,7 +654,7 @@ SUBROUTINE v_h( rhog, ehart, charge, v )
      ENDDO
 !$omp end parallel do
      !
-     fac = e2 * fpi / tpiba2
+     fac = e2 * fpi / tpiba2 * h_factor
      !
      ehart = ehart * fac
      !

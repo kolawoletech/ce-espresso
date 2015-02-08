@@ -750,7 +750,9 @@ MODULE read_namelists_module
        CALL mp_bcast( nqx2,                   ionode_id, intra_image_comm )
        CALL mp_bcast( nqx3,                   ionode_id, intra_image_comm )
        CALL mp_bcast( exx_fraction,           ionode_id, intra_image_comm )
-       CALL mp_bcast( do_hartree,             ionode_id, intra_image_comm )
+       CALL mp_bcast( h_factor,               ionode_id, intra_image_comm )
+       CALL mp_bcast( x_factor,               ionode_id, intra_image_comm )
+       CALL mp_bcast( c_factor,               ionode_id, intra_image_comm )
        CALL mp_bcast( screening_parameter,    ionode_id, intra_image_comm ) 
        !gau-pbe in
        CALL mp_bcast( gau_parameter,          ionode_id, intra_image_comm )

@@ -15,8 +15,11 @@ SUBROUTINE openfil_pp()
   !
   USE kinds,          ONLY : DP
   USE wvfct,          ONLY : nbnd, npwx
-  USE control_flags,  ONLY:  twfcollect
-  USE io_files,       ONLY : prefix, iunwfc, nwordwfc, diropn
+  USE basis,          ONLY : natomwfc
+  USE ldaU,           ONLY : nwfcU
+  USE control_flags,  ONLY : twfcollect
+  USE io_files,       ONLY : prefix, iunwfc, diropn, &
+                             nwordwfc, nwordatwfc, nwordwfcU
   USE noncollin_module, ONLY : npol
   !
   IMPLICIT NONE

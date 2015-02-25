@@ -514,7 +514,7 @@ SUBROUTINE v_xc( rho, rho_core, rhog_core, etxc, vtxc, v )
            !
            vs = 0.5D0*( vx(1) + vc(1) - vx(2) - vc(2) )
            !
-           v(ir,1) = e2*( 0.5D0*( vx(1) + vc(1) + vx(2) + vc(2) ) )
+           v(ir,1) = e2*( 0.5D0*( vx(1) + vc(1) + vx(2) + vc(2 ) ) )
            !
            IF ( amag > vanishing_mag ) THEN
               !
@@ -555,7 +555,7 @@ SUBROUTINE v_xc( rho, rho_core, rhog_core, etxc, vtxc, v )
   ! ... add gradient corrections (if any)
   !
   CALL gradcorr( rho%of_r, rho%of_g, rho_core, rhog_core, etxc, vtxc, v )
-
+ 
   !
   ! ... add non local corrections (if any)
   !

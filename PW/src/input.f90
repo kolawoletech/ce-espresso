@@ -464,7 +464,7 @@ SUBROUTINE iosys()
             '(5x,"Presently no symmetry can be used with electric field",/)' )
   ENDIF
   IF ( tefield .and. tstress ) THEN
-     tstress = .false.
+     lstres = .false.
      WRITE( stdout, &
             '(5x,"Presently stress not available with electric field",/)' )
   ENDIF
@@ -770,7 +770,15 @@ SUBROUTINE iosys()
   CASE( 'restart' )
      !
      restart = .true.
+     IF ( TRIM(startingwfc) /= 'file' ) THEN
+        CALL infomsg('input','WARNING: "startingwfc" set to '//TRIM(startingwfc)//' may spoil restart')
+     END IF
+     IF ( TRIM(startingpot) /= 'file' ) THEN
+        CALL infomsg('input','WARNING: "startingpot" set to '//TRIM(startingpot)//' may spoil restart')
+        startingpot = 'file'
+     END IF
      IF ( trim( ion_positions ) == 'from_input' ) THEN
+        CALL infomsg('input','WARNING: restarting from positions as given in input')
         startingconfig = 'input'
      ELSE
         startingconfig = 'file'
@@ -1293,6 +1301,12 @@ SUBROUTINE iosys()
       do_comp_esm    = .true.
       !
   END SELECT
+  !
+  IF ( do_comp_mt .AND. lstres ) THEN
+     lstres = .false.
+     WRITE( stdout, &
+          '(5x,"Stress calculation not meaningful in isolated systems",/)' )
+  END IF
   !
   CALL plugin_read_input()
   !

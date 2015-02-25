@@ -15,13 +15,14 @@ SUBROUTINE gradcorr( rho, rhog, rho_core, rhog_core, etxc, vtxc, v )
   USE gvect,                ONLY : nl, ngm, g
   USE lsda_mod,             ONLY : nspin
   USE cell_base,            ONLY : omega, alat
-  USE funct,                ONLY : gcxc, gcx_spin, gcc_spin, &
+  USE funct,                ONLY : gcxc, gcx_spin, gcc_spin, igcc_is_lyp, &
                                    gcc_spin_more, dft_is_gradient, get_igcc
   USE spin_orb,             ONLY : domag
   USE noncollin_module,     ONLY : ux
   USE wavefunctions_module, ONLY : psic
   USE fft_base,             ONLY : dfftp
   USE fft_interfaces,       ONLY : fwfft
+  USE input_parameters,     ONLY : x_factor, c_factor
 
   !
   IMPLICIT NONE
@@ -39,7 +40,6 @@ SUBROUTINE gradcorr( rho, rhog, rho_core, rhog_core, etxc, vtxc, v )
 
   COMPLEX(DP), ALLOCATABLE :: rhogsum(:,:)
   !
-  LOGICAL  :: igcc_is_lyp
   REAL(DP) :: grho2(2), sx, sc, v1x, v2x, v1c, v2c, &
               v1xup, v1xdw, v2xup, v2xdw, v1cup, v1cdw , &
               etxcgc, vtxcgc, segno, arho, fac, zeta, rh, grh2, amag 
@@ -50,8 +50,6 @@ SUBROUTINE gradcorr( rho, rhog, rho_core, rhog_core, etxc, vtxc, v )
   !
   !
   IF ( .NOT. dft_is_gradient() ) RETURN
-
-  igcc_is_lyp = (get_igcc() == 3 .or. get_igcc() == 7)
   !
   etxcgc = 0.D0
   vtxcgc = 0.D0
@@ -128,16 +126,16 @@ SUBROUTINE gradcorr( rho, rhog, rho_core, rhog_core, etxc, vtxc, v )
               !
               ! ... first term of the gradient correction : D(rho*Exc)/D(rho)
               !
-              v(k,1) = v(k,1) + e2 * ( v1x + v1c )
+              v(k,1) = v(k,1) + e2 * ( v1x*x_factor + v1c*c_factor )
               !
               ! ... h contains :
               !
               ! ...    D(rho*Exc) / D(|grad rho|) * (grad rho) / |grad rho|
               !
-              h(:,k,1) = e2 * ( v2x + v2c ) * grho(:,k,1)
+              h(:,k,1) = e2 * ( v2x*x_factor + v2c*c_factor ) * grho(:,k,1)
               !
-              vtxcgc = vtxcgc+e2*( v1x + v1c ) * ( rhoout(k,1) - rho_core(k) )
-              etxcgc = etxcgc+e2*( sx + sc ) * segno
+              vtxcgc = vtxcgc+e2*( v1x*x_factor + v1c*c_factor ) * ( rhoout(k,1) - rho_core(k) )
+              etxcgc = etxcgc+e2*( sx*x_factor + sc*c_factor ) * segno
               !
            ELSE
               h(:,k,1)=0.D0
@@ -170,7 +168,7 @@ SUBROUTINE gradcorr( rho, rhog, rho_core, rhog_core, etxc, vtxc, v )
         !
         IF ( rh > epsr ) THEN
            !
-           IF ( igcc_is_lyp ) THEN
+           IF ( igcc_is_lyp() ) THEN
               !
               rup = rhoout(k,1)
               rdw = rhoout(k,2)
@@ -216,8 +214,8 @@ SUBROUTINE gradcorr( rho, rhog, rho_core, rhog_core, etxc, vtxc, v )
         !
         ! ... first term of the gradient correction : D(rho*Exc)/D(rho)
         !
-        v(k,1) = v(k,1) + e2 * ( v1xup + v1cup )
-        v(k,2) = v(k,2) + e2 * ( v1xdw + v1cdw )
+        v(k,1) = v(k,1) + e2 * ( v1xup*x_factor + v1cup*c_factor )
+        v(k,2) = v(k,2) + e2 * ( v1xdw*x_factor + v1cdw*c_factor )
         !
         ! ... h contains D(rho*Exc)/D(|grad rho|) * (grad rho) / |grad rho|
         !
@@ -225,16 +223,16 @@ SUBROUTINE gradcorr( rho, rhog, rho_core, rhog_core, etxc, vtxc, v )
            !
            grup = grho(ipol,k,1)
            grdw = grho(ipol,k,2)
-           h(ipol,k,1) = e2 * ( ( v2xup + v2cup ) * grup + v2cud * grdw )
-           h(ipol,k,2) = e2 * ( ( v2xdw + v2cdw ) * grdw + v2cud * grup )
+           h(ipol,k,1) = e2 * ( ( v2xup*x_factor + v2cup*c_factor ) * grup + v2cud*c_factor * grdw )
+           h(ipol,k,2) = e2 * ( ( v2xdw*x_factor + v2cdw*c_factor ) * grdw + v2cud*c_factor * grup )
            !
         END DO
         !
         vtxcgc = vtxcgc + &
-                 e2 * ( v1xup + v1cup ) * ( rhoout(k,1) - rho_core(k) * fac )
+                 e2 * ( v1xup*x_factor + v1cup*c_factor ) * ( rhoout(k,1) - rho_core(k) * fac )
         vtxcgc = vtxcgc + &
-                 e2 * ( v1xdw + v1cdw ) * ( rhoout(k,2) - rho_core(k) * fac )
-        etxcgc = etxcgc + e2 * ( sx + sc )
+                 e2 * ( v1xdw*x_factor + v1cdw*c_factor ) * ( rhoout(k,2) - rho_core(k) * fac )
+        etxcgc = etxcgc + e2 * ( sx*x_factor + sc*c_factor )
         !
      END DO
 !$omp end parallel do

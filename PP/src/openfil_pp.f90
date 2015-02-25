@@ -40,6 +40,9 @@ SUBROUTINE openfil_pp()
   !       of COMPLEX WORDS of the wavefunction packet.
   !
   nwordwfc = nbnd * npwx * npol
+  nwordwfcU = nwfcU * npwx * npol
+  nwordatwfc = natomwfc * npwx * npol
+  !
   CALL diropn( iunwfc, 'wfc', 2*nwordwfc, exst )
   IF ( .not. exst ) &
      CALL errore ('openfil_pp','file '//trim( prefix )//'.wfc'//' not found',1)

@@ -30,7 +30,7 @@ SUBROUTINE xsf_struct (alat, at, nat, tau, atm, ityp, ounit)
 
   WRITE(ounit,*) 'CRYSTAL'
   WRITE(ounit,*) 'PRIMVEC'
-  WRITE(ounit,'(2(3F18.9/),3f15.9)') at1
+  WRITE(ounit,'(2(3F18.9/),3f18.9)') at1
   WRITE(ounit,*) 'PRIMCOORD'
   WRITE(ounit,*) nat, 1
 

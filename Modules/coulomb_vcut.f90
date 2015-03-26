@@ -24,6 +24,7 @@
   REAL(DP), PARAMETER :: FPI    = 4.0_DP * pi
   REAL(DP), PARAMETER :: e2     = 2.0_DP
   REAL(DP), PARAMETER :: eps6   = 1.0E-6_DP
+  REAL(DP), PARAMETER :: eps10  = 1.0E-10_DP
  
   !
   ! definitions
@@ -197,7 +198,7 @@ END FUNCTION vcut_get
   Rcut=Rcut-Rcut/50.0
   limit=.false.
   kg2=sum(q**2)
-  if(kg2<eps6) then
+  if(kg2<eps10) then
     limit=.true.
   endif
   if(.not.limit) then

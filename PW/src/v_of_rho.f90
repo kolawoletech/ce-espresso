@@ -677,7 +677,7 @@ SUBROUTINE v_h( rhog, ehart, charge, v )
         CALL wg_corr_h (omega, ngm, rgtot, vaux, eh_corr)
         aux1(1,1:ngm) = aux1(1,1:ngm) + REAL( vaux(1:ngm))
         aux1(2,1:ngm) = aux1(2,1:ngm) + AIMAG(vaux(1:ngm))
-        ehart = ehart + eh_corr
+        ehart = ehart + eh_corr * h_factor
         DEALLOCATE( rgtot, vaux )
      end if
      !
